@@ -47,11 +47,3 @@ dump: UI hierchary dumped to: /sdcard/ui.xml
 dump: UI hierchary dumped to: /sdcard/ui.xml
 dump: UI hierchary dumped to: /sdcard/ui.xml
 dump: UI hierchary dumped to: /sdcard/ui.xml
-dump: UI hierchary dumped to: /sdcard/ui.xml
-dump: UI hierchary dumped to: /sdcard/ui.xml
-dump: UI hierchary dumped to: /sdcard/ui.xml
-dump: UI hierchary dumped to: /sdcard/ui.xml
-dump: UI hierchary dumped to: /sdcard/ui.xml
-dump: UI hierchary dumped to: /sdcard/ui.xml
-dump: UI hierchary dumped to: /sdcard/ui.xml
-dump: UI hierchary dumped to: /sdcard/ui.xml

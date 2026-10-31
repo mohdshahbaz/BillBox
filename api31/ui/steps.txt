@@ -1,6 +1,6 @@
-tapped: Billing at 117 123
-missing: Type an item name
-missing: Bikano
+tapped: Billing at 100 2211
+tapped: Type an item name at 517 326
+tapped: Bikano at 395 470
 missing: Save & print
 missing: Parties
 missing: City Mart
