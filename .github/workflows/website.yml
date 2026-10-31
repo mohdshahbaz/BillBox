@@ -53,4 +53,4 @@ jobs:
           for p in / /mac/ /windows/ /pricing/ /buy.html /sitemap.xml /videos/mac.mp4; do
             c=$(curl -s -o /dev/null -w '%{http_code}' "https://billbox.pages.dev$p"); echo "$c $p"
           done
-          curl -s https://billbox.pages.dev/api/test/config | head -c 300; echo
+          curl -s https://billbox-app.pages.dev/api/test/config | head -c 300; echo
