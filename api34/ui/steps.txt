@@ -1,7 +1,7 @@
 tapped: Billing at 100 2274
 tapped: Type an item name at 517 391
 tapped: Bikano at 395 535
-tapped: Save & print at 892 2033
+tapped: Save & print at 892 1539
 tapped: Parties at 760 2274
 tapped: City Mart at 262 1105
 tapped: Stock at 540 2274
