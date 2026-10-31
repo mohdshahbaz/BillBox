@@ -24,6 +24,28 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.3 — print, companies, iPhone fixes, WhatsApp linking, Android fixed and tested on emulators
+
+- **Print**: a full-weight line between "Amount in words" and the totals, down beside GRAND TOTAL (Android's grey shading
+  used to cover it). New option Settings › Printing › "Company and Bill to in CAPITALS". Android's small print text
+  (address, terms, GST table) is no longer squeezed.
+- **Delete a company**: Settings › Companies › Delete (type the name to confirm). The books are hidden, not erased: the
+  file stays, and earlier backups still hold it. The last company can't be deleted.
+- **Clear message for duplicates**: adding a category or batch that already exists says so (it said "Server error" on every
+  engine, because Node's SQLite reports these differently from what the check expected).
+- **iPhone**: tables (Stock, Parties, All Bills, every list) no longer slide under the bottom bar; printing through AirPrint
+  (including a USB printer shared from a Mac) draws each page fitted to the paper instead of sending a PDF that printed blank.
+- **WhatsApp (Mac, iPhone)**: "Link with phone number" gives an 8-letter code to type in WhatsApp › Linked devices › Link
+  with phone number instead — the way to link when WhatsApp is on the same iPhone. WhatsApp Web now sees a current Safari.
+- **Android**: the bill's lines were hidden under the table heading (the heading filled the screen in the bill table);
+  phone tables lead with party and amount; the bill shows each line's amount under the item; buttons no longer cover totals;
+  a stuck request can no longer freeze every screen.
+- **Android self-test on GitHub** (Actions › Android self-test): Android 12 and 14 emulators replay the full working session
+  through the app's real engine (472 steps, compared with the Mac), screenshot every screen, then tap through billing,
+  save & print, parties, stock and settings. Results land on the `selftest-results` branch.
+- **Look**: a new default "Clean" theme on all three apps (calm greys, white panels, one indigo accent), quieter tables
+  without column lines, and one type scale on Android. The old themes stay under Settings › Appearance.
+
 ## v15.2 — Marg numbering and more print settings (Mac, iPhone, Android)
 - **Numbering like Marg**: each series has its own prefix and digits (A000001, P000001, DNB00001), and a new number always
   carries on after the last one used — so after the Marg bills imported up to A000422, the next bill is A000423. A Marg
