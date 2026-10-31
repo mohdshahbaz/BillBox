@@ -23,15 +23,31 @@ adb exec-out "run-as $PKG tar -c -C files selftest" | tar -x -C "$OUT" || echo "
 # ---- the real screens, tapped like a person would (uiautomator finds the buttons by their text)
 HERE="$(cd "$(dirname "$0")" && pwd)"
 UI="$OUT/ui"; mkdir -p "$UI"; N=20
-dump() { adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb exec-out cat /sdcard/ui.xml; }
+dump() {
+  local msg; msg=$(adb shell uiautomator dump --compressed /sdcard/ui.xml 2>&1)
+  echo "dump: $msg" >> "$UI/dumps.txt"
+  adb exec-out cat /sdcard/ui.xml
+}
+# the emulator's own launcher sometimes shows "isn't responding" over the app: answer Wait and carry on
+calm() {
+  local x; x=$(dump)
+  echo "$x" > "$UI/last.xml"
+  if echo "$x" | grep -q "responding"; then
+    local xy; xy=$(echo "$x" | python3 "$HERE/ui_find.py" "Wait") && adb shell input tap $xy && sleep 1.5
+    adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
+  fi
+}
 shot() { sleep "${2:-2}"; adb exec-out screencap -p > "$UI/${N}_$1.png"; N=$((N + 1)); }
 tap() {   # tap <text> [--edit] [--skip=n]
-  local xy; xy=$(dump | python3 "$HERE/ui_find.py" "$@") || { echo "::warning::UI step: nothing called '$1' on screen"; echo "missing: $1" >> "$UI/steps.txt"; return 1; }
+  local xy=""
+  for try in 1 2 3; do calm; xy=$(dump | python3 "$HERE/ui_find.py" "$@") && break; xy=""; sleep 2; done
+  [ -n "$xy" ] || { echo "::warning::UI step: nothing called '$1' on screen"; echo "missing: $1" >> "$UI/steps.txt"; cp "$UI/last.xml" "$UI/missing_${N}.xml" 2>/dev/null; return 1; }
   adb shell input tap $xy; echo "tapped: $1 at $xy" >> "$UI/steps.txt"; sleep 1.5
 }
 typetext() { adb shell input text "$(echo "$1" | sed 's/ /%s/g')"; sleep 2; }
 back() { adb shell input keyevent KEYCODE_BACK; sleep 1.5; }
 
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1; calm
 tap "Billing" ; shot billing 1
 tap "Type an item name" --edit && typetext "bikano" && shot search
 tap "Bikano" --skip=1 && shot line_added
