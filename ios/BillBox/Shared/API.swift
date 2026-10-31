@@ -30,6 +30,8 @@ actor EngineHost {
         Backup.accessFolder = { path in FolderAccess.open(path) }
         // BillBox's own backup folder exists from the start, so "On My iPhone › BillBox" shows in the Files app
         try? FileManager.default.createDirectory(atPath: EngineHost.defaultBackupFolder, withIntermediateDirectories: true)
+        // which BillBox this is (License.swift): "public" from the App Store / website, "admin" for the owner's test build
+        License.edition = (Bundle.main.object(forInfoDictionaryKey: "BillBoxEdition") as? String) ?? "public"
         let r = try Router(dataDir: EngineHost.dataFolder)
         try? r.backup.followAppFolder(documents: (EngineHost.defaultBackupFolder as NSString).deletingLastPathComponent)
         r.pdfText = { data in try await PDFText.read(data) }

@@ -10,7 +10,8 @@ const { createMissing } = require('../../backend/src/services/autoCreate');
 const { settings } = require('../../backend/src/services/billing');
 const { pageTextFromItems } = require('../../backend/src/services/pdfExtract');
 
-const pre = [require('../../backend/src/routes/companies'), require('../../backend/src/routes/backup')];
+const license = require('../../backend/src/services/license');
+const pre = [require('../../backend/src/routes/license'), require('../../backend/src/routes/companies'), require('../../backend/src/routes/backup')];
 const post = ['items', 'parties', 'salesmen', 'invoices', 'purchases', 'debitNotes', 'import', 'reports']
   .map((n) => ({ items: require('../../backend/src/routes/items'), parties: require('../../backend/src/routes/parties'),
     salesmen: require('../../backend/src/routes/salesmen'), invoices: require('../../backend/src/routes/invoices'),
@@ -64,6 +65,7 @@ function request(step) {
     };
     const run = (m) => { req.params = m.params; try { m.rt.hs[m.rt.hs.length - 1](req, res, (e) => (e ? onError(e) : res.status(404).json({ error: 'Not found' }))); } catch (e) { onError(e); } };
     try {
+      if (!license.allows(method, '/' + segs.join('/'))) return onError(license.blocked());
       for (const r of pre) { const m = match(r, method, segs); if (m) return run(m); }
       const id = Number(req.get('x-company-id')) || db.firstCompanyId();
       const d = db.openCompany(id);

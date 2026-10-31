@@ -19,6 +19,7 @@
 				F175B7EAC6B6277E2B03E8ED,
 				C3D83165E3EBDCD18F89F56C,
 				8BE3E84CE0375DF95380F7DB,
+				6ABF06B88DC74939CA9614CD,
 				6427A43B7CD8F999300DD242,
 				67C216E15FE82599371F29CA,
 				3FD1AF938E853BE1495D0EF5,
@@ -119,6 +120,7 @@
 		3FB9555FDC663901B27833D5 /* Category.swift in app */ = {isa = PBXBuildFile; fileRef = 0204E8151EC6A8AFA2A44F8F /* Category.swift */; };
 		3FD1AF938E853BE1495D0EF5 /* PageText.swift in tests */ = {isa = PBXBuildFile; fileRef = D930E6DCD8203396808DE79C /* PageText.swift */; };
 		403A2FF73505346220CDA30A /* ItemToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ItemToolsView.swift"; sourceTree = "<group>"; };
+		4045E0CE18E0E8E8FDC69122 /* LicenseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LicenseView.swift"; sourceTree = "<group>"; };
 		43C54578874BE7F593A35811 /* SalesmenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SalesmenView.swift"; sourceTree = "<group>"; };
 		44776A97D9DC6B6BF95A8E10 /* EwayBill.swift in tests */ = {isa = PBXBuildFile; fileRef = 71E92793486825BB4D7E6A23 /* EwayBill.swift */; };
 		44C473AE553C953FE620B9F6 /* Files.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Files.swift"; sourceTree = "<group>"; };
@@ -153,6 +155,7 @@
 				1211A8FE1213CB88C636A5B8,
 				5AD91CE2D9B2DAC1863578A9,
 				F00D59D455F386B5CDD2CBFA,
+				4CC6ACEC5733A6AC998BBE20,
 				CC55B67DEED49472A5BD92E7,
 				3F61CCFECB1C77CC4A2C7DA7,
 				D930E6DCD8203396808DE79C,
@@ -174,6 +177,7 @@
 				C9B444850B0BBD2786E10ED7,
 			); path = "Tests"; sourceTree = "<group>"; };
 		4C8517792453CA72D3F9DAF2 /* MargImportView.swift in app */ = {isa = PBXBuildFile; fileRef = 50E41B6A3D5692CCC29C0949 /* MargImportView.swift */; };
+		4CC6ACEC5733A6AC998BBE20 /* License.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "License.swift"; sourceTree = "<group>"; };
 		4DEE24542D8EB361EBED0BEA /* XLSX.swift in app */ = {isa = PBXBuildFile; fileRef = F2B38BD9412EFCCE84BE0DE6 /* XLSX.swift */; };
 		50E41B6A3D5692CCC29C0949 /* MargImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MargImportView.swift"; sourceTree = "<group>"; };
 		526C90C3507D666CB3CC1EC9 /* WebList.swift in app */ = {isa = PBXBuildFile; fileRef = C1CF911BD687227B62BBAC07 /* WebList.swift */; };
@@ -214,6 +218,7 @@
 				A08235453F87891B35190264 /* Release */,
 			); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		68D238FF7A51BFEC62224C4E /* PrintMarg.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PrintMarg.swift"; sourceTree = "<group>"; };
+		6ABF06B88DC74939CA9614CD /* License.swift in tests */ = {isa = PBXBuildFile; fileRef = 4CC6ACEC5733A6AC998BBE20 /* License.swift */; };
 		6AFE22E70BE079CBB63426F8 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
@@ -239,6 +244,7 @@
 			); path = "ParityKit"; sourceTree = "<group>"; };
 		71E92793486825BB4D7E6A23 /* EwayBill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EwayBill.swift"; sourceTree = "<group>"; };
 		7277BC339CA68DE19F3A8437 /* Schema.swift in app */ = {isa = PBXBuildFile; fileRef = 2A6D0FD159ED2CEAC3F79AD2 /* Schema.swift */; };
+		72BF88E4AD23D0A44B9A9399 /* License.swift in app */ = {isa = PBXBuildFile; fileRef = 4CC6ACEC5733A6AC998BBE20 /* License.swift */; };
 		789FD7A882F250DD8BB0BAB1 /* ParityRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ParityRunner.swift"; sourceTree = "<group>"; };
 		7C91FA706ED864FCB686B9D2 /* Components.swift in app */ = {isa = PBXBuildFile; fileRef = 5989315B529B6F684F52F4B3 /* Components.swift */; };
 		80558DCC9BEFD309F286FE1B /* Router.swift in app */ = {isa = PBXBuildFile; fileRef = 1A3A9B7F26EE47A1B90457D6 /* Router.swift */; };
@@ -252,6 +258,7 @@
 		8F7E4AAB0BC47A7AAA8FB7F9 /* EwayBill.swift in app */ = {isa = PBXBuildFile; fileRef = 71E92793486825BB4D7E6A23 /* EwayBill.swift */; };
 		8FA113047E0C3C8278B23F42 /* Billing.swift in tests */ = {isa = PBXBuildFile; fileRef = B4D1F30AB52B5B7C1D57148D /* Billing.swift */; };
 		8FAFAB6DF7C239E6721B3FE7 /* FEATURE_PARITY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "FEATURE_PARITY.md"; sourceTree = "<group>"; };
+		8FD2B979AD66A10F5F9DC8BD /* LicenseView.swift in app */ = {isa = PBXBuildFile; fileRef = 4045E0CE18E0E8E8FDC69122 /* LicenseView.swift */; };
 		92F8ADD9AAF730B1F57EBCD7 /* Utils.swift in tests */ = {isa = PBXBuildFile; fileRef = EFF01BFCF3EB383DC573CD66 /* Utils.swift */; };
 		936121B0569181F2CE00AF62 /* Themes.swift in app */ = {isa = PBXBuildFile; fileRef = 1AFB47A00CA0AF4E7D66CB6B /* Themes.swift */; };
 		953344B576AA0EF0C6B81E77 /* SQLite.swift in app */ = {isa = PBXBuildFile; fileRef = C18A6D877C8858E504196942 /* SQLite.swift */; };
@@ -337,6 +344,7 @@
 				F7143331A61F6240F988EF23,
 				48564575E899689F36D16436,
 				46EC7021001ABA598A47C662,
+				8FD2B979AD66A10F5F9DC8BD,
 				2A99A8EAEE7AC3448BC8EA7C,
 				AD79EDCE3FD30F731DDA0C2E,
 				936121B0569181F2CE00AF62,
@@ -353,6 +361,7 @@
 				27AA8D225EDE717570A1CF0D,
 				2F36E1A03DF907AE5A053FE7,
 				0D3CC0CDDE731023E3D1A226,
+				72BF88E4AD23D0A44B9A9399,
 				865CE80D793996355440B8B1,
 				0743B07A3C3626701E820707,
 				D0E8A645A155EDFBA34939FC,
@@ -413,6 +422,7 @@
 				44C473AE553C953FE620B9F6,
 				37E0B59E4CB5D558DD4F78AC,
 				AA2A39113D0D994D6522D651,
+				4045E0CE18E0E8E8FDC69122,
 				FFB9589185A5E4F5658D010C,
 				33A7C9C17650BADA28AE7BA6,
 				1AFB47A00CA0AF4E7D66CB6B,

@@ -23,6 +23,8 @@ public final class Router {
 
     /// Google Drive backups (Drive.swift). Its network work runs outside the queue; its settings take their turn in it.
     public private(set) lazy var drive = Drive(backup) { [unowned self] work in try await self.exclusive(work) }
+    /// Licence and subscription (License.swift); limits nothing unless `License.edition` is set by the app.
+    public private(set) lazy var license = License(backup) { [unowned self] work in try await self.exclusive(work) }
 
     public init(engine: Engine) {
         self.engine = engine
@@ -52,7 +54,17 @@ public final class Router {
                 return r
             }
         }
+        if seg.first == "license" {
+            return await answer {
+                guard let r = try await self.license.route(method.uppercased(), seg, JSONNorm.row(body)) else { throw HttpError(404, "Not found") }
+                return r
+            }
+        }
         await gate.enter()
+        if !license.allows(method.uppercased(), seg) {
+            gate.leave()
+            return await answer { throw License.blocked() }
+        }
         let reply = await handleNow(method, path, query: query, body: body, companyId: companyId)
         gate.leave()
         return reply

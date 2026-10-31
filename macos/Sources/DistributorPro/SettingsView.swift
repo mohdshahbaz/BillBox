@@ -16,6 +16,7 @@ import AppKit
             StockSettings().tabItem { Label("Stock", systemImage: "archivebox") }.tag("stock")
             BackupSettings().tabItem { Label("Backup", systemImage: "externaldrive") }.tag("backup")
             MargImportView().tabItem { Label("Import from Marg", systemImage: "square.and.arrow.down.on.square") }.tag("marg")
+            LicenseSettings().tabItem { Label("Licence", systemImage: "key") }.tag("licence")
         }
         .padding(16)
         .navigationTitle("Settings")

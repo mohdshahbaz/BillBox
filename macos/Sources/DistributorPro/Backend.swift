@@ -71,6 +71,8 @@ final class Backend {
             p.arguments = ["--disable-warning=ExperimentalWarning", b.server]
             p.currentDirectoryURL = URL(fileURLWithPath: (b.server as NSString).deletingLastPathComponent)
             env["DATA_DIR"] = Backend.dataFolder
+            // which BillBox this is (services/license.js): from the app's Info.plist, set when the app is built
+            env["BILLBOX_EDITION"] = (Bundle.main.object(forInfoDictionaryKey: "BillBoxEdition") as? String) ?? "public"
         } else {
             // running with `swift run` from the project: use the backend folder and a Node on this Mac
             guard let dir = guessFolder() ?? folder else { return "Choose the backend folder first." }

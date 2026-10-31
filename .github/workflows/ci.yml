@@ -5,7 +5,7 @@ name: CI
 on:
   push:
     branches: ['**']
-    paths-ignore: ['website/**', 'license-server/**']
+    paths-ignore: ['website/public/**']
   pull_request:
   workflow_dispatch:
 
@@ -41,6 +41,13 @@ jobs:
       - name: Google Drive backups against a fake Google (backend/test/drive.js)
         working-directory: backend
         run: node --disable-warning=ExperimentalWarning test/drive.js
+
+      - name: Licences against a fake licence server (backend/test/license.js)
+        working-directory: backend
+        run: node --disable-warning=ExperimentalWarning test/license.js
+
+      - name: Licence server (website/functions) against a fake Razorpay, checked by the engine
+        run: node --disable-warning=ExperimentalWarning website/test/server.test.mjs
 
       - name: Swift toolchain
         run: |

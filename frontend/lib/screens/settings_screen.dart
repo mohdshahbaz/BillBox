@@ -6,17 +6,18 @@ import '../print/invoice_pdf.dart';
 import '../state/app_state.dart';
 import '../widgets.dart';
 import 'drive_backup.dart';
+import 'license_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
   @override
   Widget build(BuildContext context) => DefaultTabController(
-        length: 4,
+        length: 5,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
           PageHeader('Settings'),
-          TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Companies'), Tab(text: 'Backup'), Tab(text: 'Printing'), Tab(text: 'Stock')]),
+          TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Companies'), Tab(text: 'Backup'), Tab(text: 'Printing'), Tab(text: 'Stock'), Tab(text: 'Licence')]),
           SizedBox(height: 14),
-          Expanded(child: TabBarView(children: [_Companies(), _Backup(), _Printing(), _StockSettings()])),
+          Expanded(child: TabBarView(children: [_Companies(), _Backup(), _Printing(), _StockSettings(), LicenseTab()])),
         ]),
       );
 }

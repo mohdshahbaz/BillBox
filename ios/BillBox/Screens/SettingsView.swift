@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
         ("appearance", "Appearance", "paintpalette", .pink), ("companies", "Companies", "building.2", .blue), ("printing", "Printing", "printer", .gray),
         ("whatsapp", "WhatsApp", "message", .green), ("billing", "Billing & Dashboard", "gauge.with.dots.needle.33percent", .orange),
         ("parties", "Parties & Payments", "person.2.fill", .purple), ("stock", "Stock", "archivebox", .brown), ("backup", "Backup", "externaldrive", .teal),
-        ("marg", "Import from Marg ERP", "square.and.arrow.down.on.square", .indigo),
+        ("marg", "Import from Marg ERP", "square.and.arrow.down.on.square", .indigo), ("licence", "Licence", "key.fill", .yellow),
     ]
 
     var body: some View {
@@ -34,6 +34,7 @@ import UniformTypeIdentifiers
         case "parties": PartiesPaymentsSettings().navigationTitle("Parties & Payments").navigationBarTitleDisplayMode(.inline)
         case "stock": StockSettings()
         case "backup": BackupSettings()
+        case "licence": LicenseSettings().navigationBarTitleDisplayMode(.inline)
         default: MargImportView().navigationTitle("Import from Marg ERP").navigationBarTitleDisplayMode(.inline)
         }
     }

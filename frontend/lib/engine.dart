@@ -78,6 +78,8 @@ class Engine {
           'DATA_DIR': '$dataDir${sep}data',
           'BILLBOX_BACKUP_DIR': backups,
           'BILLBOX_PARENT_PID': '$pid',
+          // which BillBox this is (services/license.js): chosen when the app is built (desktop/build.sh)
+          'BILLBOX_EDITION': const String.fromEnvironment('BILLBOX_EDITION', defaultValue: 'public'),
           'NODE_ENV': 'production',
         });
     _proc!.stdout.transform(const SystemEncoding().decoder).listen((s) => log = (log + s).substring((log.length + s.length - 8000).clamp(0, 1 << 30)));

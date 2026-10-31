@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.People
@@ -116,6 +117,7 @@ private val pages = listOf(
     SettingsPage("stock", "Stock", Icons.Default.Inventory2, Color(0xFF795548)),
     SettingsPage("backup", "Backup", Icons.Default.Backup, Color(0xFF00897B)),
     SettingsPage("marg", "Import from Marg ERP", Icons.Default.Download, Color(0xFF3949AB)),
+    SettingsPage("licence", "Licence", Icons.Default.Verified, Color(0xFFF9A825)),
 )
 
 /** The Mac's settings tabs as a list of sections, each opening its own page (system back returns to the list). */
@@ -149,8 +151,66 @@ fun SettingsScreen() {
                         "stock" -> StockPage()
                         "backup" -> BackupPage()
                         "marg" -> MargImportPage()
+                        "licence" -> LicencePage()
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Settings › Licence: the trial or the licence of this phone, Buy (on the website) and the licence key (services/license.js). */
+@Composable
+private fun LicencePage() {
+    val app = LocalApp.current
+    var s by remember { mutableStateOf(J()) }
+    var key by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { try { s = Api.get("/license") } catch (_: Exception) {} }
+    fun run(path: String, body: Map<String, Any?>) = app.launch {
+        busy = true
+        try {
+            s = Api.obj("POST", path, body = body)
+            if (s.str("state") == "licensed") key = ""
+            if (s.str("renew_error").isNotEmpty()) app.notify(s.str("renew_error"), true)
+            else app.notify(if (s.str("state") == "licensed") "Licence checked: BillBox is licensed on this phone." else "Done.")
+        } finally { busy = false }
+    }
+    val state = s.str("state")
+    Page {
+        SectionHeader("This phone")
+        Text(when (state) {
+            "licensed" -> if (s.str("plan") == "lifetime") "Licensed for life" else "Licensed"
+            "trial" -> "Free trial: ${s.int("trial_days_left")} day${if (s.int("trial_days_left") == 1) "" else "s"} left"
+            "expired" -> "The trial has ended"
+            else -> "No licence needed"
+        }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = if (state == "expired") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+        Hint(when (state) {
+            "licensed" -> if (s.str("expires").isEmpty()) "Everything in BillBox, on this phone, with no end date." else "Everything in BillBox until ${s.str("expires")}."
+            "trial" -> "Everything works during the ${s.int("trial_days")}-day trial. After it, your books stay safe and can be seen, printed and backed up; adding or changing anything needs a licence."
+            "expired" -> (if (s.str("reason").isEmpty()) "" else s.str("reason") + ". ") + "Your books are safe: they can still be seen, printed, exported and backed up. Buy a licence or enter your key to add and change things again."
+            else -> "This copy of BillBox is not limited."
+        })
+        if (s.str("edition") == "admin") Hint("Admin (test) edition: test licence keys and Razorpay test payments only.", color = Color(0xFFEF6C00))
+        if (state != "unlimited" && state.isNotEmpty()) {
+            if (state != "licensed") {
+                SectionHeader("Buy")
+                DriveBtn("Buy a licence…", prominent = true) { com.local.billbox.system.Platform.openUrl(s.str("buy_url")) }
+                Hint("Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking) · Yearly \$29 outside India. The licence key arrives on the page after paying; enter it below.")
+            }
+            SectionHeader("Licence")
+            if (state == "licensed") {
+                Hint("Plan: ${if (s.str("plan") == "lifetime") "Lifetime" else "Yearly"} · valid till ${s.str("expires").ifEmpty { "no end" }}" + (if (s.str("email").isNotEmpty()) " · ${s.str("email")}" else "") + " · checked online by ${s.str("renew_by")}")
+                DriveBtn(if (busy) "Checking…" else "Check the licence now", enabled = !busy) { run("/license/renew", emptyMap()) }
+                DriveBtn("Remove the licence from this phone", destructive = true, enabled = !busy) { run("/license/deactivate", emptyMap()) }
+            } else {
+                Field("Licence key (BB1.…)", key, { key = it })
+                DriveBtn(if (busy) "Checking…" else "Use this licence key", prominent = true, enabled = !busy && key.isNotBlank()) { run("/license/activate", mapOf("key" to key)) }
+            }
+            Hint("Device ${s.str("device")}. One licence works on 2 devices (Mac, Windows, Linux, iPhone or Android). BillBox checks it online every few weeks and keeps working offline in between. To move it, remove it here first.")
+            if (s.str("edition") == "admin") {
+                SectionHeader("Testing")
+                DriveBtn("Start the trial again", destructive = true, enabled = !busy) { run("/license/reset-trial", emptyMap()) }
             }
         }
     }

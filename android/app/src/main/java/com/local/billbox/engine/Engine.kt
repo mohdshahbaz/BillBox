@@ -38,6 +38,7 @@ object Engine {
 
     private class Host {
         @JavascriptInterface fun dataDir(): String = Engine.dataDir.absolutePath
+        @JavascriptInterface fun edition(): String = Edition.NAME
         @JavascriptInterface fun home(): String = Engine.homeDir.absolutePath
         @JavascriptInterface fun tmp(): String = Engine.tmpDir.absolutePath
         @JavascriptInterface fun ready() { Engine.ready.complete(Unit) }

@@ -81,7 +81,16 @@ setup_sdk() {
     ok "Android SDK ready in $sdk"
 }
 
+# EDITION=admin ./build.sh apk  makes the owner's test build (test licences, Razorpay test mode); the default is public.
+set_edition() {
+    local e="${EDITION:-public}" f="$HERE/app/src/main/java/com/local/billbox/engine/Edition.kt"
+    case "$e" in public|admin) ;; *) fail "EDITION must be public or admin";; esac
+    sed -i.bak -E "s/const val NAME = \"[a-z]+\"/const val NAME = \"$e\"/" "$f" && rm -f "$f.bak"
+    [ "$e" = public ] || echo "Edition: $e"
+}
+
 prepare() {
+    set_edition
     find_java || fail "Java 17 or newer was not found.
   Easiest: install Android Studio (https://developer.android.com/studio) — this script uses the Java inside it.
   Or install a JDK 17 (macOS: brew install openjdk@17) and set JAVA_HOME."

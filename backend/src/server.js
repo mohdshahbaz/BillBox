@@ -13,7 +13,12 @@ app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Licence: after the trial, without a licence, the books are read-only (services/license.js)
+const license = require('./services/license');
+app.use('/api', (req, res, next) => (license.allows(req.method, req.path) ? next() : next(license.blocked())));
+
 // Company-independent routes first, then everything else runs inside the selected company's database.
+app.use('/api', require('./routes/license'));
 app.use('/api', require('./routes/companies'));
 app.use('/api', require('./routes/backup'));
 app.use('/api', db.middleware);
