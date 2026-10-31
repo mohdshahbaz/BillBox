@@ -1,0 +1,28 @@
+// Compiled together with the app only for the Linux type-check: Apple Foundation/CoreFoundation API missing from swift-corelibs-foundation.
+import Foundation
+typealias CFTypeID = UInt
+func CFGetTypeID(_ x: Any?) -> CFTypeID { 0 }
+func CFBooleanGetTypeID() -> CFTypeID { 1 }
+
+// Apple-only Foundation API that swift-corelibs-foundation lacks
+extension URL {
+    func startAccessingSecurityScopedResource() -> Bool { true }
+    func stopAccessingSecurityScopedResource() {}
+    func bookmarkData(options: BookmarkCreationOptions = [], includingResourceValuesForKeys keys: Set<URLResourceKey>? = nil, relativeTo url: URL? = nil) throws -> Data { Data() }
+    init(resolvingBookmarkData data: Data, options: BookmarkResolutionOptions = [], relativeTo url: URL? = nil, bookmarkDataIsStale: inout Bool) throws { self.init(fileURLWithPath: "/") }
+    struct BookmarkCreationOptions: OptionSet { let rawValue: UInt; init(rawValue: UInt) { self.rawValue = rawValue }; static let minimalBookmark = BookmarkCreationOptions(rawValue: 1) }
+    struct BookmarkResolutionOptions: OptionSet { let rawValue: UInt; init(rawValue: UInt) { self.rawValue = rawValue }; static let withoutUI = BookmarkResolutionOptions(rawValue: 1) }
+}
+
+struct NSExceptionName { var rawValue: String }
+class NSException: NSObject { var name = NSExceptionName(rawValue: ""); var reason: String? { nil }; var callStackSymbols: [String] { [] } }
+func NSSetUncaughtExceptionHandler(_ h: ((NSException) -> Void)?) {}
+
+typealias NSErrorPointer = UnsafeMutablePointer<NSError?>?
+class NSFileCoordinator: NSObject {
+    struct ReadingOptions: OptionSet { let rawValue: UInt; static let withoutChanges = ReadingOptions(rawValue: 1); static let forUploading = ReadingOptions(rawValue: 8) }
+    struct WritingOptions: OptionSet { let rawValue: UInt; static let forReplacing = WritingOptions(rawValue: 8) }
+    override init() {}
+    func coordinate(readingItemAt url: URL, options: ReadingOptions = [], error: NSErrorPointer, byAccessor: (URL) -> Void) { byAccessor(url) }
+    func coordinate(writingItemAt url: URL, options: WritingOptions = [], error: NSErrorPointer, byAccessor: (URL) -> Void) { byAccessor(url) }
+}

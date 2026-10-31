@@ -1,0 +1,20 @@
+{
+  "name": "distributor-backend",
+  "version": "14.11.0",
+  "description": "FMCG distributor API: batches, billing, GST, salesmen, ledgers",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node src/seed.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "pdf-parse": "^1.1.1"
+  }
+}

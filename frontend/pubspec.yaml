@@ -1,0 +1,24 @@
+name: distributor_pro
+description: FMCG distributor billing, purchases, GST, printing and accounts (macOS desktop).
+publish_to: "none"
+version: 3.1.0+4
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  intl: ">=0.19.0 <1.0.0"
+  pdf: ">=3.11.0 <4.0.0"            # builds the half-A4 invoice PDF
+  printing: ">=5.13.0 <6.0.0"       # in-app preview + printer list + direct printing
+  file_picker: ">=8.1.0 <11.0.0"    # choose a purchase-bill PDF, backup folder, save Excel exports
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

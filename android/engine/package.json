@@ -1,0 +1,13 @@
+{
+  "name": "billbox-android-engine",
+  "private": true,
+  "description": "Bundles the Mac engine (backend/src) for the Android app's hidden WebView",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/run-bundle.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "pako": "1.0.11"
+  }
+}

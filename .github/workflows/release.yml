@@ -1,0 +1,189 @@
+# Builds BillBox for Android, the Mac and the iPhone and publishes them as a GitHub release.
+#
+#   git tag v15.2.0 && git push origin v15.2.0         (or: Actions › Release › Run workflow, and type the version)
+#
+# Android is signed with your release key when these repository secrets exist (android/tools/make_keystore.sh makes them):
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+# The Mac app is signed for this Mac only (ad hoc) and the iPhone .ipa is unsigned: Sideloadly or AltStore sign it with
+# your Apple ID while installing. See docs/CI_CD.md.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 15.2.0 (a tag v15.2.0 is made on the chosen branch)'
+        required: true
+      prerelease:
+        description: 'Mark as a pre-release (test build)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      code: ${{ steps.v.outputs.code }}
+      tag: ${{ steps.v.outputs.tag }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - id: v
+        env:
+          INPUT: ${{ github.event.inputs.version }}
+          PRE: ${{ github.event.inputs.prerelease }}
+        run: |
+          RAW="${INPUT:-${GITHUB_REF_NAME}}"; V="${RAW#v}"
+          [[ "$V" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::Version '$RAW' must look like 15.2.0 (or 15.2.0-beta1)"; exit 1; }
+          BASE="${V%%-*}"; IFS=. read -r MA MI PA <<<"$BASE"; PA="${PA:-0}"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "code=$(( MA * 10000 + MI * 100 + PA ))" >> "$GITHUB_OUTPUT"
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+          if [[ "$V" == *-* || "$PRE" == "true" ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+          echo "Releasing $V (code $(( MA * 10000 + MI * 100 + PA )))"
+
+  android:
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Engine bundle from backend/src
+        working-directory: android/engine
+        run: rm -rf node_modules && npm install --no-audit --no-fund && node build.mjs
+
+      - name: Release key
+        id: key
+        working-directory: android
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > billbox-release.jks
+            printf 'storeFile=billbox-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$KS_PASS" "$KEY_ALIAS" "$KEY_PASS" > keystore.properties
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the APK is signed with a throw-away key, so it cannot update an earlier install. Run android/tools/make_keystore.sh and add the secrets."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build (release)
+        working-directory: android
+        run: |
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+          ./gradlew --no-daemon :app:assembleRelease -PbillboxVersionName=${{ needs.version.outputs.version }} -PbillboxVersionCode=${{ needs.version.outputs.code }}
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release.apk ../dist/BillBox-android-${{ needs.version.outputs.version }}.apk
+          rm -f billbox-release.jks keystore.properties
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: android
+          path: dist/*.apk
+
+  mac:
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build BillBox.app (Apple silicon and Intel)
+        working-directory: macos
+        env:
+          ARCH: universal
+          VERSION: ${{ needs.version.outputs.version }}
+          BUILD_NUMBER: ${{ needs.version.outputs.code }}
+        run: |
+          xcodebuild -version
+          set -o pipefail
+          ./build_app.sh 2>&1 | tee build.log || {
+            # show the compiler's errors on the run's summary page
+            grep -E "error:|Error:" build.log | sort -u | head -20 | sed 's/^/::error::/'
+            exit 1; }
+          mkdir -p ../dist
+          ditto -c -k --sequesterRsrc --keepParent BillBox.app ../dist/BillBox-mac-${{ needs.version.outputs.version }}.zip
+      - uses: actions/upload-artifact@v6
+        with:
+          name: mac
+          path: dist/*.zip
+
+  ios:
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build BillBox.ipa (unsigned)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -version
+          mkdir -p build
+          xcodebuild archive -project BillBox.xcodeproj -scheme BillBox -configuration Release -destination "generic/platform=iOS" \
+            -archivePath build/BillBox.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION=${{ needs.version.outputs.version }} CURRENT_PROJECT_VERSION=${{ needs.version.outputs.code }} > build/archive.log 2>&1 || { grep -E "error:" build/archive.log | sort -u | head -20 | sed 's/^/::error::/'; tail -60 build/archive.log; exit 1; }
+          test -d build/BillBox.xcarchive/Products/Applications/BillBox.app
+          mkdir -p build/ipa/Payload ../dist
+          cp -R build/BillBox.xcarchive/Products/Applications/BillBox.app build/ipa/Payload/
+          (cd build/ipa && zip -qry ../../../dist/BillBox-iphone-${{ needs.version.outputs.version }}-unsigned.ipa Payload)
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ios
+          path: dist/*.ipa
+
+  publish:
+    needs: [version, android, mac, ios]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Notes
+        run: |
+          V=${{ needs.version.outputs.version }}
+          cat > notes.md <<NOTES
+          ## Install
+
+          **Android (12 and newer)** — download \`BillBox-android-$V.apk\` on the phone and open it (allow "Install unknown apps" for your browser or Files app once). It updates an earlier BillBox from these releases and keeps its books.
+
+          **Mac** — download \`BillBox-mac-$V.zip\`, unzip, drag **BillBox** to Applications. The first time: right-click › Open (on macOS 15: System Settings › Privacy & Security › Open Anyway). If macOS says it is damaged, run \`xattr -dr com.apple.quarantine /Applications/BillBox.app\` in Terminal once. Your books stay in ~/Library/Application Support/DistributorPro.
+
+          **iPhone** — \`BillBox-iphone-$V-unsigned.ipa\` is not signed: install it with Sideloadly or AltStore, which sign it with your Apple ID (or run \`cd ios && ./build.sh device\` on your Mac).
+
+          Back up first (Settings › Backup › Back up now) before installing a new version.
+          NOTES
+          sed -i 's/^          //' notes.md
+          ls -la dist
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: BillBox ${{ needs.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          body_path: notes.md
+          generate_release_notes: true
+          prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
+          files: dist/*
+          fail_on_unmatched_files: true

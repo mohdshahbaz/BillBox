@@ -1,0 +1,109 @@
+# Checks every push and pull request: the three engines give the same answers, and the Android app builds.
+# (The Mac and iPhone apps are built by the Release workflow, on a Mac runner.)
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engines:
+    name: Engines agree (Mac, iPhone, Android)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      WORK: ${{ github.workspace }}/.parity
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: System libraries
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsqlite3-dev
+
+      - name: Mac engine libraries
+        working-directory: backend
+        run: npm install --no-audit --no-fund
+
+      - name: Mac engine checks (backend/test/smoke.js)
+        working-directory: backend
+        run: node --disable-warning=ExperimentalWarning test/smoke.js
+
+      - name: Swift toolchain
+        run: |
+          if ! command -v swift >/dev/null; then
+            curl -fsSL https://download.swift.org/swift-6.0.3-release/ubuntu2404/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-ubuntu24.04.tar.gz | sudo tar xz -C /opt
+            echo /opt/swift-6.0.3-RELEASE-ubuntu24.04/usr/bin >> "$GITHUB_PATH"
+            export PATH=/opt/swift-6.0.3-RELEASE-ubuntu24.04/usr/bin:$PATH
+          fi
+          swift --version
+
+      - name: iPhone engine = Mac engine (main working session)
+        run: bash ios/tests/parity/run.sh
+
+      - name: iPhone engine = Mac engine (parser, 1,647 random bills, Marg import, page text)
+        run: bash ios/tests/parity/run_more.sh
+
+      - name: Backups restore across the apps
+        run: |
+          BIN="$(cd ios/BillBoxCore && swift build --show-bin-path)/bbcheck"
+          python3 ios/tests/parity/test_backup.py "$WORK" "$BIN"
+
+      - name: iPhone engine unit tests
+        working-directory: ios/BillBoxCore
+        run: swift test
+
+      - name: Android engine bundle
+        working-directory: android/engine
+        run: |
+          rm -rf node_modules && npm install --no-audit --no-fund
+          cp ../app/src/main/assets/engine/engine.js /tmp/engine-committed.js
+          node build.mjs
+          if ! cmp -s /tmp/engine-committed.js ../app/src/main/assets/engine/engine.js; then
+            echo "::notice::The bundled Android engine was older than backend/src; CI rebuilt it. Run 'cd android && ./build.sh engine' and commit engine.js."
+          fi
+
+      - name: Android engine = Mac engine
+        run: bash android/engine/test/run.sh
+
+  android:
+    name: Android app builds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Engine bundle from backend/src
+        working-directory: android/engine
+        run: rm -rf node_modules && npm install --no-audit --no-fund && node build.mjs
+
+      - name: Build (debug)
+        working-directory: android
+        run: |
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: BillBox-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14

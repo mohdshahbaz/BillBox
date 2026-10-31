@@ -1,0 +1,11 @@
+engine/node_modules
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.sdk/
+keystore.properties
+*.jks
+*.keystore

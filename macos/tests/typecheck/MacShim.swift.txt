@@ -1,0 +1,10 @@
+import Foundation
+public struct URLRequest { public init(url: URL) {}; public var httpMethod: String?; public var httpBody: Data?; public var timeoutInterval: Double = 60
+  public mutating func setValue(_ v: String?, forHTTPHeaderField f: String) {}; public var url: URL? }
+open class URLResponse {}
+open class HTTPURLResponse: URLResponse { open var statusCode: Int { 0 }; open func value(forHTTPHeaderField f: String) -> String? { nil } }
+open class URLSession { public static let shared = URLSession(); open func data(for r: URLRequest) async throws -> (Data, URLResponse) { fatalError() } }
+import Combine
+// Apple Foundation re-exports Combine; swift-corelibs-foundation does not.
+typealias ObservableObject = Combine.ObservableObject
+typealias Published = Combine.Published

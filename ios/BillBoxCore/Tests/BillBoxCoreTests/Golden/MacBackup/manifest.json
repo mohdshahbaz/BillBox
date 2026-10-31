@@ -1,0 +1,42 @@
+{
+  "created": "2026-10-31T08:48:40.459Z",
+  "reason": "manual",
+  "files": [
+    {
+      "company_id": 1,
+      "company": "AK  Enterprises",
+      "file": "AK_Enterprises_1.db",
+      "bytes": 217088,
+      "sha256": "b3b54a70fc32e301ce780b77b86e36b851c7605e23a2e4ffb8c2b9f5dd6c205c"
+    },
+    {
+      "company_id": 2,
+      "company": "Second Traders",
+      "file": "Second_Traders_2.db",
+      "bytes": 217088,
+      "sha256": "0316894a823eccda90c7689ad39e824aa7a4d22a5e2a109a580f9a7d593253ea"
+    },
+    {
+      "company_id": 3,
+      "company": "AK  Enterprises",
+      "fy": "2027-28",
+      "file": "AK_Enterprises_2027-28_3.db",
+      "bytes": 217088,
+      "sha256": "c8976e0c25cc127844febe5ae76002062248483d27f5707d2c41f75bdd7803b8"
+    },
+    {
+      "company_id": 4,
+      "company": "AK  Enterprises",
+      "fy": "2025-26",
+      "file": "AK_Enterprises_2025-26_4.db",
+      "bytes": 217088,
+      "sha256": "8e291aed704fb7b2dce004f566aec6e082f3f67344ed7d0b36f9a11024d1c9ce"
+    },
+    {
+      "company": "(company list)",
+      "file": "registry.db",
+      "bytes": 16384,
+      "sha256": "5d256351c766bb96bb2303698ed06622ab623cf4c5e512e3d5048c3f51717567"
+    }
+  ]
+}
