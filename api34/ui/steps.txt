@@ -1,0 +1,10 @@
+missing: Billing
+missing: Type an item name
+missing: Bikano
+missing: Save & print
+missing: Parties
+missing: City Mart
+missing: Stock
+missing: More
+missing: Printing
+missing: WhatsApp
