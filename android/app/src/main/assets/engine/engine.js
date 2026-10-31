@@ -3237,6 +3237,23 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
         reg.prepare("INSERT INTO app_settings(key,value) VALUES('last_company',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(String(req.params.id));
         res.json({ ok: true });
       }));
+      router.post("/companies/:id/delete", h((req, res) => {
+        const c = db2.companyRow(Number(req.params.id));
+        if (!c) throw new HttpError2(404, "Company not found");
+        const typed = String((req.body || {}).confirm || "").trim().toLowerCase();
+        if (typed !== String(c.name).trim().toLowerCase()) throw new HttpError2(400, `Type the company name "${c.name}" to confirm`);
+        const others = reg.prepare("SELECT COUNT(*) AS n FROM companies WHERE active=1 AND id<>?").get(c.id).n;
+        if (!others) throw new HttpError2(409, "This is the only company. Make another company first, then delete this one.");
+        reg.prepare("UPDATE companies SET active=0 WHERE id=?").run(c.id);
+        db2.closeCompany(c.id);
+        const last = reg.prepare("SELECT value FROM app_settings WHERE key='last_company'").get();
+        let lastUsed = last ? Number(last.value) : null;
+        if (lastUsed === c.id || !lastUsed) {
+          lastUsed = db2.firstCompanyId();
+          reg.prepare("INSERT INTO app_settings(key,value) VALUES('last_company',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(String(lastUsed));
+        }
+        res.json({ ok: true, last_used: lastUsed });
+      }));
       module.exports = router;
     }
   });

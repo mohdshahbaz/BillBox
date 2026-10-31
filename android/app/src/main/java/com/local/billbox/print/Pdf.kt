@@ -194,30 +194,33 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         val half = w / 2
         var ly = y + 3
         val nameH = 14f * fs
-        pen.text(companyName, x + 5, ly, half - 10, nameH, 12 * fs, 700, minScale = 0.6f); ly += nameH
-        if (co.str("print_tagline").isNotEmpty()) { pen.text(co.str("print_tagline"), x + 5, ly, half - 10, 8f * fs, 6.5f * fs, color = MUTED, minScale = 0.7f); ly += 8f * fs }
-        ly += pen.para(co.str("company_address"), x + 5, ly, half - 10, 6.5f * fs, 2)
+        pen.text(hc(companyName), x + 5, ly, half - 10, nameH, 12 * fs, 700, minScale = 0.6f); ly += nameH
+        if (co.str("print_tagline").isNotEmpty()) { pen.text(hc(co.str("print_tagline")), x + 5, ly, half - 10, 8f * fs, 6.5f * fs, color = MUTED, minScale = 0.7f); ly += 8f * fs }
+        ly += pen.para(hc(co.str("company_address")), x + 5, ly, half - 10, 6.5f * fs, 2)
         val contact = listOf(co.str("company_phone").let { if (it.isEmpty()) "" else "Phone: $it" }, co.str("state_code").let { if (it.isEmpty()) "" else "State code: $it" }).filter { it.isNotEmpty() }.joinToString("   ")
         val small = 8.5f * fs
-        if (contact.isNotEmpty()) { pen.text(contact, x + 5, ly, half - 10, small, 6.5f * fs, minScale = 0.8f); ly += small }
-        if (co.str("company_gstin").isNotEmpty()) pen.text("GSTIN: ${co.str("company_gstin")}", x + 5, ly, half - 10, small, 6.5f * fs, 600)
+        if (contact.isNotEmpty()) { pen.text(hc(contact), x + 5, ly, half - 10, small, 6.5f * fs, minScale = 0.8f); ly += small }
+        if (co.str("company_gstin").isNotEmpty()) pen.text(hc("GSTIN: ${co.str("company_gstin")}"), x + 5, ly, half - 10, small, 6.5f * fs, 600)
         pen.vLine(x + half, y, y + g.sellerBand)
         val bx = x + half + 5; val bw = half - 10
         var by = y + 3
-        val lbl = if (inv.str("doc_title") == "DEBIT NOTE") "Supplier" else "Bill to"
+        val lbl = hc(if (inv.str("doc_title") == "DEBIT NOTE") "Supplier" else "Bill to")
         val lw = pen.width(lbl, 6.5f * fs)
         val rowH = 12f * fs
         pen.text(lbl, bx, by, lw + 1, rowH, 6.5f * fs, color = MUTED, minScale = 1f)
-        pen.text(inv.str("party_name").ifEmpty { "Cash customer" }, bx + lw + 4, by, bw - lw - 4, rowH, 9 * fs, 700, minScale = 0.7f)
+        pen.text(hc(inv.str("party_name").ifEmpty { "Cash customer" }), bx + lw + 4, by, bw - lw - 4, rowH, 9 * fs, 700, minScale = 0.7f)
         by += rowH
         for (l in buyerLines()) {
             if (by + small > y + g.sellerBand) break
-            pen.text(l, bx, by, bw, small, 6.5f * fs, if (l.startsWith("GSTIN")) 600 else 400)
+            pen.text(hc(l), bx, by, bw, small, 6.5f * fs, if (l.startsWith("GSTIN")) 600 else 400)
             by += small
         }
         pen.hLine(x, x + w, y + g.sellerBand + RULE / 2)
         infoRow(pen, x, y + g.sellerBand + RULE, w)
     }
+
+    /** Settings › Printing › "Company and Bill to in CAPITALS" */
+    private fun hc(t: String) = if (co.str("print_caps_head") == "1") t.uppercase() else t
 
     private fun buyerLines(): List<String> {
         if (!on("print_party")) return emptyList()   // Settings › Printing › party's address and numbers
@@ -327,7 +330,6 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
             pen.para(inv.str("amount_words"), lx, wy + 8f * fs, w - rightW - 12, 7.5f * fs, 2, 600)
         }
         val rx = x + w - rightW
-        pen.vLine(rx, y, y + g.totals)
         var ry = y + 4
         val sh = 9f * fs
         fun sum(a: String, v: Double) { pen.text(a, rx + 6, ry, rightW - 12, sh, 7 * fs, color = MUTED); pen.text(Fmt.amount(v), rx + 6, ry, rightW - 12, sh, 7.5f * fs, align = 2); ry += sh }
@@ -344,6 +346,8 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         pen.shade(RectF(rx, gy, x + w, y + g.totals))
         pen.text(if (inv.str("doc_title") == "DEBIT NOTE") "NOTE TOTAL" else "GRAND TOTAL", rx + 6, gy, rightW / 2, gh, 8.5f * fs, 700)
         pen.text("₹ " + Fmt.amount(inv.num("total")), rx + rightW / 2, gy, rightW / 2 - 6, gh, 11 * fs, 700, 2)
+        // the line between "Amount in words" and the totals, down beside GRAND TOTAL: drawn last so the shading can't cover it
+        pen.vLine(rx, y, y + g.totals, FRAME)
     }
 
     private fun footer(pen: Pen, x: Float, y: Float, w: Float) {
@@ -360,7 +364,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         if (co.str("print_note").isNotEmpty()) { pen.text(co.str("print_note"), x + third, my, third, 9f * fs, 7f * fs, 700, align = 1, minScale = 0.7f); my += 9f * fs }
         if (pages > 1) pen.text("Page ${page + 1} of $pages", x + third, my, third, 8f * fs, 6.5f * fs, align = 1, color = MUTED)
         if (on("print_signature")) {
-            pen.text("For $companyName", x + 2 * third - 2, top, third, 9f * fs, 7 * fs, 700, 2, minScale = 0.7f)
+            pen.text(hc("For $companyName"), x + 2 * third - 2, top, third, 9f * fs, 7 * fs, 700, 2, minScale = 0.7f)
             pen.text("Authorised Signatory", x + 2 * third - 2, y + g.foot - 9f * fs, third, 8f * fs, 6.5f * fs, align = 2, color = MUTED)
         }
     }

@@ -10,6 +10,7 @@ open class PDFPage: NSObject {
     open var numberOfCharacters: Int { 0 }
     open var rotation: Int = 0
     open func bounds(for box: PDFDisplayBox) -> CGRect { .zero }
+    open func draw(with box: PDFDisplayBox, to context: CGContext) {}
     open func characterBounds(at index: Int) -> CGRect { .zero }
     open func selection(for range: NSRange) -> PDFSelection? { nil }
     open func thumbnail(of size: CGSize, for box: PDFDisplayBox) -> UIImage { UIImage() }

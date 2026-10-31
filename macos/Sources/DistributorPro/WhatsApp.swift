@@ -90,6 +90,7 @@ enum WhatsApp {
     @State private var cc = "91"
     @State private var message = ""
     @State private var testNumber = ""
+    @State private var linkNumber = WhatsAppWeb.linkNumber
     @State private var loaded = false
 
     var body: some View {
@@ -102,6 +103,20 @@ enum WhatsApp {
                 if web.connected { Button("Disconnect") { Task { await web.disconnect() } } }
                 Button("Show page") { web.reveal() }.help("Opens the live WhatsApp page in a window so you can watch it or check the chat. Close the window to hide it again.")
             }
+            if !web.connected {
+                HStack {
+                    TextField("Or link with your WhatsApp number (no QR code)", text: $linkNumber, prompt: Text("10-digit mobile"))
+                    Button("Link with phone number") { Task { await web.linkWithPhone(linkNumber, countryCode: cc) } }
+                        .disabled(linkNumber.filter(\.isNumber).count < 10)
+                }
+                if !web.linkCode.isEmpty {
+                    HStack(spacing: 12) {
+                        Text(web.linkCode).font(.system(size: 28, weight: .bold, design: .monospaced)).textSelection(.enabled)
+                        Text("On your phone: WhatsApp › Settings › Linked devices › Link a device › Link with phone number instead, then type this code.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
             Toggle("After saving a bill, send the customer's copy on WhatsApp (in the background)", isOn: Binding(
                 get: { auto },
                 set: { on in auto = on; Task { await save(quiet: true) } }))
@@ -111,7 +126,7 @@ enum WhatsApp {
             }
             TextField("Country code for 10-digit numbers", text: $cc).frame(maxWidth: 260)
             TextField("Message sent with the bill", text: $message, prompt: Text(WhatsApp.defaultMessage))
-            Text("Click Connect WhatsApp once and scan the QR code with your phone (WhatsApp > Linked devices > Link a device). After that, bills are sent through WhatsApp Web inside BillBox, in the background: no window opens, nothing steals your focus and no Accessibility permission is needed. Each bill goes as one Original copy in PDF form to the customer's mobile number; customers without a number are skipped, and numbers that are not on WhatsApp are reported. Use {name}, {invoice}, {total} and {company} in the message. WhatsApp Web must stay linked on your phone; if you sign out there, connect again. Note that WhatsApp does not officially support automated sending, so keep it to your own customers' bills.")
+            Text("Click Connect WhatsApp once and scan the QR code with your phone (WhatsApp > Linked devices > Link a device), or use Link with phone number and type the code on your phone instead. After that, bills are sent through WhatsApp Web inside BillBox, in the background: no window opens, nothing steals your focus and no Accessibility permission is needed. Each bill goes as one Original copy in PDF form to the customer's mobile number; customers without a number are skipped, and numbers that are not on WhatsApp are reported. Use {name}, {invoice}, {total} and {company} in the message. WhatsApp Web must stay linked on your phone; if you sign out there, connect again. Note that WhatsApp does not officially support automated sending, so keep it to your own customers' bills.")
                 .font(.caption).foregroundStyle(.secondary)
             if !web.lastResult.isEmpty { Text("Last send: \(web.lastResult)").font(.caption2).foregroundStyle(.secondary) }
             HStack { Spacer(); Button("Save") { Task { await save(quiet: false) } }.buttonStyle(.borderedProminent) }

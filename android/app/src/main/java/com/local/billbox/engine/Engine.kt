@@ -86,7 +86,14 @@ object Engine {
         pending[id] = d
         val js = "BillBox.handle($id, ${JSONObject.quote(req.toString())})"
         withContext(Dispatchers.Main) { web?.evaluateJavascript(js, null) }
-        JSONObject(d.await())
+        // never wait forever: one request that gets no answer would otherwise hold the lock and freeze every screen
+        val reply = kotlinx.coroutines.withTimeoutOrNull(if (req.optString("path").startsWith("/import") || req.has("op")) 600_000 else 120_000) { d.await() }
+        if (reply == null) {
+            pending.remove(id)
+            Log.e("BillBoxEngine", "no answer for ${req.optString("method")} ${req.optString("path")}")
+            return@withLock JSONObject().put("status", 504).put("body", JSONObject().put("error", "BillBox took too long to answer. Try again."))
+        }
+        JSONObject(reply)
     }
 
     /** Runs code on the main thread (for callers outside coroutines). */

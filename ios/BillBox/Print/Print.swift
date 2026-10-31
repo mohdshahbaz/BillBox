@@ -172,6 +172,8 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
     /// the item column says "Description of goods" unless the company changed it
     private var headingsFor: [String] { headings }
     private func on(_ key: String) -> Bool { co.str(key) != "0" }
+    /// Settings › Printing › "Company and Bill to in CAPITALS"
+    private func hc(_ s: String) -> String { co.str("print_caps_head") == "1" ? s.uppercased() : s }
     private var tableHeight: CGFloat { g.inner - (first ? g.headFirst : g.headNext) - g.foot - (last ? g.totals : 0) }
 
     private func t(_ s: String, _ size: CGFloat = 7, bold: Bool = false, weight: Font.Weight? = nil) -> Text {
@@ -220,22 +222,22 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                        co.str("state_code").isEmpty ? "" : "State code: \(co.str("state_code"))"].filter { !$0.isEmpty }.joined(separator: "   ")
         return HStack(alignment: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 1) {
-                t(companyName, 12, bold: true).lineLimit(1).minimumScaleFactor(0.6)
-                if !co.str("print_tagline").isEmpty { t(co.str("print_tagline"), 6.5).italic().lineLimit(1).minimumScaleFactor(0.7) }
-                t(co.str("company_address"), 6.5).lineLimit(2).fixedSize(horizontal: false, vertical: true)
-                if !contact.isEmpty { t(contact, 6.5).lineLimit(1).minimumScaleFactor(0.8) }
-                if !co.str("company_gstin").isEmpty { t("GSTIN: \(co.str("company_gstin"))", 6.5, weight: .semibold).lineLimit(1) }
+                t(hc(companyName), 12, bold: true).lineLimit(1).minimumScaleFactor(0.6)
+                if !co.str("print_tagline").isEmpty { t(hc(co.str("print_tagline")), 6.5).italic().lineLimit(1).minimumScaleFactor(0.7) }
+                t(hc(co.str("company_address")), 6.5).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                if !contact.isEmpty { t(hc(contact), 6.5).lineLimit(1).minimumScaleFactor(0.8) }
+                if !co.str("company_gstin").isEmpty { t(hc("GSTIN: \(co.str("company_gstin"))"), 6.5, weight: .semibold).lineLimit(1) }
             }
             .padding(.horizontal, 5).padding(.vertical, 3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             vRule()
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    t(inv.str("doc_title") == "DEBIT NOTE" ? "Supplier" : "Bill to", 6.5).foregroundStyle(muted)
-                    t(inv.str("party_name").isEmpty ? "Cash customer" : inv.str("party_name"), 9, bold: true).lineLimit(1).minimumScaleFactor(0.7)
+                    t(hc(inv.str("doc_title") == "DEBIT NOTE" ? "Supplier" : "Bill to"), 6.5).foregroundStyle(muted)
+                    t(hc(inv.str("party_name").isEmpty ? "Cash customer" : inv.str("party_name")), 9, bold: true).lineLimit(1).minimumScaleFactor(0.7)
                 }
                 ForEach(Array(buyerLines.enumerated()), id: \.offset) { _, l in
-                    t(l, 6.5, weight: l.hasPrefix("GSTIN") ? .semibold : .regular).lineLimit(1).minimumScaleFactor(0.75)
+                    t(hc(l), 6.5, weight: l.hasPrefix("GSTIN") ? .semibold : .regular).lineLimit(1).minimumScaleFactor(0.75)
                 }
             }
             .padding(.horizontal, 5).padding(.vertical, 3)
@@ -367,8 +369,10 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             }
             .padding(.horizontal, 6).padding(.vertical, 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            vRule()
             sumColumn
+                .frame(maxHeight: .infinity)
+                // the line between "Amount in words" and the totals, down beside GRAND TOTAL to the frame
+                .overlay(alignment: .leading) { vRule(frameLine) }
         }
         .frame(height: g.totals, alignment: .top)
     }
@@ -444,7 +448,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             }
             VStack(alignment: .trailing, spacing: 0) {
                 if on("print_signature") {
-                    t("For \(companyName)", 7, bold: true).lineLimit(1).minimumScaleFactor(0.7)
+                    t(hc("For \(companyName)"), 7, bold: true).lineLimit(1).minimumScaleFactor(0.7)
                     Spacer(minLength: 0)
                     t("Authorised Signatory", 6.5).foregroundStyle(muted)
                 }
@@ -634,11 +638,40 @@ final class PaperChooser: NSObject, UIPrintInteractionControllerDelegate {
     }
 }
 
+/// Draws each page of a PDF into the printable area of the paper the printer gives, turned a quarter if the page and the
+/// paper lie differently (a landscape half sheet on portrait A5), scaled to fit and centred, on white.
+final class PDFFitRenderer: UIPrintPageRenderer {
+    let doc: PDFDocument
+    init(_ doc: PDFDocument) { self.doc = doc; super.init() }
+    override var numberOfPages: Int { doc.pageCount }
+    override func drawPage(at index: Int, in printableRect: CGRect) {
+        guard let page = doc.page(at: index), let ctx = UIGraphicsGetCurrentContext() else { return }
+        let box = page.bounds(for: .mediaBox)
+        let w = box.width, h = box.height
+        guard w > 0, h > 0, printableRect.width > 0, printableRect.height > 0 else { return }
+        let turn = (w > h) != (printableRect.width > printableRect.height)
+        let cw = turn ? h : w, ch = turn ? w : h
+        let scale = min(printableRect.width / cw, printableRect.height / ch)
+        ctx.saveGState()
+        ctx.setFillColor(UIColor.white.cgColor)
+        ctx.fill(paperRect)
+        ctx.translateBy(x: printableRect.midX, y: printableRect.midY)
+        if turn { ctx.rotate(by: .pi / 2) }
+        ctx.scaleBy(x: scale, y: scale)
+        // the print context has y going down; a PDF page has y going up from its bottom-left corner
+        ctx.translateBy(x: -w / 2, y: h / 2)
+        ctx.scaleBy(x: 1, y: -1)
+        ctx.translateBy(x: -box.minX, y: -box.minY)
+        page.draw(with: .mediaBox, to: ctx)
+        ctx.restoreGState()
+    }
+}
+
 /// Prints through AirPrint. `silent` prints straight to the saved printer without the print panel.
 /// Half-sheet bills go out on A5 / half-A4 paper (one copy per sheet), landscape; A4 layouts on A4.
 @MainActor
 func runPrint(_ pdf: PDFDocument, jobName: String, silent: Bool, done: ((Bool) -> Void)? = nil) {
-    guard let data = pdf.dataRepresentation() else { done?(false); return }
+    guard pdf.pageCount > 0 else { done?(false); return }
     let size = pdf.page(at: 0)?.bounds(for: .mediaBox).size ?? Paper.a4
     let pc = UIPrintInteractionController.shared
     let info = UIPrintInfo(dictionary: nil)
@@ -649,7 +682,10 @@ func runPrint(_ pdf: PDFDocument, jobName: String, silent: Bool, done: ((Bool) -
     let chooser = PaperChooser(pageSize: size)
     PaperChooser.current = chooser
     pc.delegate = chooser
-    pc.printingItem = data
+    // Drawn page by page, fitted to the paper the printer reports (not handed over as a PDF file): a USB printer shared
+    // from a Mac printed the raw half-sheet PDF as a blank page, because the Mac placed the sideways page off the paper.
+    pc.printingItem = nil
+    pc.printPageRenderer = PDFFitRenderer(pdf)
     if silent, let url = DevicePrinter.url {
         pc.print(to: UIPrinter(url: url)) { _, ok, _ in done?(ok) }
         return

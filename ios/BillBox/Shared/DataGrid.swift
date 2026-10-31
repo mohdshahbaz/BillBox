@@ -184,7 +184,13 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                 .scrollDismissesKeyboard(.never)
                 .frame(width: full, height: geo.size.height)
             }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
         }
+        // A scroll view that touches the bottom edge stretches under the tab bar / bottom toolbar, and when it sits inside the
+        // sideways scroller it gets no inset for them, so the last rows hid behind the buttons. One point of padding keeps the
+        // grid inside the visible area; the clip keeps rows from being drawn under the bars.
+        .padding(.bottom, 1)
         .background(Theme.page)
         .overlay(Rectangle().stroke(Theme.line, lineWidth: 0.5))
         .sheet(isPresented: $showColumns) { ColumnSheet(layout: layout, columns: columns) }

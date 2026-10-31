@@ -25,6 +25,7 @@ import UniformTypeIdentifiers
     @EnvironmentObject private var app: AppModel
     @State private var editing: JSON?
     @State private var creating = false
+    @State private var deleting: JSON?
     @State private var yearStart = AppModel.currentFYStart + 1
 
     var body: some View {
@@ -40,6 +41,7 @@ import UniformTypeIdentifiers
                         if c.id == app.companyId { Label("Open", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption) }
                         else { Button("Open") { Task { await app.switchCompany(c.id) } }.buttonStyle(.bordered) }
                         Button("Edit…") { editing = c }.buttonStyle(.bordered)
+                        Button(role: .destructive) { deleting = c } label: { Image(systemName: "trash") }.buttonStyle(.bordered)
                     }
                 }
             } footer: {
@@ -64,6 +66,7 @@ import UniformTypeIdentifiers
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $creating) { CompanySheet(company: nil) }
         .sheet(item: $editing) { c in CompanySheet(company: c) }
+        .sheet(item: $deleting) { c in DeleteCompanySheet(company: c) }
     }
 }
 

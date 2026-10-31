@@ -35,6 +35,7 @@ open class Intent(action: String? = null) {
     fun putExtra(name: String, value: String?): Intent = this
     fun putExtra(name: String, value: android.os.Parcelable?): Intent = this
     fun addFlags(flags: Int): Intent = this
+    fun getBooleanExtra(name: String, defaultValue: Boolean): Boolean = defaultValue
     companion object {
         const val ACTION_SEND = "send"; const val ACTION_VIEW = "view"; const val EXTRA_STREAM = "stream"; const val EXTRA_TEXT = "text"
         const val FLAG_GRANT_READ_URI_PERMISSION = 1; const val FLAG_ACTIVITY_NEW_TASK = 2

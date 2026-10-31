@@ -58,4 +58,24 @@ router.post('/companies/:id/activate', h((req, res) => {
   res.json({ ok: true });
 }));
 
+// Delete a company (one set of books). Body { confirm: "<company name>" }. The books are only hidden (active=0) and the
+// file stays in the data folder, so a deleted company can be brought back by hand; backups made before keep it too.
+router.post('/companies/:id/delete', h((req, res) => {
+  const c = db.companyRow(Number(req.params.id));
+  if (!c) throw new HttpError(404, 'Company not found');
+  const typed = String((req.body || {}).confirm || '').trim().toLowerCase();
+  if (typed !== String(c.name).trim().toLowerCase()) throw new HttpError(400, `Type the company name "${c.name}" to confirm`);
+  const others = reg.prepare('SELECT COUNT(*) AS n FROM companies WHERE active=1 AND id<>?').get(c.id).n;
+  if (!others) throw new HttpError(409, 'This is the only company. Make another company first, then delete this one.');
+  reg.prepare('UPDATE companies SET active=0 WHERE id=?').run(c.id);
+  db.closeCompany(c.id);
+  const last = reg.prepare("SELECT value FROM app_settings WHERE key='last_company'").get();
+  let lastUsed = last ? Number(last.value) : null;
+  if (lastUsed === c.id || !lastUsed) {
+    lastUsed = db.firstCompanyId();
+    reg.prepare("INSERT INTO app_settings(key,value) VALUES('last_company',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(String(lastUsed));
+  }
+  res.json({ ok: true, last_used: lastUsed });
+}));
+
 module.exports = router;

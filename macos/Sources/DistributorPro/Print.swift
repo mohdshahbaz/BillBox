@@ -172,6 +172,8 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
     /// the item column says "Description of goods" unless the company changed it
     private var headingsFor: [String] { headings }
     private func on(_ key: String) -> Bool { co.str(key) != "0" }
+    /// Settings › Printing › "Company and Bill to in CAPITALS"
+    private func hc(_ s: String) -> String { co.str("print_caps_head") == "1" ? s.uppercased() : s }
     private var tableHeight: CGFloat { g.inner - (first ? g.headFirst : g.headNext) - g.foot - (last ? g.totals : 0) }
 
     private func t(_ s: String, _ size: CGFloat = 7, bold: Bool = false, weight: Font.Weight? = nil) -> Text {
@@ -220,22 +222,22 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                        co.str("state_code").isEmpty ? "" : "State code: \(co.str("state_code"))"].filter { !$0.isEmpty }.joined(separator: "   ")
         return HStack(alignment: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 1) {
-                t(companyName, 12, bold: true).lineLimit(1).minimumScaleFactor(0.6)
-                if !co.str("print_tagline").isEmpty { t(co.str("print_tagline"), 6.5).italic().lineLimit(1).minimumScaleFactor(0.7) }
-                t(co.str("company_address"), 6.5).lineLimit(2).fixedSize(horizontal: false, vertical: true)
-                if !contact.isEmpty { t(contact, 6.5).lineLimit(1).minimumScaleFactor(0.8) }
-                if !co.str("company_gstin").isEmpty { t("GSTIN: \(co.str("company_gstin"))", 6.5, weight: .semibold).lineLimit(1) }
+                t(hc(companyName), 12, bold: true).lineLimit(1).minimumScaleFactor(0.6)
+                if !co.str("print_tagline").isEmpty { t(hc(co.str("print_tagline")), 6.5).italic().lineLimit(1).minimumScaleFactor(0.7) }
+                t(hc(co.str("company_address")), 6.5).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                if !contact.isEmpty { t(hc(contact), 6.5).lineLimit(1).minimumScaleFactor(0.8) }
+                if !co.str("company_gstin").isEmpty { t(hc("GSTIN: \(co.str("company_gstin"))"), 6.5, weight: .semibold).lineLimit(1) }
             }
             .padding(.horizontal, 5).padding(.vertical, 3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             vRule()
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    t(inv.str("doc_title") == "DEBIT NOTE" ? "Supplier" : "Bill to", 6.5).foregroundStyle(muted)
-                    t(inv.str("party_name").isEmpty ? "Cash customer" : inv.str("party_name"), 9, bold: true).lineLimit(1).minimumScaleFactor(0.7)
+                    t(hc(inv.str("doc_title") == "DEBIT NOTE" ? "Supplier" : "Bill to"), 6.5).foregroundStyle(muted)
+                    t(hc(inv.str("party_name").isEmpty ? "Cash customer" : inv.str("party_name")), 9, bold: true).lineLimit(1).minimumScaleFactor(0.7)
                 }
                 ForEach(Array(buyerLines.enumerated()), id: \.offset) { _, l in
-                    t(l, 6.5, weight: l.hasPrefix("GSTIN") ? .semibold : .regular).lineLimit(1).minimumScaleFactor(0.75)
+                    t(hc(l), 6.5, weight: l.hasPrefix("GSTIN") ? .semibold : .regular).lineLimit(1).minimumScaleFactor(0.75)
                 }
             }
             .padding(.horizontal, 5).padding(.vertical, 3)
@@ -367,8 +369,10 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             }
             .padding(.horizontal, 6).padding(.vertical, 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            vRule()
             sumColumn
+                .frame(maxHeight: .infinity)
+                // the line between "Amount in words" and the totals, down beside GRAND TOTAL to the frame
+                .overlay(alignment: .leading) { vRule(frameLine) }
         }
         .frame(height: g.totals, alignment: .top)
     }
@@ -444,7 +448,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             }
             VStack(alignment: .trailing, spacing: 0) {
                 if on("print_signature") {
-                    t("For \(companyName)", 7, bold: true).lineLimit(1).minimumScaleFactor(0.7)
+                    t(hc("For \(companyName)"), 7, bold: true).lineLimit(1).minimumScaleFactor(0.7)
                     Spacer(minLength: 0)
                     t("Authorised Signatory", 6.5).foregroundStyle(muted)
                 }

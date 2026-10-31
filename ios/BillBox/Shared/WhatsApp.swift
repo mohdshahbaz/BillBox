@@ -86,6 +86,7 @@ enum WhatsApp {
     @State private var cc = "91"
     @State private var message = ""
     @State private var testNumber = ""
+    @State private var linkNumber = WhatsAppWeb.linkNumber
     @State private var loaded = false
 
     var body: some View {
@@ -101,6 +102,18 @@ enum WhatsApp {
             } footer: {
                 Text("Show page opens the live WhatsApp page so you can watch it or check the chat. Close it to hide it again.")
             }
+            if !web.connected {
+                Section {
+                    Field("Your WhatsApp number", text: $linkNumber, prompt: Text("10-digit mobile")).keyboardType(.phonePad)
+                    Button("Link with phone number") { Task { await web.linkWithPhone(linkNumber, countryCode: cc) } }
+                        .disabled(linkNumber.filter(\.isNumber).count < 10)
+                    if !web.linkCode.isEmpty {
+                        Text(web.linkCode).font(.system(size: 34, weight: .bold, design: .monospaced)).frame(maxWidth: .infinity).textSelection(.enabled)
+                    }
+                } header: { Text("WhatsApp is on this iPhone?") } footer: {
+                    Text("A QR code can't be scanned by the same phone that shows it. Instead: type your WhatsApp number and tap Link with phone number. BillBox shows an 8-letter code. Then in WhatsApp: Settings › Linked devices › Link a device › Link with phone number instead, and type the code (WhatsApp usually also shows a notification for it). BillBox connects by itself once the code is accepted.")
+                }
+            }
             Section {
                 Toggle("After saving a bill, send the customer's copy on WhatsApp (in the background)", isOn: Binding(
                     get: { auto },
@@ -112,7 +125,7 @@ enum WhatsApp {
                 Field("Message sent with the bill", text: $message, prompt: Text(WhatsApp.defaultMessage), axis: .vertical)
             }
             Section {
-                Text("Tap Connect WhatsApp once and scan the QR code with the phone that has your WhatsApp (WhatsApp > Linked devices > Link a device). After that, bills are sent through WhatsApp Web inside BillBox. On iPhone and iPad this works only while BillBox is open on screen; if you leave the app during a send, it finishes when you come back. Each bill goes as one Original copy in PDF form to the customer's mobile number; customers without a number are skipped, and numbers that are not on WhatsApp are reported. Use {name}, {invoice}, {total} and {company} in the message. WhatsApp does not officially support automated sending, so keep it to your own customers' bills.")
+                Text("Connect WhatsApp once: scan the QR code with the phone that has your WhatsApp (WhatsApp > Linked devices > Link a device), or, when WhatsApp is on this iPhone, use Link with phone number. After that, bills are sent through WhatsApp Web inside BillBox. On iPhone and iPad this works only while BillBox is open on screen; if you leave the app during a send, it finishes when you come back. Each bill goes as one Original copy in PDF form to the customer's mobile number; customers without a number are skipped, and numbers that are not on WhatsApp are reported. Use {name}, {invoice}, {total} and {company} in the message. WhatsApp does not officially support automated sending, so keep it to your own customers' bills.")
                     .font(.caption).foregroundStyle(.secondary)
                 if !web.lastResult.isEmpty { Text("Last send: \(web.lastResult)").font(.caption2).foregroundStyle(.secondary) }
             }

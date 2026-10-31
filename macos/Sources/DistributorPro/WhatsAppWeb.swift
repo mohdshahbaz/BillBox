@@ -32,6 +32,10 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
 
     // MARK: window
 
+    /// A current desktop Safari: WhatsApp Web refuses to link browsers it thinks are out of date, and serves its desktop page
+    /// (with the QR code and "Log in with phone number") only to a desktop browser.
+    static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15"
+
     private func ensure() -> WKWebView {
         if let web { return web }
         let cfg = WKWebViewConfiguration()
@@ -40,7 +44,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
         let awake = WKUserScript(source: Self.stayAwake, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         cfg.userContentController.addUserScript(awake)
         let w = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 720), configuration: cfg)
-        w.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
+        w.customUserAgent = Self.userAgent
         w.navigationDelegate = self
         w.autoresizingMask = [.width, .height]
         let p = ParkedPanel(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 720),
@@ -133,13 +137,14 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
         await run("const h = document.querySelector('#main header span[dir=\"auto\"]') || document.querySelector('#main header'); return h ? (h.innerText || '').split('\\n')[0].trim() : '';")
     }
 
-    /// loading | qr | chats | composer | invalid
+    /// loading | qr | code (a phone-number link code is shown) | chats | composer | invalid
     private func pageState() async -> String {
         await run("""
         const q = (s) => document.querySelector(s);
         if (q('footer div[contenteditable="true"]')) return 'composer';
         const d = q('div[role="dialog"]');
         if (d && /invalid|isn.t on WhatsApp|not on WhatsApp/i.test(d.innerText || '')) return 'invalid';
+        if (q('[data-link-code]')) return 'code';
         if (q('canvas[aria-label]') || q('div[data-ref]') || q('[data-testid="qrcode"]')) return 'qr';
         if (q('#pane-side') || q('[data-icon="chats"]')) return 'chats';
         return 'loading';
@@ -171,6 +176,108 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
             status = "Not connected. Try again."
         }
     }
+
+    // MARK: linking with a phone number (no QR code)
+
+    /// The 8-letter code WhatsApp gives for "Link with phone number instead", while one is waiting to be typed on the phone.
+    @Published var linkCode = ""
+
+    /// The number linked last time, for the next link.
+    static var linkNumber: String {
+        get { UserDefaults.standard.string(forKey: "wa_link_number") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "wa_link_number") }
+    }
+
+    /// Asks WhatsApp Web for a link code for this WhatsApp number, instead of a QR code: the way to link when WhatsApp is on
+    /// this same phone (a QR code on its own screen can't be scanned). The code is typed in WhatsApp on the phone:
+    /// Settings › Linked devices › Link a device › Link with phone number instead. WhatsApp also shows a notification for it.
+    func linkWithPhone(_ raw: String, countryCode: String) async {
+        var digits = raw.filter(\.isNumber)
+        if digits.hasPrefix("0") { digits.removeFirst() }
+        if digits.count == 10 { digits = countryCode.filter(\.isNumber) + digits }
+        guard digits.count >= 11 else { status = "Type your WhatsApp number (10 digits, or with the country code)."; return }
+        Self.linkNumber = raw
+        linkCode = ""
+        status = "Asking WhatsApp for a link code…"
+        watcher?.cancel()
+        _ = ensure()
+        let state = await pageState()
+        if state == "chats" || state == "composer" { connected = true; status = "Already connected"; return }
+        if state != "qr" && state != "code" { await load("https://web.whatsapp.com/") }
+        // wait for the login page
+        for _ in 0..<40 {
+            let s = await pageState()
+            if s == "qr" || s == "code" { break }
+            if s == "chats" || s == "composer" { connected = true; status = "Already connected"; return }
+            await pause(ms: 500)
+        }
+        let r = await run(Self.linkScript, ["number": "+" + digits])
+        if r.hasPrefix("code:") {
+            let c = String(r.dropFirst(5)).uppercased().filter { $0.isLetter || $0.isNumber }
+            linkCode = c.count == 8 ? String(c.prefix(4)) + "-" + String(c.suffix(4)) : c
+            status = "Type the code on your phone: WhatsApp › Settings › Linked devices › Link a device › Link with phone number instead"
+            watchLink()
+        } else {
+            status = "WhatsApp did not give a code (\(r)). Open the page with Show page and tap “Log in with phone number” there, or scan the QR code."
+        }
+    }
+
+    /// Waits for the phone to accept the link, then hides the page.
+    private func watchLink() {
+        watcher?.cancel()
+        watcher = Task {
+            for _ in 0..<180 {
+                await pause(ms: 2000)
+                if Task.isCancelled { return }
+                let s = await pageState()
+                if s == "chats" || s == "composer" {
+                    connected = true; linkCode = ""; status = "Connected"
+                    hidePanel()
+                    return
+                }
+            }
+            if !connected { status = "The code was not used in time. Ask for a new one." }
+        }
+    }
+
+    /// Clicks "Log in with phone number", types the number, presses Next and reads the code WhatsApp shows.
+    private static let linkScript = #"""
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const deepest = (re) => {
+      const all = [...document.querySelectorAll('button, a, [role="button"], span, div')]
+        .filter((e) => re.test((e.innerText || '').trim()) && (e.innerText || '').trim().length < 60);
+      return all.length ? all[all.length - 1] : null;
+    };
+    const press = (el) => { const b = el.closest('button, a, [role="button"]') || el; b.click(); };
+    const code = () => {
+      const c = document.querySelector('[data-link-code]');
+      if (c) return (c.getAttribute('data-link-code') || '').replace(/[^A-Za-z0-9]/g, '');
+      return '';
+    };
+    if (code()) return 'code:' + code();
+    let link = null;
+    for (let i = 0; i < 20 && !link; i++) { link = deepest(/^(log in|link) with phone( number)?/i); if (!link) await sleep(500); }
+    if (!link) return 'no phone-number option on the page';
+    press(link);
+    let input = null;
+    for (let i = 0; i < 20 && !input; i++) {
+      await sleep(500);
+      input = document.querySelector('input[aria-label*="phone" i], input[type="tel"], form input[type="text"], div[role="dialog"] input, input[type="text"]');
+    }
+    if (!input) return 'no number box';
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    input.focus();
+    setter.call(input, ''); input.dispatchEvent(new Event('input', { bubbles: true }));
+    setter.call(input, number); input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(700);
+    const next = deepest(/^next$/i);
+    if (!next) return 'no Next button';
+    press(next);
+    for (let i = 0; i < 40; i++) { await sleep(500); if (code()) return 'code:' + code(); }
+    const m = (document.body.innerText || '').match(/\b([A-Z0-9]{4})[- ]?([A-Z0-9]{4})\b/);
+    return m ? 'code:' + m[1] + m[2] : 'no code shown';
+    """#
 
     func disconnect() async {
         _ = ensure()

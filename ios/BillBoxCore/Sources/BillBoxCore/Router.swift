@@ -91,6 +91,7 @@ public final class Router {
             if n == 1 && m == "POST" { return try addCompany(b) }
             if n == 2 && m == "PUT" { return ok(try updateCompany(s[1], b)) }
             if n == 3 && s[2] == "activate" && m == "POST" { return ok(try activateCompany(s[1])) }
+            if n == 3 && s[2] == "delete" && m == "POST" { return ok(try deleteCompany(s[1], b)) }
             if n == 3 && s[2] == "years" && m == "POST" { return .json(201, try Years.addYear(engine, Int(JS.number(s[1])), b)) }
         }
         if n >= 1 && s[0] == "backup" {
@@ -415,6 +416,24 @@ public final class Router {
         // every year's books keep the same name
         if JS.blank(b["name"] ?? nil) != nil { try Years.renameAll(engine, c.str("name"), JS.trim(JS.string(b.v("name")))) }
         return ["ok": true] as Row
+    }
+
+    /// Deletes a company (one set of books): hidden (active=0), its file kept. Body { confirm: "<company name>" }.
+    func deleteCompany(_ idS: String, _ b: Row) throws -> Any {
+        guard let c = try engine.companyRow(Int(JS.number(idS))) else { throw HttpError(404, "Company not found") }
+        let typed = JS.trim(JS.string(b["confirm"] ?? nil)).lowercased()
+        if typed != JS.trim(c.str("name")).lowercased() { throw HttpError(400, "Type the company name \"\(c.str("name"))\" to confirm") }
+        let others = try engine.registry.prepare("SELECT COUNT(*) AS n FROM companies WHERE active=1 AND id<>?").get(c.i("id"))?.i("n") ?? 0
+        if others == 0 { throw HttpError(409, "This is the only company. Make another company first, then delete this one.") }
+        try engine.registry.prepare("UPDATE companies SET active=0 WHERE id=?").run(c.i("id"))
+        engine.closeCompany(c.i("id"))
+        let last = try engine.registry.prepare("SELECT value FROM app_settings WHERE key='last_company'").get()
+        var lastUsed: Int? = last.map { Int(JS.number($0["value"] ?? nil)) }
+        if lastUsed == c.i("id") || lastUsed == nil || lastUsed == 0 {
+            lastUsed = try engine.firstCompanyId()
+            try engine.registry.prepare("INSERT INTO app_settings(key,value) VALUES('last_company',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(String(lastUsed ?? 0))
+        }
+        return ["ok": true, "last_used": lastUsed.map { $0 as Any } ?? NSNull()] as Row
     }
 
     func activateCompany(_ idS: String) throws -> Any {

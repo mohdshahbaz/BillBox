@@ -23,6 +23,7 @@ import AppKit
     @EnvironmentObject private var app: AppModel
     @State private var editing: JSON?
     @State private var creating = false
+    @State private var deleting: JSON?
     @State private var yearStart = AppModel.currentFYStart + 1
 
     var body: some View {
@@ -38,6 +39,7 @@ import AppKit
                     if c.id == app.companyId { Label("Open", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption) }
                     else { Button("Open") { Task { await app.switchCompany(c.id) } } }
                     Button("Edit…") { editing = c }
+                    Button("Delete…", role: .destructive) { deleting = c }
                 }
             }
             .frame(minHeight: 200)
@@ -61,6 +63,7 @@ import AppKit
         }
         .sheet(isPresented: $creating) { CompanySheet(company: nil) }
         .sheet(item: $editing) { c in CompanySheet(company: c) }
+        .sheet(item: $deleting) { c in DeleteCompanySheet(company: c) }
     }
 }
 

@@ -205,6 +205,7 @@ private fun CompaniesPage() {
     val app = LocalApp.current
     var editing by remember { mutableStateOf<J?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf<J?>(null) }
     var yearStart by remember { mutableIntStateOf(app.currentFYStart + 1) }
     Page {
         app.companies.forEach { c ->
@@ -216,6 +217,7 @@ private fun CompaniesPage() {
                 if (c.id == app.companyId) Text("Open", color = Good, style = MaterialTheme.typography.labelMedium)
                 else OutlinedButton(onClick = { app.launch { app.switchCompany(c.id) } }) { Text("Open") }
                 TextButton(onClick = { editing = c }) { Text("Edit") }
+                TextButton(onClick = { deleting = c }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             }
         }
         Hint("Each company has its own books (stock, parties, bills). Switch company from the menu under the screen title.")
@@ -228,6 +230,24 @@ private fun CompaniesPage() {
     }
     if (creating) CompanyForm(null) { creating = false }
     editing?.let { CompanyForm(it) { editing = null } }
+    deleting?.let { DeleteCompanyDialog(it) { deleting = null } }
+}
+
+/** The company name has to be typed to confirm. The books are hidden, not erased: the file stays in the data folder and in backups. */
+@Composable
+private fun DeleteCompanyDialog(company: J, onDismiss: () -> Unit) {
+    val app = LocalApp.current
+    val name = company.str("name")
+    var typed by remember { mutableStateOf("") }
+    FormDialog("Delete $name" + if (company.str("fy").isEmpty()) "" else " · FY ${company.str("fy")}", onDismiss, saveLabel = "Delete company",
+        canSave = typed.trim().equals(name.trim(), ignoreCase = true), onSave = {
+            Api.obj("POST", "/companies/${company.id}/delete", body = mapOf("confirm" to typed))
+            app.reloadCompanies(pick = true)
+            app.notify("$name deleted")
+        }) {
+        Text("Its stock, parties, bills and accounts disappear from BillBox. Backups made before today still have them, so it can be brought back from Settings › Backup if needed.")
+        Field("Type the company name to confirm", typed, { typed = it }, placeholder = name)
+    }
 }
 
 @Composable
@@ -661,6 +681,7 @@ private fun PrintOptions() {
     SwitchRow("Party's previous balance and total due", flag("print_balance", false), { setFlag("print_balance", it) },
         "Prints “Previous balance · This bill · Now due” above the amount in words, from the party's ledger.")
     SwitchRow("Item names in CAPITALS", flag("print_caps", false), { setFlag("print_caps", it) })
+    SwitchRow("Company and Bill to in CAPITALS", flag("print_caps_head", false), { setFlag("print_caps_head", it) })
     val (qty, setQty) = settingChoice("print_qty", "boxpcs")
     Choice("Quantity as", listOf("boxpcs" to "Boxes and pieces (6 box 6 pcs)", "pcs" to "Pieces only (150 pcs)"), qty, setQty)
     SectionHeader("Size and copies")

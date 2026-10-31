@@ -1,0 +1,105 @@
+# Runs BillBox for Android on an emulator: replays the parity working session through the app's real engine (WebView +
+# Android SQLite) and compares every answer with the Mac's, then screenshots every screen and a printed bill.
+# Results are pushed to the branch "selftest-results" (screenshots, comparison, log), so they can be looked at without
+# downloading anything. Start it from Actions › Android self-test › Run workflow (or it runs on pushes to the "selftest" branch).
+name: Android self-test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [selftest]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-selftest
+  cancel-in-progress: true
+
+jobs:
+  emulator:
+    name: Android ${{ matrix.api }} emulator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [31, 34]       # Android 12 (SQLite 3.32, the oldest BillBox supports) and Android 14
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Engine bundle and debug app
+        run: |
+          (cd backend && npm install --no-audit --no-fund)
+          (cd android/engine && rm -rf node_modules && npm install --no-audit --no-fund && node build.mjs)
+          cd android && printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties && ./gradlew --no-daemon :app:assembleDebug
+
+      - name: The working session, answered by the Mac engine
+        run: |
+          W=$PWD/st; mkdir -p $W
+          python3 ios/tests/parity/gen_scenario.py $W >/dev/null
+          sed "s#{engine}#mac#g" $W/scenario.json > $W/scen-mac.json
+          sed "s#{engine}#android#g" $W/scenario.json > $W/scen-android.json
+          node --disable-warning=ExperimentalWarning ios/tests/parity/run-node.js $W/mac/data $W/scen-mac.json $W/mac/home/DistributorProBackups > $W/mac.jsonl
+          wc -l $W/mac.jsonl
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash android/tools/selftest_device.sh android/app/build/outputs/apk/debug/app-debug.apk st/scen-android.json st/out
+
+      - name: Compare with the Mac
+        if: always()
+        run: |
+          W=$PWD/st
+          if [ -f $W/out/selftest/android.jsonl ]; then
+            python3 ios/tests/parity/compare.py $W/scenario.json $W/mac.jsonl $W/out/selftest/android.jsonl > $W/out/compare.txt 2>&1 || true
+          else
+            echo "no android.jsonl: the replay did not finish" > $W/out/compare.txt
+          fi
+          tail -1 $W/out/compare.txt
+          echo "::notice title=Android ${{ matrix.api }}::$(tail -1 $W/out/compare.txt)"
+          grep -v "steps compared" $W/out/compare.txt | head -8 | sed 's/^/::error title=Android ${{ matrix.api }} parity::/' || true
+          grep -E "SELFTEST.*(failed|server errors|error)|FATAL|AndroidRuntime" $W/out/logcat.txt 2>/dev/null | head -8 | sed 's/^/::warning title=Android ${{ matrix.api }} log::/' || true
+
+      - name: Publish results to the selftest-results branch
+        if: always()
+        env:
+          URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          API: api${{ matrix.api }}
+        run: |
+          R=$PWD/results; rm -rf $R
+          git clone -q --depth 1 -b selftest-results "$URL" $R 2>/dev/null || { mkdir -p $R; git -C $R init -q -b selftest-results; git -C $R remote add origin "$URL"; }
+          rm -rf $R/$API; mkdir -p $R/$API
+          cp -r st/out/selftest/shots $R/$API/ 2>/dev/null || true
+          cp st/out/compare.txt st/out/logcat.txt st/out/final-screen.png $R/$API/ 2>/dev/null || true
+          cp st/out/selftest/bill_*.pdf $R/$API/ 2>/dev/null || true
+          echo "${{ github.sha }}" > $R/$API/commit.txt
+          cd $R
+          git config user.name "BillBox self-test"; git config user.email "actions@github.com"
+          git add -A
+          git commit -q -m "Android ${{ matrix.api }} self-test for ${{ github.sha }}" || true
+          for i in 1 2 3 4; do
+            git push -q origin HEAD:selftest-results && break
+            sleep $((i * 5)); git pull -q --rebase -X theirs origin selftest-results || true
+          done

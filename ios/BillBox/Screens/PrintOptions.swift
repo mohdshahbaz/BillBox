@@ -23,6 +23,7 @@ import SwiftUI
             Toggle("Terms", isOn: flag("print_terms", true))
             Toggle("Party's previous balance and total due", isOn: flag("print_balance", false))
             Toggle("Item names in CAPITALS", isOn: flag("print_caps", false))
+            Toggle("Company and Bill to in CAPITALS", isOn: flag("print_caps_head", false))
             Picker("Quantity as", selection: choice("print_qty", "boxpcs")) {
                 Text("Boxes and pieces (6 box 6 pcs)").tag("boxpcs"); Text("Pieces only (150 pcs)").tag("pcs")
             }

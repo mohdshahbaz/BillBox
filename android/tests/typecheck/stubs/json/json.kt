@@ -33,4 +33,5 @@ class JSONArray() {
     fun opt(i: Int): Any? = null
     fun optJSONObject(i: Int): JSONObject? = null
     fun getString(i: Int): String = ""
+    fun getJSONObject(i: Int): JSONObject = TODO()
 }

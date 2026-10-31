@@ -9,6 +9,8 @@ public typealias CFMutableData = NSMutableData
 public final class CGDataConsumer { public init?(data: CFMutableData) {} }
 public final class CGImage {}
 public final class CGPath {}
+public final class CGColor {}
+public struct CGAffineTransform { public static let identity = CGAffineTransform(); public init() {}; public init(scaleX: CGFloat, y: CGFloat) {} }
 public final class CGContext {
     public init?(consumer: CGDataConsumer, mediaBox: UnsafePointer<CGRect>?, _ auxiliaryInfo: NSDictionary?) {}
     public func beginPDFPage(_ pageInfo: NSDictionary?) {}
@@ -19,7 +21,10 @@ public final class CGContext {
     public func translateBy(x: CGFloat, y: CGFloat) {}
     public func scaleBy(x: CGFloat, y: CGFloat) {}
     public func fill(_ r: CGRect) {}
+    public func rotate(by angle: CGFloat) {}
+    public func setFillColor(_ c: CGColor) {}
 }
+public func UIGraphicsGetCurrentContext() -> CGContext? { nil }
 
 public enum UIUserInterfaceStyle: Int { case unspecified, light, dark }
 public enum UIUserInterfaceIdiom: Int { case unspecified, phone, pad, mac }
@@ -28,6 +33,7 @@ public class UITraitCollection: NSObject { public var userInterfaceStyle: UIUser
 open class UIColor: NSObject {
     public init(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) {}
     public init(white: CGFloat, alpha: CGFloat) {}
+    open var cgColor: CGColor { CGColor() }
     public init(dynamicProvider: @escaping (UITraitCollection) -> UIColor) {}
     public convenience init(_ dynamicProvider: @escaping (UITraitCollection) -> UIColor) { self.init(dynamicProvider: dynamicProvider) }
     public func setFill() {}
@@ -104,6 +110,8 @@ open class UIView: UIResponder {
     open var isUserInteractionEnabled = true
     open var backgroundColor: UIColor?
     open var clipsToBounds = false
+    open var transform: CGAffineTransform = .identity
+    open func layoutSubviews() {}
     open var superview: UIView? { nil }
     open var subviews: [UIView] { [] }
     open var window: UIWindow? { nil }
@@ -205,12 +213,20 @@ open class UIPrintInteractionController: NSObject {
     open var printInfo: UIPrintInfo?
     open var printingItem: Any?
     open var printingItems: [Any]?
+    open var printPageRenderer: UIPrintPageRenderer?
     open var showsNumberOfCopies = true
     weak open var delegate: UIPrintInteractionControllerDelegate?
     @discardableResult open func present(animated: Bool, completionHandler: CompletionHandler? = nil) -> Bool { true }
     @discardableResult open func present(from rect: CGRect, in view: UIView, animated: Bool, completionHandler: CompletionHandler? = nil) -> Bool { true }
     @discardableResult open func print(to printer: UIPrinter, completionHandler: CompletionHandler? = nil) -> Bool { true }
     open func dismiss(animated: Bool) {}
+}
+open class UIPrintPageRenderer: NSObject {
+    public override init() {}
+    open var numberOfPages: Int { 0 }
+    open var paperRect: CGRect { .zero }
+    open var printableRect: CGRect { .zero }
+    open func drawPage(at pageIndex: Int, in printableRect: CGRect) {}
 }
 open class UIPrinterPickerController: NSObject {
     public typealias CompletionHandler = (UIPrinterPickerController, Bool, Error?) -> Void
