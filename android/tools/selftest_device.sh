@@ -24,7 +24,7 @@ adb exec-out "run-as $PKG tar -c -C files selftest" | tar -x -C "$OUT" || echo "
 HERE="$(cd "$(dirname "$0")" && pwd)"
 UI="$OUT/ui"; mkdir -p "$UI"; N=20
 dump() {
-  local msg; msg=$(adb shell uiautomator dump --compressed /sdcard/ui.xml 2>&1)
+  local msg; msg=$(adb shell uiautomator dump /sdcard/ui.xml 2>&1)
   echo "dump: $msg" >> "$UI/dumps.txt"
   adb exec-out cat /sdcard/ui.xml
 }
@@ -48,22 +48,23 @@ typetext() { adb shell input text "$(echo "$1" | sed 's/ /%s/g')"; sleep 2; }
 back() { adb shell input keyevent KEYCODE_BACK; sleep 1.5; }
 
 adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1; calm
-tap "Billing" ; shot billing 1
-tap "Type an item name" --edit && typetext "bikano" && shot search
+adb shell input keyevent KEYCODE_ESCAPE; sleep 1
+tap "Billing" --last; shot billing 1
+tap "Type an item name" && typetext "bikano" && shot search
 tap "Bikano" --skip=1 && shot line_added
 tap "Save & print" && shot after_save 4
 back; back
-tap "Parties" && shot parties
+tap "Parties" --last && shot parties
 tap "City Mart" && shot party_open 3
 back; back
-tap "Stock" && tap "New item" && shot new_item
+tap "Stock" --last && tap "New item" && shot new_item
 back; back
-tap "More" && tap "Settings" && tap "Companies" && shot companies
+tap "More" --last && tap "Settings" && tap "Companies" && shot companies
 back; tap "Printing" && shot printing
 adb shell input swipe 500 1600 500 500 400; shot printing_more 1
 back; tap "WhatsApp" && shot whatsapp
 adb logcat -d -v time | grep -E "AndroidRuntime|FATAL|BillBoxEngine" > "$UI/logcat-ui.txt" || true
 adb logcat -d -v time > "$OUT/logcat-full.txt" || true
-grep -E "SELFTEST|BillBoxEngine|AndroidRuntime|FATAL|chromium.*(Uncaught|Error)|System.err" "$OUT/logcat-full.txt" > "$OUT/logcat.txt" || true
+grep -E "SELFTEST|BillBoxEngine|BillBoxNet|AndroidRuntime|FATAL|chromium.*(Uncaught|Error)|System.err" "$OUT/logcat-full.txt" > "$OUT/logcat.txt" || true
 adb exec-out screencap -p > "$OUT/final-screen.png" || true
 ls -la "$OUT" "$OUT/selftest" "$OUT/selftest/shots" 2>/dev/null || true

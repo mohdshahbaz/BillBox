@@ -16,6 +16,7 @@ class NetBridge {
 
     @JavascriptInterface
     fun request(url: String, optsJson: String): String = try {
+        android.util.Log.i("BillBoxNet", (if (offline) "blocked " else "") + url.take(140))
         if (offline) throw java.net.UnknownHostException("offline (self-test)")
         val opts = JSONObject(optsJson)
         val c = URL(url).openConnection() as HttpURLConnection

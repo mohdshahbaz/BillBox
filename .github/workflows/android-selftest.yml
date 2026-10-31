@@ -96,7 +96,7 @@ jobs:
           cp -r st/out/selftest/shots $R/$API/ 2>/dev/null || true
           cp -r st/out/ui $R/$API/ 2>/dev/null || true
           cp st/out/compare.txt st/out/logcat.txt st/out/final-screen.png $R/$API/ 2>/dev/null || true
-          cp st/out/selftest/bill_*.pdf $R/$API/ 2>/dev/null || true
+          cp st/out/selftest/bill_*.pdf st/out/selftest/android.jsonl $R/$API/ 2>/dev/null || true
           echo "${{ github.sha }}" > $R/$API/commit.txt
           cd $R
           git config user.name "BillBox self-test"; git config user.email "actions@github.com"
