@@ -45,26 +45,23 @@ step 313 GET /categories.body[4].name: 'Staples & Grains' != 'Personal Care'
 step 438 POST /companies/1/years.body.carried.masters: 55 != 56
 step 448 GET /items.body[5].category_id: 5 != 6
 step 448 GET /items.body[12].category_id: 5 != 6
+step 448 GET /items.body[16].category_id: 7 != 8
+step 448 GET /items.body[17].category_id: 7 != 8
+step 448 GET /items.body[18].category_id: 7 != 8
 step 448 GET /items.body[22].category: None != 'Biscuits & Cookies'
-step 448 GET /items.body[22].category_id: None != 8
-step 448 GET /items.body[23].category_id: 6 != 8
-step 448 GET /items.body[24].category: None != 'Noodles & Pasta'
-step 448 GET /items.body[24].category_id: None != 7
-step 448 GET /items.body[26].category: None != 'Dairy'
-step 448 GET /items.body[26].category_id: None != 5
-step 448 GET /items.body[27].category: None != 'Dairy'
-step 448 GET /items.body[27].category_id: None != 5
+step 448 GET /items.body[22].category_id: None != 7
+step 448 GET /items.body[23].category_id: 6 != 7
 step 471 dump .dump.companies.1.categories: 7 items on Mac, 8 on iOS
 step 471 dump .dump.companies.1.categories[4].name: 'Namkeen' != 'Dairy'
 step 471 dump .dump.companies.1.categories[5].name: 'Biscuits & Cookies' != 'Namkeen'
+step 471 dump .dump.companies.1.categories[6].name: 'Noodles & Pasta' != 'Biscuits & Cookies'
 step 471 dump .dump.companies.1.items[13].category_id: 5 != 6
 step 471 dump .dump.companies.1.items[14].category_id: 5 != 6
-step 471 dump .dump.companies.1.items[15].category_id: None != 7
-step 471 dump .dump.companies.1.items[16].category_id: None != 5
-step 471 dump .dump.companies.1.items[18].category_id: None != 5
-step 471 dump .dump.companies.1.items[26].category_id: None != 8
-step 471 dump .dump.companies.1.items[27].category_id: 6 != 8
+step 471 dump .dump.companies.1.items[26].category_id: None != 7
+step 471 dump .dump.companies.1.items[27].category_id: 6 != 7
+step 471 dump .dump.companies.1.items[29].category_id: 7 != 8
+step 471 dump .dump.companies.1.items[30].category_id: 7 != 8
+step 471 dump .dump.companies.1.items[31].category_id: 7 != 8
 step 471 dump .dump.companies.3.categories: 7 items on Mac, 8 on iOS
-step 471 dump .dump.companies.3.categories[4].name: 'Namkeen' != 'Dairy'
   ...
 472 steps compared, 18 with differences
