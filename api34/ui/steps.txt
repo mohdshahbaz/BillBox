@@ -1,4 +1,4 @@
-missing: Billing
+tapped: Billing at 117 188
 missing: Type an item name
 missing: Bikano
 missing: Save & print
