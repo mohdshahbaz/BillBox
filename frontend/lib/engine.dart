@@ -82,8 +82,12 @@ class Engine {
           'BILLBOX_EDITION': const String.fromEnvironment('BILLBOX_EDITION', defaultValue: 'public'),
           'NODE_ENV': 'production',
         });
-    _proc!.stdout.transform(const SystemEncoding().decoder).listen((s) => log = (log + s).substring((log.length + s.length - 8000).clamp(0, 1 << 30)));
-    _proc!.stderr.transform(const SystemEncoding().decoder).listen((s) => log = (log + s).substring((log.length + s.length - 8000).clamp(0, 1 << 30)));
+    void keep(String s) {
+      log += s;
+      if (log.length > 8000) log = log.substring(log.length - 8000);
+    }
+    _proc!.stdout.transform(const SystemEncoding().decoder).listen(keep);
+    _proc!.stderr.transform(const SystemEncoding().decoder).listen(keep);
     var exited = false;
     unawaited(_proc!.exitCode.then((_) => exited = true));
     Api.root = 'http://127.0.0.1:$port';
