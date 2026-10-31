@@ -2,9 +2,12 @@ tapped: Billing at 100 2274
 tapped: Type an item name at 517 391
 tapped: Bikano at 395 535
 missing: Save & print
-missing: Parties
-missing: City Mart
-missing: Stock
-missing: More
-missing: Printing
-missing: WhatsApp
+tapped: Parties at 760 2274
+tapped: City Mart at 262 1105
+tapped: Stock at 540 2274
+missing: New item
+tapped: More at 980 2274
+tapped: Settings at 224 1120
+tapped: Companies at 277 520
+tapped: Printing at 246 670
+tapped: WhatsApp at 268 820
