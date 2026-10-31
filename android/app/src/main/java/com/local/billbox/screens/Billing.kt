@@ -422,17 +422,20 @@ private fun payModeTitle(m: String) = mapOf("CASH" to "Cash", "UPI" to "UPI", "C
 private fun BillTable(st: BillingState, totals: Totals?) {
     val calc = st.lines.mapIndexed { i, l -> l.id to totals?.lines?.getOrNull(i) }.toMap()
     fun upd(l: BillLine, f: (BillLine) -> BillLine) { val i = st.lines.indexOfFirst { it.id == l.id }; if (i >= 0) st.lines[i] = f(st.lines[i]) }
+    // a phone shows the item (with its amount under the name), boxes and pieces; the rest is a swipe to the right
+    val phone = LocalConfiguration.current.screenWidthDp < 600
     val cols =
         listOf(
-            Col<BillLine>("Item", "item", 200) { l ->
+            Col<BillLine>("Item", "item", if (phone) 150 else 200) { l ->
                 Column {
                     Text(l.name, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                    if (phone) calc[l.id]?.let { Text(Fmt.money(it.amount), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary) }
                     val schemes = calc[l.id]?.schemes ?: emptyList()
                     Hint((listOfNotNull(if (l.ppb > 1) "${l.ppb} pcs / box" else null, "Stock ${Fmt.boxPcs(l.stock.toInt(), l.ppb)}") + schemes).joinToString("  ·  "))
                 }
             },
-            Col("Box", "box", 66) { l -> if (l.ppb > 1) IntCell(l.boxes, { v -> upd(l) { it.copy(boxes = v) } }) else Cell("–") },
-            Col("Pcs", "pcs", 70) { l -> IntCell(l.pcs, { v -> upd(l) { it.copy(pcs = v) } }) },
+            Col("Box", "box", if (phone) 60 else 66) { l -> if (l.ppb > 1) IntCell(l.boxes, { v -> upd(l) { it.copy(boxes = v) } }) else Cell("–") },
+            Col("Pcs", "pcs", if (phone) 64 else 70) { l -> IntCell(l.pcs, { v -> upd(l) { it.copy(pcs = v) } }) },
             Col("Total pcs", "total", 70, end = true) { l -> Cell("${l.totalPcs}", MaterialTheme.colorScheme.onSurfaceVariant, end = true) },
             Col("Disc %", "disc", 66) { l -> EditCell(l.disc, { v -> upd(l) { it.copy(disc = v) } }, placeholder = "0") },
             Col("Rate / pc (ex-GST)", "rate", 112, end = true) { l ->
@@ -454,7 +457,8 @@ private fun BillTable(st: BillingState, totals: Totals?) {
             Col("", "remove", 44) { l -> IconButton({ st.lines.removeAll { it.id == l.id } }, Modifier.size(32.dp)) { Icon(Icons.Default.Cancel, "Remove ${l.name}", tint = MaterialTheme.colorScheme.onSurfaceVariant) } },
         )
     // every row stays alive while typing: the number pad never closes when the bill gets longer than the screen
-    DataTable(st.lines.toList(), "billing", rowHeight = 48, lazy = false, keyOf = { it.id }, columns = cols)
+    DataTable(st.lines.toList(), "billing", rowHeight = 48, lazy = false, keyOf = { it.id }, columns = cols,
+        phone = listOf("item", "box", "pcs", "remove", "amount", "disc", "rate", "boxrate", "free", "total"))
 }
 
 

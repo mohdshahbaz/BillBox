@@ -45,14 +45,16 @@ tap() {   # tap <text> [--edit] [--skip=n]
   adb shell input tap $xy; echo "tapped: $1 at $xy" >> "$UI/steps.txt"; sleep 1.5
 }
 typetext() { adb shell input text "$(echo "$1" | sed 's/ /%s/g')"; sleep 2; }
-back() { adb shell input keyevent KEYCODE_BACK; sleep 1.5; }
+back() { adb shell input keyevent KEYCODE_BACK; sleep 1.5; front; }
+# BillBox back in front if Back closed it (Back on the start screen leaves the app, as usual on Android)
+front() { adb shell dumpsys activity activities | grep -q "topResumedActivity.*$PKG" || { adb shell am start -n "$PKG/.MainActivity" >/dev/null; sleep 3; }; }
 
 adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1; calm
-adb shell input keyevent KEYCODE_ESCAPE; sleep 1
 tap "Billing" --last; shot billing 1
 tap "Type an item name" && typetext "bikano" && shot search
 tap "Bikano" --skip=1 && shot line_added
-adb shell input keyevent 111; sleep 1   # the keyboard away first
+# the keyboard away first (only when it is up: with no keyboard, Escape is Back and would close the app)
+adb shell dumpsys input_method | grep -q "mInputShown=true" && { adb shell input keyevent 111; sleep 1; }
 tap "Save & print" && shot after_save 4
 back; back
 tap "Parties" --last && shot parties
