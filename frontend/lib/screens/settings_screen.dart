@@ -5,6 +5,7 @@ import '../api.dart';
 import '../print/invoice_pdf.dart';
 import '../state/app_state.dart';
 import '../widgets.dart';
+import 'drive_backup.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -160,6 +161,17 @@ class _BackupState extends State<_Backup> {
     if (t0 != null) setState(() => time = '${t0.hour.toString().padLeft(2, '0')}:${t0.minute.toString().padLeft(2, '0')}');
   }
 
+  Future<void> _restoreFolder() async {
+    final d = await FilePicker.platform.getDirectoryPath(dialogTitle: 'Choose a backup folder (FMCG_Backup_…)');
+    if (d != null && mounted && await restoreBackup(context, folder: d, label: d.split(RegExp(r'[\\/]')).last)) _load();
+  }
+
+  Future<void> _restoreFile() async {
+    final r = await FilePicker.platform.pickFiles(dialogTitle: 'One company file (.db) from a backup', type: FileType.custom, allowedExtensions: ['db']);
+    final f = r?.files.single.path;
+    if (f != null && mounted && await restoreBackup(context, file: f, companyId: AppScope.read(context).companyId, label: f.split(RegExp(r'[\\/]')).last)) _load();
+  }
+
   String _size(num b) => b > 1e6 ? '${(b / 1e6).toStringAsFixed(1)} MB' : '${(b / 1e3).toStringAsFixed(0)} KB';
 
   @override
@@ -201,17 +213,31 @@ class _BackupState extends State<_Backup> {
           if (lastStatus.isNotEmpty)
             Text(ok ? 'Last backup OK: ${lastStatus.substring(3)}' : lastStatus, style: TextStyle(color: ok ? Palette.leaf : Palette.brick, fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          const Text('Each backup is a new folder named FMCG_Backup_YYYYMMDD_HHMMSS holding a verified copy of every company\'s database. To restore: quit the app, copy the .db files from a backup folder over the files in backend/data, and start again.',
+          const Text('Each backup is a new folder named FMCG_Backup_YYYYMMDD_HHMMSS holding a verified copy of every company\'s database — the same backup the Mac, iPhone and Android make, so it restores on any of them.',
               style: TextStyle(color: Palette.muted, fontSize: 12)),
+          const SizedBox(height: 12),
+          Wrap(spacing: 10, runSpacing: 10, children: [
+            OutlinedButton.icon(onPressed: _restoreFolder, icon: const Icon(Icons.settings_backup_restore), label: const Text('Restore from a backup folder…')),
+            OutlinedButton.icon(onPressed: _restoreFile, icon: const Icon(Icons.description_outlined), label: const Text('Restore one company file (.db)…')),
+          ]),
         ]),
       ),
+      const SizedBox(height: 14),
+      DrivePanel(onRestored: _load),
       const SizedBox(height: 14),
       Panel(
         title: 'Backups in this folder',
         child: backups.isEmpty
             ? const Text('No backups yet.', style: TextStyle(color: Palette.muted))
-            : table(['Folder', 'Created', 'Files', 'Size'], [
-                for (final b in backups) [Text(b['name']), Text('${b['created'] ?? 'incomplete'}'.replaceFirst('T', ' ').split('.').first), t('${b['files']}'), t(_size(num_(b['bytes'])))],
+            : table(['Folder', 'Created', 'Files', 'Size', ''], [
+                for (final b in backups)
+                  [
+                    Text(b['name']),
+                    Text('${b['created'] ?? 'incomplete'}'.replaceFirst('T', ' ').split('.').first),
+                    t('${b['files']}'),
+                    t(_size(num_(b['bytes']))),
+                    TextButton(onPressed: () async { if (await restoreBackup(context, name: '${b['name']}', label: '${b['name']}')) _load(); }, child: const Text('Restore…')),
+                  ],
               ], numeric: {2, 3}),
       ),
     ]);

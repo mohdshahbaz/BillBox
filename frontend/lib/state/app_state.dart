@@ -28,7 +28,7 @@ class AppState extends ChangeNotifier {
   }
 
   Json? get company => companies.cast<Json?>().firstWhere((c) => c!['id'] == companyId, orElse: () => null);
-  String get companyName => (company?['name'] ?? 'Distributor Pro') as String;
+  String get companyName => (company?['name'] ?? 'BillBox') as String;
 
   Future<void> init() async {
     try {

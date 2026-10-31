@@ -21,7 +21,7 @@ const setSetting = (k, v) => reg.prepare('INSERT INTO app_settings(key,value) VA
 
 function config() {
   return {
-    dir: getSetting('backup_dir', path.join(os.homedir(), 'DistributorProBackups')),
+    dir: getSetting('backup_dir', process.env.BILLBOX_BACKUP_DIR || path.join(os.homedir(), 'DistributorProBackups')),
     enabled: getSetting('backup_enabled', '0') === '1',
     time: getSetting('backup_time', '21:00'),
     on_exit: getSetting('backup_on_exit', '0') === '1',

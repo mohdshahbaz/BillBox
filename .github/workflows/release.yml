@@ -155,8 +155,14 @@ jobs:
           name: ios
           path: dist/*.ipa
 
+  desktop:
+    needs: version
+    uses: ./.github/workflows/desktop.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
   publish:
-    needs: [version, android, mac, ios]
+    needs: [version, android, mac, ios, desktop]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -173,6 +179,10 @@ jobs:
           **Android (12 and newer)** — download \`BillBox-android-$V.apk\` on the phone and open it (allow "Install unknown apps" for your browser or Files app once). It updates an earlier BillBox from these releases and keeps its books.
 
           **Mac** — download \`BillBox-mac-$V.dmg\`, open it and drag **BillBox** onto Applications (\`BillBox-mac-$V.zip\` is the same app as a zip). The first time: right-click › Open (on macOS 15: System Settings › Privacy & Security › Open Anyway). If macOS says it is damaged, run \`xattr -dr com.apple.quarantine /Applications/BillBox.app\` in Terminal once. Your books stay in ~/Library/Application Support/DistributorPro.
+
+          **Windows 10 / 11** — download \`BillBox-windows-$V-setup.exe\` and run it (if SmartScreen warns: More info › Run anyway). \`BillBox-windows-$V-x64.zip\` is the same app without an installer. Your books stay in %APPDATA%\\BillBox.
+
+          **Linux (Ubuntu 22.04+, Debian 12+, Mint 21+)** — \`sudo apt install ./BillBox-linux-$V-amd64.deb\`, or unpack \`BillBox-linux-$V-x64.tar.gz\` anywhere and run \`BillBox/install.sh\` once for the menu entry. Your books stay in ~/.local/share/BillBox.
 
           **iPhone** — \`BillBox-iphone-$V-unsigned.ipa\` is not signed: install it with Sideloadly or AltStore, which sign it with your Apple ID (or run \`cd ios && ./build.sh device\` on your Mac).
 

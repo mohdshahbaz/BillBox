@@ -1,5 +1,5 @@
 name: distributor_pro
-description: FMCG distributor billing, purchases, GST, printing and accounts (macOS desktop).
+description: BillBox for Linux and Windows (Flutter desktop) — billing, purchases, GST, printing and accounts, with the same books engine as the Mac app.
 publish_to: "none"
 version: 3.1.0+4
 

@@ -9,11 +9,22 @@ import 'screens/purchase_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/salesmen_screen.dart';
 import 'screens/settings_screen.dart';
+import 'engine.dart';
 import 'state/app_state.dart';
 import 'widgets.dart';
 
-void main() {
-  final state = AppState()..init();
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final engineError = await Engine.start();
+  final state = AppState();
+  if (engineError != null) {
+    state
+      ..error = engineError
+      ..ready = true;
+  } else {
+    state.init();
+  }
+  AppLifecycleListener(onExitRequested: () async { Engine.stop(); return AppExitResponse.exit; });
   runApp(AppScope(state: state, child: const DistributorApp()));
 }
 
@@ -21,7 +32,7 @@ class DistributorApp extends StatelessWidget {
   const DistributorApp({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Distributor Pro',
+        title: 'BillBox',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(),
         home: const Gate(),

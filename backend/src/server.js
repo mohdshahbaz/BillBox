@@ -40,3 +40,12 @@ app.listen(PORT, '127.0.0.1', () => {
   console.log(`Distributor API on http://127.0.0.1:${PORT}`);
   backup.startScheduler();
 });
+
+// The Linux and Windows apps start this server themselves and pass their process id: when the app has gone (closed,
+// crashed or killed), the server stops too, so it never keeps the books open in the background.
+const parent = Number(process.env.BILLBOX_PARENT_PID || 0);
+if (parent > 0) {
+  setInterval(() => {
+    try { process.kill(parent, 0); } catch (e) { if (e.code !== 'EPERM') { console.log('BillBox closed: stopping.'); process.exit(0); } }
+  }, 2000).unref();
+}

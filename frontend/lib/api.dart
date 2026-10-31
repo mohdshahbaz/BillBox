@@ -13,7 +13,8 @@ class ApiException implements Exception {
 }
 
 class Api {
-  static const root = 'http://127.0.0.1:3000';
+  /// Set by Engine.start(): the bundled engine's port (Linux, Windows), or the server started by hand.
+  static String root = 'http://127.0.0.1:3000';
 
   /// Set by AppState when the user switches company; sent on every request.
   static int? companyId;
@@ -39,9 +40,9 @@ class Api {
     try {
       return _handle(await f());
     } on SocketException {
-      throw ApiException('Cannot reach the server. Start it with "npm start" in the backend folder.', 0);
+      throw ApiException('Cannot reach the BillBox engine. Close BillBox and open it again.', 0);
     } on http.ClientException {
-      throw ApiException('Cannot reach the server. Start it with "npm start" in the backend folder.', 0);
+      throw ApiException('Cannot reach the BillBox engine. Close BillBox and open it again.', 0);
     }
   }
 
@@ -58,9 +59,9 @@ class Api {
       }
       return r.bodyBytes;
     } on SocketException {
-      throw ApiException('Cannot reach the server. Start it with "npm start" in the backend folder.', 0);
+      throw ApiException('Cannot reach the BillBox engine. Close BillBox and open it again.', 0);
     } on http.ClientException {
-      throw ApiException('Cannot reach the server. Start it with "npm start" in the backend folder.', 0);
+      throw ApiException('Cannot reach the BillBox engine. Close BillBox and open it again.', 0);
     }
   }
 
