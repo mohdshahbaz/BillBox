@@ -42,17 +42,10 @@ jobs:
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set: the site was built and checked but not deployed."; exit 0
           fi
-          W="npx --yes wrangler@4"
-          $W pages project list | grep -q ' billbox ' || $W pages project create billbox --production-branch main
-          # the licence store (one KV namespace, made once)
-          ID="$($W kv namespace list | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const l=JSON.parse(s);const n=l.find(x=>x.title==="billbox-licenses");console.log(n?n.id:"")})')"
-          [ -n "$ID" ] || ID="$($W kv namespace create billbox-licenses 2>&1 | grep -oE '[0-9a-f]{32}' | head -1)"
-          sed -i "s/__KV_ID__/$ID/" wrangler.toml
-          # secrets (only those set in GitHub)
-          for s in LICENSE_KEY_LIVE LICENSE_KEY_TEST ADMIN_TOKEN RZP_KEY_ID_LIVE RZP_KEY_SECRET_LIVE RZP_KEY_ID_TEST RZP_KEY_SECRET_TEST RZP_WEBHOOK_SECRET UPI_VPA; do
-            if [ -n "${!s}" ]; then printf '%s' "${!s}" | $W pages secret put "$s" --project-name billbox >/dev/null && echo "secret $s set"; fi
-          done
-          $W pages deploy public --project-name billbox --branch "${GITHUB_REF_NAME}" --commit-dirty=true
+          set -o pipefail
+          ./deploy.sh "${GITHUB_REF_NAME}" 2>&1 | tee deploy.log || {
+            echo "::error title=Deploy log::$(grep -v '^\s*$' deploy.log | grep -v -i 'secret\b.*[A-Za-z0-9+/=]\{40,\}' | tail -30 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+            exit 1; }
       - name: Check the live site
         if: github.ref == 'refs/heads/main'
         run: |

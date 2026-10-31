@@ -36,6 +36,7 @@ jobs:
       code: ${{ steps.v.outputs.code }}
       tag: ${{ steps.v.outputs.tag }}
       prerelease: ${{ steps.v.outputs.prerelease }}
+      edition: ${{ steps.v.outputs.edition }}
     steps:
       - id: v
         env:
@@ -49,6 +50,8 @@ jobs:
           echo "code=$(( MA * 10000 + MI * 100 + PA ))" >> "$GITHUB_OUTPUT"
           echo "tag=v$V" >> "$GITHUB_OUTPUT"
           if [[ "$V" == *-* || "$PRE" == "true" ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+          # a version ending in -admin (v15.8.0-admin) is the owner's test build: test licences, Razorpay test mode
+          if [[ "$V" == *-admin* ]]; then echo "edition=admin" >> "$GITHUB_OUTPUT"; else echo "edition=public" >> "$GITHUB_OUTPUT"; fi
           echo "Releasing $V (code $(( MA * 10000 + MI * 100 + PA )))"
 
   android:
@@ -91,6 +94,7 @@ jobs:
       - name: Build (release)
         working-directory: android
         run: |
+          sed -i -E 's/const val NAME = "[a-z]+"/const val NAME = "${{ needs.version.outputs.edition }}"/' app/src/main/java/com/local/billbox/engine/Edition.kt
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
           ./gradlew --no-daemon :app:assembleRelease -PbillboxVersionName=${{ needs.version.outputs.version }} -PbillboxVersionCode=${{ needs.version.outputs.code }}
           mkdir -p ../dist
@@ -112,6 +116,7 @@ jobs:
         working-directory: macos
         env:
           ARCH: universal
+          EDITION: ${{ needs.version.outputs.edition }}
           VERSION: ${{ needs.version.outputs.version }}
           BUILD_NUMBER: ${{ needs.version.outputs.code }}
         run: |
@@ -143,6 +148,7 @@ jobs:
           set -o pipefail
           xcodebuild -version
           mkdir -p build
+          plutil -replace BillBoxEdition -string "${{ needs.version.outputs.edition }}" BillBox/Info.plist
           xcodebuild archive -project BillBox.xcodeproj -scheme BillBox -configuration Release -destination "generic/platform=iOS" \
             -archivePath build/BillBox.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             MARKETING_VERSION=${{ needs.version.outputs.version }} CURRENT_PROJECT_VERSION=${{ needs.version.outputs.code }} > build/archive.log 2>&1 || { grep -E "error:" build/archive.log | sort -u | head -20 | sed 's/^/::error::/'; tail -60 build/archive.log; exit 1; }
@@ -160,6 +166,7 @@ jobs:
     uses: ./.github/workflows/desktop.yml
     with:
       version: ${{ needs.version.outputs.version }}
+      edition: ${{ needs.version.outputs.edition }}
 
   publish:
     needs: [version, android, mac, ios, desktop]
@@ -193,7 +200,7 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.version.outputs.tag }}
-          name: BillBox ${{ needs.version.outputs.version }}
+          name: BillBox ${{ needs.version.outputs.version }}${{ needs.version.outputs.edition == 'admin' && ' (admin test build — test licences only)' || '' }}
           target_commitish: ${{ github.sha }}
           body_path: notes.md
           generate_release_notes: true

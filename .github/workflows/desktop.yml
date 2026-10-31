@@ -12,6 +12,7 @@ on:
   workflow_call:
     inputs:
       version: { type: string, required: true }
+      edition: { type: string, required: false, default: public }
 
 concurrency:
   group: desktop-${{ github.ref }}-${{ inputs.version || 'ci' }}
@@ -29,6 +30,7 @@ jobs:
       - name: Build tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev xvfb >/dev/null
       - name: Build
+        env: { EDITION: "${{ inputs.edition || 'public' }}" }
         run: |
           set -o pipefail
           desktop/build.sh linux "${{ inputs.version || '0.0.0-ci' }}" 2>&1 | tee build.log || {
@@ -65,6 +67,7 @@ jobs:
       - name: Inno Setup
         run: command -v iscc || [ -f "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" ] || choco install innosetup -y --no-progress
       - name: Build
+        env: { EDITION: "${{ inputs.edition || 'public' }}" }
         run: |
           set -o pipefail
           desktop/build.sh windows "${{ inputs.version || '0.0.0-ci' }}" 2>&1 | tee build.log || {

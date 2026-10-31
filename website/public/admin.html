@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BillBox admin</title>
+<meta name="description" content="Licence administration.">
+<meta name="robots" content="noindex, nofollow"><link rel="canonical" href="https://billbox.pages.dev/admin.html">
+<meta name="theme-color" content="#4f46e5">
+<meta property="og:type" content="website"><meta property="og:site_name" content="BillBox"><meta property="og:title" content="BillBox admin">
+<meta property="og:description" content="Licence administration."><meta property="og:url" content="https://billbox.pages.dev/admin.html"><meta property="og:image" content="https://billbox.pages.dev/videos/mac.jpg">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="BillBox admin"><meta name="twitter:description" content="Licence administration."><meta name="twitter:image" content="https://billbox.pages.dev/videos/mac.jpg">
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/assets/icon-32.png"><link rel="apple-touch-icon" href="/assets/icon-180.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/assets/style.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "BillBox", "url": "https://billbox.pages.dev", "logo": "https://billbox.pages.dev/assets/icon-512.png", "email": "mohdshabaz12@gmail.com"}</script>
+</head>
+<body>
+<nav class="nav" aria-label="Main"><div class="wrap">
+  <a class="brand" href="/"><img src="/assets/icon-32.png" alt="" width="22" height="22">BillBox</a>
+  <button class="menu-btn" aria-label="Menu" aria-expanded="false">☰</button>
+  <div class="links"><a href="/mac/">Mac</a><a href="/windows/">Windows</a><a href="/linux/">Linux</a><a href="/iphone/">iPhone</a><a href="/android/">Android</a><a href="/pricing/">Pricing</a><a href="/#faq">FAQ</a></div>
+  <a class="cta" href="/pricing/">Buy</a>
+</div></nav>
+<main>
+<section style="padding-top:56px"><div class="wrap" style="max-width:980px">
+  <h2>Licences</h2><p style="color:var(--muted)">For the owner only. The admin token is kept in this browser.</p>
+  <div class="card" style="margin-top:20px">
+    <label for="tok">Admin token</label><input id="tok" type="password" autocomplete="off">
+    <label>Licences of</label><div class="choices" style="grid-template-columns:1fr 1fr">
+      <label class="choice"><input type="radio" name="env" value="test" checked><b>Test</b><span>admin apps</span></label>
+      <label class="choice"><input type="radio" name="env" value="live"><b>Live</b><span>public apps</span></label></div>
+  </div>
+  <div class="card" style="margin-top:20px"><h3>Issue a licence (UPI, cash, free)</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 16px">
+      <div><label for="iplan">Plan</label><select id="iplan"><option value="yearly">Yearly</option><option value="lifetime">Lifetime</option></select></div>
+      <div><label for="idays">Days (yearly)</label><input id="idays" type="number" value="365"></div>
+      <div><label for="idev">Devices</label><input id="idev" type="number" value="2"></div>
+      <div><label for="iemail">E-mail</label><input id="iemail" type="email"></div>
+      <div><label for="iname">Name</label><input id="iname"></div>
+      <div><label for="inote">Note (UPI ref…)</label><input id="inote"></div>
+    </div>
+    <div class="btns" style="justify-content:flex-start"><button class="btn" id="issue" type="button">Issue</button></div>
+    <div id="imsg"></div></div>
+  <div class="card" style="margin-top:20px"><h3>All licences</h3><div class="btns" style="justify-content:flex-start;margin-top:10px"><button class="btn" id="load" type="button">Load</button></div>
+    <div style="overflow-x:auto"><table id="list" style="width:100%;font-size:14px;margin-top:14px;border-collapse:collapse"></table></div></div>
+</div></section>
+<script src="/assets/admin.js" defer></script></main>
+<footer><div class="wrap">
+  <div class="cols">
+    <div><h4>BillBox</h4><a href="/mac/">BillBox for Mac</a><a href="/windows/">BillBox for Windows</a><a href="/linux/">BillBox for Linux</a><a href="/iphone/">BillBox for iPhone</a><a href="/android/">BillBox for Android</a></div>
+    <div><h4>Buy</h4><a href="/pricing/">Pricing</a><a href="/buy.html">Buy a licence</a><a href="/buy.html#find">Find my licence key</a></div>
+    <div><h4>Help</h4><a href="/#faq">Questions</a><a href="https://github.com/mohdshahbaz/BillBox/releases">All downloads</a><a href="/contact/">Contact</a></div>
+    <div><h4>Policies</h4><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/refunds/">Refunds and cancellation</a></div>
+  </div>
+  <div class="bottom"><span>Copyright © 2026 AK Enterprises. All rights reserved.</span><span>Made in India for Indian distributors.</span></div>
+</div></footer>
+<script src="/assets/site.js" defer></script>
+</body></html>

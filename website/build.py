@@ -356,7 +356,35 @@ def extras():
     s = head("Page not found — BillBox", "This page does not exist.", "/404.html")
     write("/404.html", s + '<section class="hero"><div class="wrap center"><h1>Page not found.</h1><p class="lead">The page you are looking for is not here.</p><div class="btns"><a class="btn" href="/">Go to BillBox</a></div></div></section>' + FOOT)
 
+def admin():
+    s = head("BillBox admin", "Licence administration.", "/admin.html")
+    s = s.replace('<link rel="canonical"', '<meta name="robots" content="noindex, nofollow"><link rel="canonical"')
+    s += """<section style="padding-top:56px"><div class="wrap" style="max-width:980px">
+  <h2>Licences</h2><p style="color:var(--muted)">For the owner only. The admin token is kept in this browser.</p>
+  <div class="card" style="margin-top:20px">
+    <label for="tok">Admin token</label><input id="tok" type="password" autocomplete="off">
+    <label>Licences of</label><div class="choices" style="grid-template-columns:1fr 1fr">
+      <label class="choice"><input type="radio" name="env" value="test" checked><b>Test</b><span>admin apps</span></label>
+      <label class="choice"><input type="radio" name="env" value="live"><b>Live</b><span>public apps</span></label></div>
+  </div>
+  <div class="card" style="margin-top:20px"><h3>Issue a licence (UPI, cash, free)</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 16px">
+      <div><label for="iplan">Plan</label><select id="iplan"><option value="yearly">Yearly</option><option value="lifetime">Lifetime</option></select></div>
+      <div><label for="idays">Days (yearly)</label><input id="idays" type="number" value="365"></div>
+      <div><label for="idev">Devices</label><input id="idev" type="number" value="2"></div>
+      <div><label for="iemail">E-mail</label><input id="iemail" type="email"></div>
+      <div><label for="iname">Name</label><input id="iname"></div>
+      <div><label for="inote">Note (UPI ref…)</label><input id="inote"></div>
+    </div>
+    <div class="btns" style="justify-content:flex-start"><button class="btn" id="issue" type="button">Issue</button></div>
+    <div id="imsg"></div></div>
+  <div class="card" style="margin-top:20px"><h3>All licences</h3><div class="btns" style="justify-content:flex-start;margin-top:10px"><button class="btn" id="load" type="button">Load</button></div>
+    <div style="overflow-x:auto"><table id="list" style="width:100%;font-size:14px;margin-top:14px;border-collapse:collapse"></table></div></div>
+</div></section>
+<script src="/assets/admin.js" defer></script>"""
+    write("/admin.html", s + FOOT)
+
 if __name__ == "__main__":
-    home(); pricing(); buy(); legal_pages(); extras()
+    home(); pricing(); buy(); legal_pages(); extras(); admin()
     for k in ORDER: platform(k)
     print("website built in", OUT)
