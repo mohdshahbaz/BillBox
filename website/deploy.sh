@@ -4,6 +4,15 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 BRANCH="${1:-main}"
+# a token or id pasted with a space or a line break still works
+export CLOUDFLARE_API_TOKEN="$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]')"
+export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')"
+V="$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify)"
+if ! printf '%s' "$V" | grep -q '"status":"active"'; then
+  echo "::error::Cloudflare does not accept the API token in CLOUDFLARE_API_TOKEN ($(printf '%s' "$V" | grep -oE '"message":"[^"]*"' | head -1)). Copy the token again (My Profile › API Tokens › Roll, then copy the new value) into the GitHub secret."
+  exit 1
+fi
+[[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]] || { echo "::error::CLOUDFLARE_ACCOUNT_ID should be 32 letters and digits (Workers & Pages › Account ID), not an e-mail or zone id."; exit 1; }
 W() { npx --yes wrangler@4 "$@"; }
 step() { echo; echo "== $*"; }
 
