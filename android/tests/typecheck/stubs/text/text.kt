@@ -10,4 +10,4 @@ class TextStyle {
     fun copy(color: Color = Color.Unspecified, fontSize: TextUnit = TextUnit(0), fontWeight: FontWeight? = null, fontFamily: FontFamily? = null,
              textAlign: TextAlign = TextAlign.Start, textDecoration: TextDecoration? = null, lineHeight: TextUnit = TextUnit(0)): TextStyle = this
 }
-@JvmInline value class TextRange(val packed: Long) { constructor(index: Int) : this(0L) }
+@JvmInline value class TextRange(val packed: Long) { constructor(index: Int) : this(0L); constructor(start: Int, end: Int) : this(0L) }

@@ -128,6 +128,8 @@ class BillingState(app: AppState) {
     var preview by mutableStateOf<J?>(null)
     var previewKey by mutableStateOf("")
     var errorText by mutableStateOf<String?>(null)
+    /** The line whose Box (or Pcs) gets the cursor next: the one just added. */
+    var focusLine by mutableStateOf<Long?>(null)
 
     val recalcKey: String get() = "$partyId|$billDate|$saleType|$payMode|$paid|" + lines.joinToString(",") { "${it.itemId}:${it.boxes}:${it.pcs}:${it.disc}:${it.rate}" }
 
@@ -266,7 +268,8 @@ fun BillingScreen() {
         if (i >= 0) { val l = st.lines[i]; st.lines[i] = if (l.ppb > 1) l.copy(boxes = l.boxes + 1) else l.copy(pcs = l.pcs + 1) }
         else st.lines.add(BillLine.fresh(item, app.setting("bill_default_disc"), app.setting("bill_new_unit")))
         st.query = ""; highlight = 0
-        runCatching { searchFocus.requestFocus() }
+        // the cursor goes to the line's Box (Pcs for loose items); the keyboard's Next / Done goes on from there
+        st.focusLine = st.lines.firstOrNull { it.itemId == item.id }?.id
     }
 
     fun submitSearch() {
@@ -434,8 +437,8 @@ private fun BillTable(st: BillingState, totals: Totals?) {
                     Hint((listOfNotNull(if (l.ppb > 1) "${l.ppb} pcs / box" else null, "Stock ${Fmt.boxPcs(l.stock.toInt(), l.ppb)}") + schemes).joinToString("  ·  "))
                 }
             },
-            Col("Box", "box", if (phone) 60 else 66) { l -> if (l.ppb > 1) IntCell(l.boxes, { v -> upd(l) { it.copy(boxes = v) } }) else Cell("–") },
-            Col("Pcs", "pcs", if (phone) 64 else 70) { l -> IntCell(l.pcs, { v -> upd(l) { it.copy(pcs = v) } }) },
+            Col("Box", "box", if (phone) 60 else 66) { l -> if (l.ppb > 1) IntCell(l.boxes, { v -> upd(l) { it.copy(boxes = v) } }, focusNow = st.focusLine == l.id, onFocused = { st.focusLine = null }) else Cell("–") },
+            Col("Pcs", "pcs", if (phone) 64 else 70) { l -> IntCell(l.pcs, { v -> upd(l) { it.copy(pcs = v) } }, focusNow = st.focusLine == l.id && l.ppb <= 1, onFocused = { st.focusLine = null }) },
             Col("Total pcs", "total", 70, end = true) { l -> Cell("${l.totalPcs}", MaterialTheme.colorScheme.onSurfaceVariant, end = true) },
             Col("Disc %", "disc", 66) { l -> EditCell(l.disc, { v -> upd(l) { it.copy(disc = v) } }, placeholder = "0") },
             Col("Rate / pc (ex-GST)", "rate", 112, end = true) { l ->

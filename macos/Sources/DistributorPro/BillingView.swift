@@ -57,6 +57,9 @@ struct BillLine: Identifiable {
     @State private var query = ""
     @State private var highlight = 0
     @FocusState private var searchFocus: Bool
+    /// The Box (or Pcs) field the cursor goes to when an item is added, so its quantity can be typed straight away.
+    @FocusState private var qtyFocus: QtyField?
+    @State private var qtySelect: QtyField?
 
     /// The lines live in the model so every change recalculates the bill immediately.
     private var lines: [BillLine] {
@@ -246,14 +249,26 @@ struct BillLine: Identifiable {
     }
 
     private func add(_ item: JSON) {
+        let id: UUID
         if let i = lines.firstIndex(where: { $0.itemId == item.id }) {
             // same item again: one more box (or one more piece for loose items)
             if lines[i].ppb > 1 { lines[i].boxes += 1 } else { lines[i].pcs += 1 }
+            id = lines[i].id
         } else {
-            lines.append(BillLine.fresh(item, disc: app.settings.str("bill_default_disc"), unit: app.settings.str("bill_new_unit")))
+            let l = BillLine.fresh(item, disc: app.settings.str("bill_default_disc"), unit: app.settings.str("bill_new_unit"))
+            lines.append(l)
+            id = l.id
         }
         query = ""
-        searchFocus = true
+        // the cursor goes to the line's Box (Pcs for loose items): type the quantity, Return goes back to the search
+        guard let l = lines.first(where: { $0.id == id }) else { searchFocus = true; return }
+        let target: QtyField = l.ppb > 1 ? .box(id) : .pcs(id)
+        qtySelect = target
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)   // the new row's field exists after this redraw
+            searchFocus = false
+            qtyFocus = target
+        }
     }
 
     // MARK: Lines
@@ -287,14 +302,14 @@ struct BillLine: Identifiable {
 
             GridColumn("Box", id: "box", min: 56, ideal: 70) { (l: BillLine) in
                 if l.ppb > 1 {
-                    IntCell(value: lb(l.id, \.boxes, 0))
+                    IntCell(value: lb(l.id, \.boxes, 0), field: .box(l.id), focus: $qtyFocus, select: $qtySelect) { qtyFocus = nil; searchFocus = true }
                 } else {
                     Text("–").foregroundStyle(.secondary)
                 }
             }
 
             GridColumn("Pcs", id: "pcs", min: 64, ideal: 80) { (l: BillLine) in
-                IntCell(value: lb(l.id, \.pcs, 0))
+                IntCell(value: lb(l.id, \.pcs, 0), field: .pcs(l.id), focus: $qtyFocus, select: $qtySelect) { qtyFocus = nil; searchFocus = true }
             }
 
             GridColumn("Total pcs", id: "total", min: 56, ideal: 72, align: .trailing) { (l: BillLine) in
@@ -652,22 +667,45 @@ struct BillLine: Identifiable {
 
 /// A whole-number field for Box / Pcs. It keeps what is typed (so clearing the field is allowed) and pushes every keystroke
 /// straight into the bill; if the bill changes the number from elsewhere (a repeated scan adds a box) the text follows.
+/// Which quantity field of which line has the cursor.
+enum QtyField: Hashable { case box(UUID), pcs(UUID) }
+
 private struct IntCell: View {
     @Binding var value: Int
+    let field: QtyField
+    var focus: FocusState<QtyField?>.Binding
+    @Binding var select: QtyField?
+    var next: () -> Void = {}
     @State private var text = ""
+    /// Reached by adding the item: the first digit typed replaces the number (shown greyed meanwhile); leaving without typing keeps it.
+    @State private var replacing = false
 
     var body: some View {
-        TextField("0", text: $text)
+        TextField("0", text: $text, prompt: Text(replacing ? String(value) : "0"))
             .multilineTextAlignment(.trailing)
+            .focused(focus, equals: field)
+            .onSubmit { next() }
             .onAppear { text = String(value) }
             .onChange(of: text) { t in
                 let digits = String(t.filter(\.isNumber).prefix(7))
                 if digits != t { text = digits }
+                if replacing && digits.isEmpty { return }
+                replacing = false
                 let n = Int(digits) ?? 0
                 if n != value { value = n }
             }
             .onChange(of: value) { v in
-                if (Int(text) ?? 0) != v { text = String(v) }
+                if !replacing && (Int(text) ?? 0) != v { text = String(v) }
+            }
+            .onChange(of: focus.wrappedValue) { f in
+                if f == field && select == field {
+                    select = nil
+                    replacing = true
+                    text = ""
+                } else if f != field && replacing {
+                    replacing = false
+                    text = String(value)
+                }
             }
     }
 }

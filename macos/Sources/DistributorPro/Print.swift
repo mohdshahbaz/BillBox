@@ -232,12 +232,13 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             vRule()
             VStack(alignment: .leading, spacing: 1) {
+                // the buyer stands out: "Bill to" and the party in bold, larger than the seller's details
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    t(hc(inv.str("doc_title") == "DEBIT NOTE" ? "Supplier" : "Bill to"), 6.5).foregroundStyle(muted)
-                    t(hc(inv.str("party_name").isEmpty ? "Cash customer" : inv.str("party_name")), 9, bold: true).lineLimit(1).minimumScaleFactor(0.7)
+                    t(hc(inv.str("doc_title") == "DEBIT NOTE" ? "Supplier" : "Bill to"), 7.5, bold: true)
+                    t(hc(inv.str("party_name").isEmpty ? "Cash customer" : inv.str("party_name")), 11.5, bold: true).lineLimit(1).minimumScaleFactor(0.6)
                 }
                 ForEach(Array(buyerLines.enumerated()), id: \.offset) { _, l in
-                    t(hc(l), 6.5, weight: l.hasPrefix("GSTIN") ? .semibold : .regular).lineLimit(1).minimumScaleFactor(0.75)
+                    t(hc(l), 7.5, weight: l.hasPrefix("GSTIN") ? .bold : .semibold).lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
             .padding(.horizontal, 5).padding(.vertical, 3)

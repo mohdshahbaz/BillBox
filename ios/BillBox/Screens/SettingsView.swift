@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 @MainActor struct SettingsView: View {
     var body: some View {
         List {
+            BackupSafetyRow()
             NavigationLink { AppearanceSettings().navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline) } label: { SettingsRow(title: "Appearance", symbol: "paintpalette", color: .pink) }
             NavigationLink { CompanySettings() } label: { SettingsRow(title: "Companies", symbol: "building.2", color: .blue) }
             NavigationLink { PrintSettings() } label: { SettingsRow(title: "Printing", symbol: "printer", color: .gray) }
@@ -293,8 +294,21 @@ import UniformTypeIdentifiers
         }
     }
 
+    /// Inside BillBox's own folder the backups go when BillBox is deleted (iOS removes an app's folder with the app).
+    private var insideApp: Bool { !dir.isEmpty && dir.hasPrefix(NSHomeDirectory()) }
+
     private var settingsSection: some View {
         Section {
+            if insideApp {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Deleting BillBox deletes these backups", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.callout.weight(.semibold))
+                    Text("iPhone removes an app's own folder together with the app. Choose a folder in iCloud Drive, or make one in Files › On My iPhone (outside BillBox): backups there stay when BillBox is deleted, and “Restore from a backup folder or .zip…” reads them after installing again.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Button { Task { await chooseFolder() } } label: { Label("Choose a safe folder…", systemImage: "icloud.and.arrow.up") }
+                        .buttonStyle(.borderedProminent).disabled(busy)
+                }
+                .padding(.vertical, 4)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Backup folder").font(.subheadline).foregroundStyle(.secondary)
                 Text(folderName).font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
@@ -672,5 +686,33 @@ struct SettingsRow: View {
             } header: { Text("Payments") }
         }
         .groupedForm()
+    }
+}
+
+
+/// Settings' first row while backups are still inside BillBox's own folder (lost if BillBox is deleted).
+@MainActor struct BackupSafetyRow: View {
+    @State private var inside = false
+
+    var body: some View {
+        Group {
+            if inside {
+                NavigationLink { BackupSettings() } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Backups are inside BillBox").font(.callout.weight(.semibold))
+                            Text("Deleting the app deletes them. Choose a folder in iCloud Drive.").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .task {
+            if let r = try? await API.obj("GET", "/backup") {
+                let d = r.obj("config").str("dir")
+                inside = !d.isEmpty && d.hasPrefix(NSHomeDirectory())
+            }
+        }
     }
 }

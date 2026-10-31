@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -50,7 +51,11 @@ fun EditCell(value: String, onValue: (String) -> Unit, modifier: Modifier = Modi
         textStyle = style,
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number, imeAction = ImeAction.Next),
-        modifier = modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+        // reaching the cell selects its number, so typing replaces it (the 1 of a new line) instead of adding to it
+        modifier = modifier.fillMaxWidth().onFocusChanged {
+            if (it.isFocused && !focused) tf = tf.copy(selection = TextRange(0, tf.text.length))
+            focused = it.isFocused
+        },
         decorationBox = { inner ->
             Box(Modifier.fillMaxWidth().heightIn(min = 34.dp)
                 .border(if (focused) 2.dp else 1.dp, if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
@@ -64,8 +69,12 @@ fun EditCell(value: String, onValue: (String) -> Unit, modifier: Modifier = Modi
 
 /** Whole numbers only (boxes, pieces): blank reads as 0. */
 @Composable
-fun IntCell(value: Int, onValue: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun IntCell(value: Int, onValue: (Int) -> Unit, modifier: Modifier = Modifier, focusNow: Boolean = false, onFocused: () -> Unit = {}) {
+    // a new bill line: the cursor comes here so its quantity can be typed straight away
+    val fr = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(focusNow) { if (focusNow) { kotlinx.coroutines.delay(80); runCatching { fr.requestFocus() }; onFocused() } }
     var text by remember { mutableStateOf(value.toString()) }
     LaunchedEffect(value) { if ((text.toIntOrNull() ?: 0) != value) text = value.toString() }
-    EditCell(text, { t -> val d = t.filter { it.isDigit() }.take(7); text = d; val n = d.toIntOrNull() ?: 0; if (n != value) onValue(n) }, modifier, placeholder = "0", decimal = false)
+    EditCell(text, { t -> val d = t.filter { it.isDigit() }.take(7); text = d; val n = d.toIntOrNull() ?: 0; if (n != value) onValue(n) },
+        modifier.focusRequester(fr), placeholder = "0", decimal = false)
 }

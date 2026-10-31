@@ -207,15 +207,17 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         val bx = x + half + 5; val bw = half - 10
         var by = y + 3
         val lbl = hc(if (inv.str("doc_title") == "DEBIT NOTE") "Supplier" else "Bill to")
-        val lw = pen.width(lbl, 6.5f * fs)
-        val rowH = 12f * fs
-        pen.text(lbl, bx, by, lw + 1, rowH, 6.5f * fs, color = MUTED, minScale = 1f)
-        pen.text(hc(inv.str("party_name").ifEmpty { "Cash customer" }), bx + lw + 4, by, bw - lw - 4, rowH, 9 * fs, 700, minScale = 0.7f)
+        // the buyer stands out: "Bill to" and the party in bold, larger than the seller's details
+        val lw = pen.width(lbl, 7.5f * fs, 700)
+        val rowH = 15f * fs
+        pen.text(lbl, bx, by, lw + 1, rowH, 7.5f * fs, 700, minScale = 1f)
+        pen.text(hc(inv.str("party_name").ifEmpty { "Cash customer" }), bx + lw + 4, by, bw - lw - 4, rowH, 11.5f * fs, 700, minScale = 0.6f)
         by += rowH
+        val lineH = 9.5f * fs
         for (l in buyerLines()) {
-            if (by + small > y + g.sellerBand) break
-            pen.text(hc(l), bx, by, bw, small, 6.5f * fs, if (l.startsWith("GSTIN")) 600 else 400)
-            by += small
+            if (by + lineH > y + g.sellerBand) break
+            pen.text(hc(l), bx, by, bw, lineH, 7.5f * fs, if (l.startsWith("GSTIN")) 700 else 600, minScale = 0.7f)
+            by += lineH
         }
         pen.hLine(x, x + w, y + g.sellerBand + RULE / 2)
         infoRow(pen, x, y + g.sellerBand + RULE, w)

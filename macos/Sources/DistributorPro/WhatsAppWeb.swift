@@ -205,7 +205,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
         if state == "chats" || state == "composer" { connected = true; status = "Already connected"; return }
         if state != "qr" && state != "code" { await load("https://web.whatsapp.com/") }
         // wait for the login page
-        for _ in 0..<40 {
+        for _ in 0..<60 {
             let s = await pageState()
             if s == "qr" || s == "code" { break }
             if s == "chats" || s == "composer" { connected = true; status = "Already connected"; return }
@@ -218,7 +218,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
             status = "Type the code on your phone: WhatsApp › Settings › Linked devices › Link a device › Link with phone number instead"
             watchLink()
         } else {
-            status = "WhatsApp did not give a code (\(r)). Open the page with Show page and tap “Log in with phone number” there, or scan the QR code."
+            status = r.hasPrefix("page:") ? "WhatsApp did not offer the phone-number login. The page shows: \(r.dropFirst(5).trimmingCharacters(in: .whitespaces)). Use Show page to see it." : "WhatsApp did not give a code (\(r)). Use Show page and tap “Log in with phone number” there."
         }
     }
 
@@ -243,12 +243,14 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
     /// Clicks "Log in with phone number", types the number, presses Next and reads the code WhatsApp shows.
     private static let linkScript = #"""
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const deepest = (re) => {
-      const all = [...document.querySelectorAll('button, a, [role="button"], span, div')]
-        .filter((e) => re.test((e.innerText || '').trim()) && (e.innerText || '').trim().length < 60);
+    const words = (e) => ((e.textContent || '') + ' ' + (e.getAttribute && (e.getAttribute('aria-label') || '') || '')).replace(/\s+/g, ' ').trim();
+    // the smallest element whose own text asks for the phone-number login (WhatsApp words it a few ways)
+    const find = (re) => {
+      const all = [...document.querySelectorAll('button, a, [role="button"], [role="link"], span, div')]
+        .filter((e) => re.test(words(e)) && words(e).length < 80);
       return all.length ? all[all.length - 1] : null;
     };
-    const press = (el) => { const b = el.closest('button, a, [role="button"]') || el; b.click(); };
+    const press = (el) => { const b = el.closest('button, a, [role="button"], [role="link"]') || el; b.click(); };
     const code = () => {
       const c = document.querySelector('[data-link-code]');
       if (c) return (c.getAttribute('data-link-code') || '').replace(/[^A-Za-z0-9]/g, '');
@@ -256,8 +258,8 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
     };
     if (code()) return 'code:' + code();
     let link = null;
-    for (let i = 0; i < 20 && !link; i++) { link = deepest(/^(log in|link) with phone( number)?/i); if (!link) await sleep(500); }
-    if (!link) return 'no phone-number option on the page';
+    for (let i = 0; i < 30 && !link; i++) { link = find(/(log ?in|link|sign ?in)( with| using)? (your )?phone( number)?|phone number instead/i); if (!link) await sleep(500); }
+    if (!link) return 'page: ' + (document.title || '') + ' | ' + (document.body ? words(document.body).slice(0, 220) : 'empty');
     press(link);
     let input = null;
     for (let i = 0; i < 20 && !input; i++) {
@@ -271,11 +273,11 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
     setter.call(input, number); input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
     await sleep(700);
-    const next = deepest(/^next$/i);
+    const next = find(/^next$/i);
     if (!next) return 'no Next button';
     press(next);
     for (let i = 0; i < 40; i++) { await sleep(500); if (code()) return 'code:' + code(); }
-    const m = (document.body.innerText || '').match(/\b([A-Z0-9]{4})[- ]?([A-Z0-9]{4})\b/);
+    const m = (document.body.textContent || '').match(/\b([A-Z0-9]{4})[- ]?([A-Z0-9]{4})\b/);
     return m ? 'code:' + m[1] + m[2] : 'no code shown';
     """#
 

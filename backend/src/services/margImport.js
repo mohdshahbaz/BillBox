@@ -126,12 +126,61 @@ function model(files) {
     } else if (clean(r.SGCODE) === 'ZZZZZZ' && !(code in company)) company[code] = clean(r.SNAME) || clean(r.PARNAM) || null;
   }
 
-  // latest sale rate of each item (ex-GST, per piece): what the item is actually sold at
+  /**
+   * How many pieces Marg's Rate A is for. Marg keeps it per its own pack (10 for "Boondi 38g (250 PKT)", where 250 is the
+   * case), per the case, or per piece, item by item. The last purchase rate (LPRATE) is per piece, so the pack that puts
+   * the per-piece sale rate just above it wins; without one, Marg's own pack (never the case size read from the name).
+   */
+  function rateUnit(rate, packs, lp, inner) {
+    const marg = Math.max(1, packs[0] || 1);
+    if (!(lp > 0) || !(rate > 0)) return marg;
+    // one piece, Marg's pack, the case in the name, or Marg's pack of the packs its bills are written in (36 x 12)
+    const cands = [...new Set([1, ...packs.filter((p) => p > 0), ...inner.filter((q) => q > 1).map((q) => marg * q)])];
+    const off = (d) => Math.abs(Math.log(rate / d / (lp * 1.15)));
+    const best = cands.reduce((b, d) => (off(d) < off(b) - 1e-9 ? d : b), marg);
+    return off(best) <= Math.log(3) ? best : marg;   // nothing near the purchase rate: the purchase rate is off, keep Marg's pack
+  }
+  /** Marg's last purchase rate is per piece for most items and per box for some: when it is far above the per-piece sale
+   *  rate, the box it is for (the usual billing pack, or Marg's pack) brings it back to just under the sale rate. */
+  function purchaseRate(lp, sale, packs) {
+    if (!(lp > 0) || !(sale > 0) || lp <= sale * 3) return r8(lp);
+    const off = (d) => Math.abs(Math.log(lp / d / (sale * 0.87)));
+    const best = packs.filter((p) => p > 1).reduce((b, d) => (b === null || off(d) < off(b) - 1e-9 ? d : b), null);
+    return best !== null && off(best) <= Math.log(2) ? r8(lp / best) : r8(lp);
+  }
+  /** A name with the piece's MRP ("Fatax Noodles 5/-") whose rate is above it: the rate is for a box, so the box it is for
+   *  (the box in the name, the usual billing pack or Marg's pack) that lands it under the MRP brings it to one piece. */
+  function byNameMrp(it, packs) {
+    const nm = mrpFromName(it.name);
+    const incl = it.retail_price * (1 + (it.gst_rate || 0) / 100);
+    if (!(nm > 0) || !(incl > nm * 1.02)) return;
+    for (const d of [...new Set(packs.filter((p) => p > 1))]) {
+      const v = incl / d;
+      if (v >= nm * 0.5 && v <= nm * 1.02) {
+        it.retail_price = it.wholesale_price = r8(it.retail_price / d);
+        if (it.purchase_price > nm) it.purchase_price = r8(it.purchase_price / d);
+        return;
+      }
+    }
+  }
+  // the packs each item's bill rows are written in (12 for a box of 12 packets)
+  const linePacks = {};
+  for (const l of dis) { const p = int(l.PACK); if (p > 1) (linePacks[clean(l.CODE)] = linePacks[clean(l.CODE)] || new Set()).add(p); }
+
+  // latest sale rate of each item (ex-GST, per piece): what the item is actually sold at.
+  // The pack each item is usually billed in (rows in another pack, like a later change of pack in Marg, are left out)
+  const packCount = {};
+  for (const l of dis) if (clean(l.FLG) === 'G' && num(l.SFRATE) > 0) {
+    const c = clean(l.CODE), p = Math.max(1, int(l.PACK) || 1);
+    (packCount[c] = packCount[c] || {})[p] = (packCount[c][p] || 0) + 1;
+  }
+  const usualPack = (c) => Object.entries(packCount[c] || {}).reduce((b, [p, n]) => (!b || n > b[1] || (n === b[1] && +p < +b[0]) ? [p, n] : b), null);
   const saleRate = {};
   for (const l of dis) if (clean(l.FLG) === 'G' && num(l.SFRATE) > 0) {
-    const d = day(l.DATE) || '';
-    const cur = saleRate[clean(l.CODE)];
-    if (!cur || d >= cur.date) saleRate[clean(l.CODE)] = { date: d, rate: r8(num(l.SFRATE) / Math.max(1, int(l.PACK) || 1)) };
+    const d = day(l.DATE) || '', c = clean(l.CODE), p = Math.max(1, int(l.PACK) || 1);
+    if (String(p) !== usualPack(c)[0]) continue;
+    const cur = saleRate[c];
+    if (!cur || d >= cur.date) saleRate[c] = { date: d, rate: r8(num(l.SFRATE) / p) };
   }
 
   // the MRP Marg keeps as the batch label on bill rows ("120.00" = a box of 12 at Rs 10), per piece, latest row first
@@ -139,6 +188,7 @@ function model(files) {
   for (const l of dis) {
     const f = clean(l.FLG), b = num(l.BATCH);
     if ((f !== 'G' && f !== 'P') || !(b > 0)) continue;
+    if (packCount[clean(l.CODE)] && String(Math.max(1, int(l.PACK) || 1)) !== usualPack(clean(l.CODE))[0]) continue;   // the usual pack only
     const d = day(l.DATE) || '';
     const cur = batchMrp[clean(l.CODE)];
     if (!cur || d >= cur.date) batchMrp[clean(l.CODE)] = { date: d, mrp: r2(b / Math.max(1, int(l.PACK) || 1)) };
@@ -154,17 +204,23 @@ function model(files) {
     const pack = packFromName(name) || Math.max(1, int(r.PACK) || 1);
     let k = key(name);
     if (itemByKey[k] && itemByKey[k].pcs_per_box !== pack && clean(r.PACKING)) { name = `${name} ${clean(r.PACKING)}`; k = key(name); }
-    if (itemByKey[k]) { itemByCode[code] = itemByKey[k]; mergedItems++; continue; }
+    if (itemByKey[k]) {
+      const ex = itemByKey[k];
+      // the same item under a second Marg code: its real sale rate beats the first code's list rate
+      if (ex.rateFromList && saleRate[code]) { ex.retail_price = ex.wholesale_price = saleRate[code].rate; ex.rateFromList = false; }
+      itemByCode[code] = ex; mergedItems++; continue;
+    }
     const com = commodity[clean(r.GCODE6)] || {};
     const gst = clean(r.TAXL) === 'E' ? 0 : (com.gst || num(r.IGST) || 0);
     const sr = saleRate[code];
-    const rateA = num(r.RATEA) > 0 ? r8(num(r.RATEA) / (1 + gst / 100) / pack) : 0;
+    const rateA = num(r.RATEA) > 0 ? r8(num(r.RATEA) / (1 + gst / 100) / rateUnit(num(r.RATEA) / (1 + gst / 100), [int(r.PACK), pack], num(r.LPRATE), [...(linePacks[code] || [])].sort((a, b) => a - b))) : 0;
     const it = {
       code, name, pcs_per_box: pack, gst_rate: gst, hsn: com.hsn || null, mrp: mrpFromName(name) || (batchMrp[code] ? batchMrp[code].mrp : 0),
       category: pinned(name) || byRules(name) || byRules(cleanQuery(name)) || company[clean(r.GCODE)] || null,
-      purchase_price: r8(num(r.LPRATE)), retail_price: sr ? sr.rate : rateA, wholesale_price: sr ? sr.rate : rateA,
-      opening: int(r.OPENING), closing: int(r.BALANCE), moved: 0,
+      purchase_price: purchaseRate(num(r.LPRATE), sr ? sr.rate : rateA, [packCount[code] ? +usualPack(code)[0] : 0, int(r.PACK)]), retail_price: sr ? sr.rate : rateA, wholesale_price: sr ? sr.rate : rateA,
+      opening: int(r.OPENING), closing: int(r.BALANCE), moved: 0, rateFromList: !sr,
     };
+    byNameMrp(it, [pack, packCount[code] ? +usualPack(code)[0] : 0, int(r.PACK)]);
     items.push(it); itemByCode[code] = it; itemByKey[k] = it;
   }
   if (skippedItems) cleaning.push(`${skippedItems} placeholder item rows skipped (###…, "PRODUCT NAME").`);
@@ -460,6 +516,35 @@ function importMarg(p) {
   return { ...m.summary, added: out.added, already_here: out.existing, numbering };
 }
 
+/**
+ * Settings › Import from Marg › Correct item prices: reads the Marg backup again and puts right the sale, wholesale and
+ * purchase price (and MRP) of items already here whose price is far off what Marg says (twice as much or less: a price
+ * worked out per box instead of per piece by an earlier BillBox). Prices changed by hand by a little are left alone.
+ * body { path, apply }: without apply it only lists what would change.
+ */
+function correctPrices(p, apply) {
+  const m = model(readSource(p));
+  const far = (have, want) => (want > 0 ? !(have > 0) || have / want >= 1.9 || want / have >= 1.9 : false);
+  const items = [];
+  let checked = 0;
+  const run = () => {
+    for (const it of m.items) {
+      const h = db.prepare('SELECT id,name,retail_price,wholesale_price,purchase_price,mrp FROM items WHERE lower(name)=lower(?)').get(it.name);
+      if (!h) continue;
+      checked++;
+      const want = { retail_price: r8(it.retail_price), wholesale_price: r8(it.wholesale_price), purchase_price: r8(it.purchase_price), mrp: r2(it.mrp || 0) };
+      const next = {};
+      for (const k of Object.keys(want)) next[k] = far(Number(h[k]) || 0, want[k]) ? want[k] : Number(h[k]) || 0;
+      if (Object.keys(want).every((k) => next[k] === (Number(h[k]) || 0))) continue;
+      items.push({ name: h.name, retail_old: Number(h.retail_price) || 0, retail_new: next.retail_price, wholesale_old: Number(h.wholesale_price) || 0,
+        wholesale_new: next.wholesale_price, purchase_old: Number(h.purchase_price) || 0, purchase_new: next.purchase_price, mrp_old: Number(h.mrp) || 0, mrp_new: next.mrp });
+      if (apply) db.prepare('UPDATE items SET retail_price=?,wholesale_price=?,purchase_price=?,mrp=? WHERE id=?').run(next.retail_price, next.wholesale_price, next.purchase_price, next.mrp, h.id);
+    }
+  };
+  if (apply) db.transaction(run)(); else run();
+  return { checked, changed: items.length, applied: !!apply, items };
+}
+
 /** The cleaned books as plain tables (for checking in a spreadsheet, or keeping): items, parties, bills, bill rows, money. */
 function cleanTables(p) {
   const m = model(readSource(p));
@@ -477,4 +562,4 @@ function cleanTables(p) {
   };
 }
 
-module.exports = { previewMarg, importMarg, cleanTables, parseCsv, readZip };
+module.exports = { previewMarg, importMarg, cleanTables, parseCsv, readZip, correctPrices };

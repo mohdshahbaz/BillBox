@@ -27,6 +27,7 @@ import UniformTypeIdentifiers
             }
             if let errorText { Section { Text(errorText).foregroundStyle(.red) } }
             if let r = result ?? report { summary(r) }
+            if let path { MargPriceFix(path: path) }
         }
         .groupedForm()
         .confirmationDialog("Import this Marg backup into \(app.companyName)?", isPresented: $confirm, titleVisibility: .visible) {
@@ -139,5 +140,56 @@ import UniformTypeIdentifiers
         case .success(let p): await preview(p)
         case .failure(let e): errorText = e.localizedDescription
         }
+    }
+}
+
+/// Settings › Import from Marg › Correct item prices: items already in the books whose price is far off the Marg backup
+/// (an earlier BillBox worked some out per box instead of per piece) are listed, then put right on Correct.
+@MainActor struct MargPriceFix: View {
+    @EnvironmentObject private var app: AppModel
+    let path: String
+    @State private var check: JSON?
+    @State private var busy = false
+    @State private var errorText: String?
+
+    var body: some View {
+        Section {
+            Button { Task { await run(apply: false) } } label: { Label("Check item prices against this backup", systemImage: "indianrupeesign.circle") }
+                .disabled(busy)
+            if let errorText { Text(errorText).foregroundStyle(.red).font(.callout) }
+            if let c = check {
+                let rows = c.list("items")
+                if c.bool("applied") {
+                    Text("Corrected the prices of \(c.int("changed")) items.").font(.callout)
+                } else if rows.isEmpty {
+                    Text("All \(c.int("checked")) items already here match the backup.").font(.callout).foregroundStyle(.secondary)
+                } else {
+                    Text("\(rows.count) of \(c.int("checked")) items have a price far off the backup (per piece, ex-GST):").font(.callout)
+                    ForEach(Array(rows.prefix(40).enumerated()), id: \.offset) { _, r in
+                        HStack {
+                            Text(r.str("name")).lineLimit(1)
+                            Spacer()
+                            Text("\(Fmt.rate(r.num("retail_old"))) → \(Fmt.rate(r.num("retail_new")))").monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        .font(.callout)
+                    }
+                    if rows.count > 40 { Text("…and \(rows.count - 40) more").font(.caption).foregroundStyle(.secondary) }
+                    Button { Task { await run(apply: true) } } label: { Label("Correct \(rows.count) prices", systemImage: "checkmark.circle") }
+                        .buttonStyle(.borderedProminent).disabled(busy)
+                }
+            }
+        } header: { Text("Prices of items already here") } footer: {
+            Text("Only prices at least twice or half of what Marg says are changed (an earlier BillBox read some Marg rates per box instead of per piece). Prices you changed by a little are kept.")
+        }
+    }
+
+    private func run(apply: Bool) async {
+        busy = true
+        defer { busy = false }
+        errorText = nil
+        do {
+            check = try await API.objRaw("POST", "/import/marg/prices", body: ["path": path, "apply": apply])
+            if apply { app.notify("Corrected the prices of \(check?.int("changed") ?? 0) items.") }
+        } catch { errorText = error.localizedDescription }
     }
 }

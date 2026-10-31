@@ -60,6 +60,9 @@ struct BillLine: Identifiable {
     @State private var creditAlert: String?
     @State private var askPrint: JSON?
     @FocusState private var searchFocus: Bool
+    /// The Box (or Pcs) field the cursor goes to when an item is added, so its quantity can be typed straight away.
+    @FocusState private var qtyFocus: QtyField?
+    @State private var qtySelect: QtyField?
 
     private var lines: [BillLine] {
         get { model.lines }
@@ -118,7 +121,14 @@ struct BillLine: Identifiable {
                 searchField
                 // the suggestions float over the bill and never add to its height: with the keyboard up, a list taller than the
                 // space left used to push the search field under the top bar and leave the bill unable to scroll
-                linesTable
+                Group {
+                    // an empty bill shows just the hint: drawn over the table it sat on the column headings when the keyboard
+                    // left little room
+                    if lines.isEmpty {
+                        ScrollView { EmptyState(title: "Start a bill", symbol: "cart", message: "Search an item above and press Return.").padding(.top, 24) }
+                            .scrollDismissesKeyboard(.never)
+                    } else { linesTable }
+                }
                     .frame(maxHeight: .infinity)
                     .overlay(alignment: .top) { if !suggestions.isEmpty { suggestionList } }
                 if let errorText { Banner(text: errorText, symbol: "exclamationmark.triangle.fill", tint: .red) }
@@ -137,6 +147,14 @@ struct BillLine: Identifiable {
                     .keyboardShortcut("k", modifiers: .command)
                 Button { clear() } label: { Label(editingId != nil ? "Cancel edit" : "New bill", systemImage: "doc.badge.plus") }
                     .keyboardShortcut("n", modifiers: .command)
+            }
+            // above the number pad (it has no Return key): back to the item search for the next line
+            ToolbarItemGroup(placement: .keyboard) {
+                if qtyFocus != nil {
+                    Spacer()
+                    Button { qtyFocus = nil; searchFocus = true } label: { Label("Next item", systemImage: "magnifyingglass") }
+                        .labelStyle(.titleAndIcon)
+                }
             }
         }
         .sheet(isPresented: $newPartyOpen) {
@@ -277,14 +295,26 @@ struct BillLine: Identifiable {
     }
 
     private func add(_ item: JSON) {
+        let id: UUID
         if let i = lines.firstIndex(where: { $0.itemId == item.id }) {
             // same item again: one more box (or one more piece for loose items)
             if lines[i].ppb > 1 { lines[i].boxes += 1 } else { lines[i].pcs += 1 }
+            id = lines[i].id
         } else {
-            lines.append(BillLine.fresh(item, disc: app.settings.str("bill_default_disc"), unit: app.settings.str("bill_new_unit")))
+            let l = BillLine.fresh(item, disc: app.settings.str("bill_default_disc"), unit: app.settings.str("bill_new_unit"))
+            lines.append(l)
+            id = l.id
         }
         query = ""
-        searchFocus = true
+        // the cursor goes to the line's Box (Pcs for loose items): the quantity is typed next, replacing the 1
+        guard let l = lines.first(where: { $0.id == id }) else { searchFocus = true; return }
+        let target: QtyField = l.ppb > 1 ? .box(id) : .pcs(id)
+        qtySelect = target
+        Task { @MainActor in
+            await pause(ms: 120)   // the new row's field exists after this redraw
+            searchFocus = false
+            qtyFocus = target
+        }
     }
 
     // MARK: Lines
@@ -328,10 +358,10 @@ struct BillLine: Identifiable {
                 }
             }
             GridColumn("Box", id: "box", min: 56, ideal: 66) { (l: BillLine) in
-                if l.ppb > 1 { IntCell(value: lb(l.id, \.boxes, 0), label: "Boxes of \(l.name)") } else { Text("–").foregroundStyle(.secondary) }
+                if l.ppb > 1 { IntCell(value: lb(l.id, \.boxes, 0), label: "Boxes of \(l.name)", field: .box(l.id), focus: $qtyFocus, select: $qtySelect) } else { Text("–").foregroundStyle(.secondary) }
             }
             GridColumn("Pcs", id: "pcs", min: 60, ideal: 72) { (l: BillLine) in
-                IntCell(value: lb(l.id, \.pcs, 0), label: "Pieces of \(l.name)")
+                IntCell(value: lb(l.id, \.pcs, 0), label: "Pieces of \(l.name)", field: .pcs(l.id), focus: $qtyFocus, select: $qtySelect)
             }
             GridColumn("Total pcs", id: "total", min: 56, ideal: 70, align: .trailing) { (l: BillLine) in
                 Text("\(l.totalPcs)").monospacedDigit().foregroundStyle(.secondary)
@@ -368,9 +398,6 @@ struct BillLine: Identifiable {
                 Button { lines.removeAll { $0.id == l.id } } label: { Image(systemName: "xmark.circle.fill") }
                     .buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel("Remove \(l.name)")
             }
-        }
-        .overlay {
-            if lines.isEmpty { EmptyState(title: "Start a bill", symbol: "cart", message: "Search an item above and press Return.") }
         }
     }
 
@@ -691,25 +718,46 @@ struct BillLine: Identifiable {
 
 /// A whole-number field for Box / Pcs. It keeps what is typed (so clearing is allowed) and pushes every keystroke into the bill;
 /// when the bill changes the number from elsewhere (a repeated scan adds a box) the text follows.
+/// Which quantity field of which line has the cursor.
+enum QtyField: Hashable { case box(UUID), pcs(UUID) }
+
 private struct IntCell: View {
     @Binding var value: Int
     let label: String
+    let field: QtyField
+    var focus: FocusState<QtyField?>.Binding
+    @Binding var select: QtyField?
     @State private var text = ""
+    /// Reached by adding the item: the first digit typed replaces the number (shown greyed meanwhile); leaving without typing keeps it.
+    @State private var replacing = false
 
     var body: some View {
-        TextField("0", text: $text)
+        TextField("0", text: $text, prompt: Text(replacing ? String(value) : "0"))
             .multilineTextAlignment(.trailing)
             .keyboardType(.numberPad)
+            .focused(focus, equals: field)
             .accessibilityLabel(label)
             .onAppear { text = String(value) }
             .onChange(of: text) { t in
                 let digits = String(t.filter(\.isNumber).prefix(7))
                 if digits != t { text = digits }
+                if replacing && digits.isEmpty { return }
+                replacing = false
                 let n = Int(digits) ?? 0
                 if n != value { value = n }
             }
             .onChange(of: value) { v in
-                if (Int(text) ?? 0) != v { text = String(v) }
+                if !replacing && (Int(text) ?? 0) != v { text = String(v) }
+            }
+            .onChange(of: focus.wrappedValue) { f in
+                if f == field && select == field {
+                    select = nil
+                    replacing = true
+                    text = ""
+                } else if f != field && replacing {
+                    replacing = false
+                    text = String(value)
+                }
             }
     }
 }

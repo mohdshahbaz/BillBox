@@ -5,6 +5,47 @@ import Foundation
 // closing balances and closing stock. Importing twice adds nothing twice.
 
 public enum MargImport {
+    /// How many pieces Marg's Rate A is for (margImport.js rateUnit): its own pack, the case or one piece, item by item; the
+    /// pack that puts the per-piece sale rate just above the last purchase rate (per piece) wins, else Marg's own pack.
+    /// Marg's last purchase rate is per piece for most items and per box for some (margImport.js purchaseRate).
+    static func purchaseRate(_ lp: Double, _ sale: Double, _ packs: [Int]) -> Double {
+        if !(lp > 0) || !(sale > 0) || lp <= sale * 3 { return r8(lp) }
+        let off = { (d: Int) -> Double in abs(log(lp / Double(d) / (sale * 0.87))) }
+        var best: Int? = nil
+        for d in packs where d > 1 && (best == nil || off(d) < off(best!) - 1e-9) { best = d }
+        if let b = best, off(b) <= log(2) { return r8(lp / Double(b)) }
+        return r8(lp)
+    }
+
+    /// A name with the piece's MRP whose rate is above it: the rate is for a box (margImport.js byNameMrp).
+    static func byNameMrp(_ it: Item, _ packs: [Int]) {
+        guard let nm = PDFParser.mrpFromName(it.name), nm > 0 else { return }
+        let incl = it.retail * (1 + it.gst / 100)
+        if !(incl > nm * 1.02) { return }
+        var seen: [Int] = []
+        for d in packs where d > 1 && !seen.contains(d) {
+            seen.append(d)
+            let v = incl / Double(d)
+            if v >= nm * 0.5 && v <= nm * 1.02 {
+                it.retail = r8(it.retail / Double(d))
+                if it.purchase > nm { it.purchase = r8(it.purchase / Double(d)) }
+                return
+            }
+        }
+    }
+
+    static func rateUnit(_ rate: Double, _ packs: [Int], _ lp: Double, _ inner: [Int]) -> Int {
+        let marg = max(1, packs.first ?? 1)
+        if !(lp > 0) || !(rate > 0) { return marg }
+        var cands: [Int] = [1]
+        for p in packs where p > 0 && !cands.contains(p) { cands.append(p) }
+        for q in inner where q > 1 && !cands.contains(marg * q) { cands.append(marg * q) }
+        let off = { (d: Int) -> Double in abs(log(rate / Double(d) / (lp * 1.15))) }
+        var best = marg
+        for d in cands where off(d) < off(best) - 1e-9 { best = d }
+        return off(best) <= log(3) ? best : marg
+    }
+
     static let GSTIN_RE = rx("^\\d{2}[A-Z]{5}\\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
     static let PAN_RE = rx("^[A-Z]{5}\\d{4}[A-Z]$")
     static let NO_EXPIRY = "2099-12-31"
@@ -113,7 +154,7 @@ public enum MargImport {
     // MARK: the books built from the CSV tables
 
     final class Item { var code = "", name = "", pcsPerBox = 1, gst = 0.0, hsn: String?, mrp = 0.0, category: String?, purchase = 0.0, retail = 0.0
-        var opening = 0, closing = 0, moved = 0, id = 0, batch = 0, isNew = false }
+        var opening = 0, closing = 0, moved = 0, id = 0, batch = 0, isNew = false, rateFromList = false }
     final class Party { var code = "", kind = "", name = "", gstin: String?, state: String?, pan: String?, address: String?, phone: String?, mobiles: String?, tel: String?
         var opening = 0.0, closing = 0.0, moved = 0.0, id = 0 }
     struct Line { let item: Item; let qty: Int; let free: Int; let taxable: Double; let discAmt: Double; let discPct: Double; let gross: Double; let rate: Double
@@ -159,11 +200,27 @@ public enum MargImport {
             }
         }
 
+        // the packs each item's bill rows are written in (12 for a box of 12 packets)
+        var linePacks: [String: Set<Int>] = [:]
+        for l in dis { let p = int(l["PACK"]); if p > 1 { linePacks[clean(l["CODE"]), default: []].insert(p) } }
+        // the pack each item is usually billed in (rows in another pack, like a later change of pack in Marg, are left out)
+        var packCount: [String: [Int: Int]] = [:]
+        for l in dis where clean(l["FLG"]) == "G" && num(l["SFRATE"]) > 0 {
+            let p = max(1, int(l["PACK"]) != 0 ? int(l["PACK"]) : 1)
+            packCount[clean(l["CODE"]), default: [:]][p, default: 0] += 1
+        }
+        func usualPack(_ c: String) -> Int {
+            var best: (p: Int, n: Int)? = nil
+            for (p, n) in packCount[c] ?? [:] where best == nil || n > best!.n || (n == best!.n && p < best!.p) { best = (p, n) }
+            return best?.p ?? 1
+        }
         var saleRate: [String: (date: String, rate: Double)] = [:]
         for l in dis where clean(l["FLG"]) == "G" && num(l["SFRATE"]) > 0 {
             let d = day(l["DATE"]) ?? ""
             let c = clean(l["CODE"])
-            if saleRate[c] == nil || d >= saleRate[c]!.date { saleRate[c] = (d, r8(num(l["SFRATE"]) / Double(max(1, int(l["PACK"]) != 0 ? int(l["PACK"]) : 1)))) }
+            let p = max(1, int(l["PACK"]) != 0 ? int(l["PACK"]) : 1)
+            if p != usualPack(c) { continue }
+            if saleRate[c] == nil || d >= saleRate[c]!.date { saleRate[c] = (d, r8(num(l["SFRATE"]) / Double(p))) }
         }
         var batchMrp: [String: (date: String, mrp: Double)] = [:]
         for l in dis {
@@ -171,6 +228,7 @@ public enum MargImport {
             if (f != "G" && f != "P") || !(b > 0) { continue }
             let d = day(l["DATE"]) ?? ""
             let c = clean(l["CODE"])
+            if packCount[c] != nil && max(1, int(l["PACK"]) != 0 ? int(l["PACK"]) : 1) != usualPack(c) { continue }   // the usual pack only
             if batchMrp[c] == nil || d >= batchMrp[c]!.date { batchMrp[c] = (d, r2(b / Double(max(1, int(l["PACK"]) != 0 ? int(l["PACK"]) : 1)))) }
         }
 
@@ -184,18 +242,25 @@ public enum MargImport {
             let pack = PDFParser.packFromName(name) ?? max(1, int(r["PACK"]) != 0 ? int(r["PACK"]) : 1)
             var k = key(name)
             if let ex = itemByKey[k], ex.pcsPerBox != pack, !clean(r["PACKING"]).isEmpty { name = "\(name) \(clean(r["PACKING"]))"; k = key(name) }
-            if let ex = itemByKey[k] { itemByCode[code] = ex; mergedItems += 1; continue }
+            if let ex = itemByKey[k] {
+                // the same item under a second Marg code: its real sale rate beats the first code's list rate
+                if ex.rateFromList, let sr = saleRate[code] { ex.retail = sr.rate; ex.rateFromList = false }
+                itemByCode[code] = ex; mergedItems += 1; continue
+            }
             let com = commodity[clean(r["GCODE6"])]
             let gst: Double = clean(r["TAXL"]) == "E" ? 0 : ((com?.gst ?? 0) != 0 ? com!.gst : (num(r["IGST"]) != 0 ? num(r["IGST"]) : 0))
-            let rateA = num(r["RATEA"]) > 0 ? r8(num(r["RATEA"]) / (1 + gst / 100) / Double(pack)) : 0
+            let rateEx = num(r["RATEA"]) / (1 + gst / 100)
+            let rateA = num(r["RATEA"]) > 0 ? r8(rateEx / Double(Self.rateUnit(rateEx, [int(r["PACK"]), pack], num(r["LPRATE"]), (linePacks[code] ?? []).sorted()))) : 0
             let it = Item()
             it.code = code; it.name = name; it.pcsPerBox = pack; it.gst = gst; it.hsn = com?.hsn ?? nil
             let fromName = PDFParser.mrpFromName(name) ?? 0
             it.mrp = fromName != 0 ? fromName : (batchMrp[code]?.mrp ?? 0)
             it.category = Category.pinned(name) ?? Category.byRules(name) ?? Category.byRules(Category.cleanQuery(name)) ?? (company[clean(r["GCODE"])] ?? nil)
-            it.purchase = r8(num(r["LPRATE"]))
+            it.purchase = Self.purchaseRate(num(r["LPRATE"]), saleRate[code]?.rate ?? rateA, [packCount[code] != nil ? usualPack(code) : 0, int(r["PACK"])])
             it.retail = saleRate[code]?.rate ?? rateA
+            it.rateFromList = saleRate[code] == nil
             it.opening = int(r["OPENING"]); it.closing = int(r["BALANCE"])
+            Self.byNameMrp(it, [pack, packCount[code] != nil ? usualPack(code) : 0, int(r["PACK"])])
             items.append(it); itemByCode[code] = it; itemByKey[k] = it
         }
         if skippedItems > 0 { cleaning.append("\(skippedItems) placeholder item rows skipped (###…, \"PRODUCT NAME\").") }
@@ -495,6 +560,36 @@ public enum MargImport {
         var r: Row = [:]
         for (s, _) in out { r[s] = try peekNo(db, s, nil)["next_no"] ?? "" }
         return r
+    }
+
+    /// Settings › Import from Marg › Correct item prices (margImport.js correctPrices): items already here whose price is
+    /// far off what Marg says are put right; without `apply` it only lists them.
+    static func correctPrices(_ db: Database, _ p: Any?, apply: Bool) throws -> Row {
+        let m = model(try readSource(p))
+        func far(_ have: Double, _ want: Double) -> Bool { want > 0 ? (!(have > 0) || have / want >= 1.9 || want / have >= 1.9) : false }
+        var items: [Any] = []
+        var checked = 0
+        let keys = ["retail_price", "wholesale_price", "purchase_price", "mrp"]
+        func work() throws {
+            for it in m.items {
+                guard let h = try db.prepare("SELECT id,name,retail_price,wholesale_price,purchase_price,mrp FROM items WHERE lower(name)=lower(?)").get(it.name) else { continue }
+                checked += 1
+                let want: [String: Double] = ["retail_price": r8(it.retail), "wholesale_price": r8(it.retail), "purchase_price": r8(it.purchase), "mrp": r2(it.mrp)]
+                var have: [String: Double] = [:], next: [String: Double] = [:]
+                for k in keys { have[k] = JS.number(h[k] ?? nil).isNaN ? 0 : JS.number(h[k] ?? nil); next[k] = far(have[k]!, want[k]!) ? want[k]! : have[k]! }
+                if keys.allSatisfy({ next[$0] == have[$0] }) { continue }
+                let o: Row = ["name": h["name"] ?? NSNull(), "retail_old": have["retail_price"]!, "retail_new": next["retail_price"]!,
+                              "wholesale_old": have["wholesale_price"]!, "wholesale_new": next["wholesale_price"]!,
+                              "purchase_old": have["purchase_price"]!, "purchase_new": next["purchase_price"]!, "mrp_old": have["mrp"]!, "mrp_new": next["mrp"]!]
+                items.append(o)
+                if apply {
+                    try db.prepare("UPDATE items SET retail_price=?,wholesale_price=?,purchase_price=?,mrp=? WHERE id=?")
+                        .run(next["retail_price"]!, next["wholesale_price"]!, next["purchase_price"]!, next["mrp"]!, h.i("id"))
+                }
+            }
+        }
+        if apply { _ = try db.transaction { () throws -> Int in try work(); return 0 } } else { try work() }
+        return ["checked": checked, "changed": items.count, "applied": apply, "items": items] as Row
     }
 
     static func run(_ db: Database, _ p: Any?) throws -> Row {

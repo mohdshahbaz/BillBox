@@ -15,6 +15,11 @@ open class WKWebsiteDataStore: NSObject {
 open class WKWebViewConfiguration: NSObject {
     open var websiteDataStore: WKWebsiteDataStore = .default()
     open var userContentController = WKUserContentController()
+    open var defaultWebpagePreferences = WKWebpagePreferences()
+}
+open class WKWebpagePreferences: NSObject {
+    public enum ContentMode: Int { case recommended, mobile, desktop }
+    open var preferredContentMode: ContentMode = .recommended
 }
 open class WKNavigation: NSObject {}
 open class WKFrameInfo: NSObject {}

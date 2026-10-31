@@ -652,6 +652,7 @@ private fun MargImportPage() {
                 if (parts.isNotEmpty()) Text("New bills carry on Marg's numbering: ${parts.joinToString(", ")}. Change it in Settings › Billing & Dashboard › Numbering.")
             }
         }
+        path?.let { MargPriceFix(it) }
     }
     if (confirm) Confirm("Import this Marg backup into ${app.companyName}?", "Items, parties, bills, debit notes, receipts and payments that are not already here are added. Anything with the same name or number is left as it is.", "Import", {
         val p = path ?: return@Confirm
@@ -664,6 +665,40 @@ private fun MargImportPage() {
             } catch (e: Exception) { errorText = e.message } finally { busy = false }
         }
     }, { confirm = false })
+}
+
+/** Items already in the books whose price is far off the Marg backup (an earlier BillBox worked some out per box instead of
+ *  per piece): listed, then put right on Correct. */
+@Composable
+private fun MargPriceFix(path: String) {
+    val app = LocalApp.current
+    var check by remember { mutableStateOf<J?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var err by remember { mutableStateOf<String?>(null) }
+    fun run(apply: Boolean) = app.launch {
+        busy = true; err = null
+        try {
+            check = Api.obj("POST", "/import/marg/prices", body = mapOf("path" to path, "apply" to apply))
+            if (apply) app.notify("Corrected the prices of ${check?.int("changed") ?: 0} items.")
+        } catch (e: Exception) { err = e.message } finally { busy = false }
+    }
+    SectionHeader("Prices of items already here")
+    OutlinedButton(onClick = { run(false) }, enabled = !busy) { Text("Check item prices against this backup") }
+    ErrorText(err)
+    check?.let { c ->
+        val rows = c.list("items")
+        when {
+            c.bool("applied") -> Text("Corrected the prices of ${c.int("changed")} items.")
+            rows.isEmpty() -> Hint("All ${c.int("checked")} items already here match the backup.")
+            else -> {
+                Text("${rows.size} of ${c.int("checked")} items have a price far off the backup (per piece, ex-GST):")
+                rows.take(40).forEach { r -> InfoLine(r.str("name"), "${Fmt.rate(r.num("retail_old"))} → ${Fmt.rate(r.num("retail_new"))}") }
+                if (rows.size > 40) Hint("…and ${rows.size - 40} more")
+                Button(onClick = { run(true) }, enabled = !busy) { Text("Correct ${rows.size} prices") }
+            }
+        }
+    }
+    Hint("Only prices at least twice or half of what Marg says are changed (an earlier BillBox read some Marg rates per box instead of per piece). Prices you changed by a little are kept.")
 }
 
 /** Settings › Printing: what else the bill shows, its size, a third copy and lines of your own (saved as you change them). */

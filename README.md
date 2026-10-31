@@ -24,6 +24,25 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.4 — Marg prices per piece, quantity first, bolder Bill to, Mac .dmg
+
+- **Marg prices**: an item without past sales got Marg's Rate A divided by the case size in its name ("Boondi Salted 38g
+  (250 PKT)": ₹0.32 a packet instead of ₹7.90). Rate A is now divided by the pack it is really for (Marg's own pack, the case,
+  or one piece, checked against the last purchase rate); sale rates come from rows in the item's usual billing pack (a later
+  change of pack in Marg made one item ₹47.62 a packet); MRP and purchase rates follow the same pack. Items already in your
+  books: Settings › Import from Marg › choose the backup › **Check item prices against this backup** › Correct (only prices
+  twice or half of Marg's are changed).
+- **Billing**: picking an item puts the cursor in that line's Box (Pcs for loose items); the first digit typed replaces the 1.
+  iPhone: "Next item" above the number pad goes back to the search; Mac: Return does. The empty bill's hint no longer sits on
+  the table headings.
+- **Print**: "Bill to" and the party in bold and larger; the buyer's address, GSTIN and phone a size up.
+- **WhatsApp on iPhone**: the WhatsApp page now asks for the desktop site and looks like a Mac to WhatsApp's checks (a phone
+  was sent to "download the app", with no QR code and no phone-number login). If the code still doesn't come, the message
+  says what the page shows.
+- **iPhone backups**: while they are in BillBox's own folder (deleted with the app) Settings shows a warning and
+  Settings › Backup offers "Choose a safe folder…" (iCloud Drive, or a folder made in Files outside BillBox).
+- **Mac**: releases include BillBox-mac-<version>.dmg (open, drag to Applications); ./macos/build_dmg.sh makes one locally.
+
 ## v15.3 — print, companies, iPhone fixes, WhatsApp linking, Android fixed and tested on emulators
 
 - **Print**: a full-weight line between "Amount in words" and the totals, down beside GRAND TOTAL (Android's grey shading

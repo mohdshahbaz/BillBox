@@ -237,6 +237,7 @@ public final class Router {
         // import.js
         case ("POST", 3, "import") where s[1] == "marg" && s[2] == "preview": return ok(try MargImport.preview(db, b["path"] ?? nil))
         case ("POST", 2, "import") where s[1] == "marg": return ok(try MargImport.run(db, b["path"] ?? nil))
+        case ("POST", 3, "import") where s[1] == "marg" && s[2] == "prices": return ok(try MargImport.correctPrices(db, b["path"] ?? nil, apply: JS.truthy(b["apply"] ?? nil)))
 
         // debitNotes.js
         case ("GET", 1, "debit-notes"):

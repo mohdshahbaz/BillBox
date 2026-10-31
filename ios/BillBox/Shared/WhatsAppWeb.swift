@@ -43,6 +43,10 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         cfg.websiteDataStore = .default()          // keeps the WhatsApp login between launches
         let awake = WKUserScript(source: Self.stayAwake, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         cfg.userContentController.addUserScript(awake)
+        // WhatsApp Web sends phones to a "download the app" page (no QR code, no phone-number login): ask for the desktop
+        // site and look like a Mac to its checks (platform, touch points), not only by the browser name
+        cfg.defaultWebpagePreferences.preferredContentMode = .desktop
+        cfg.userContentController.addUserScript(WKUserScript(source: Self.desktop, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         let w = WKWebView(frame: CGRect(x: 0, y: 0, width: 1000, height: 720), configuration: cfg)
         // WhatsApp Web serves its desktop page only to a desktop browser
         w.customUserAgent = Self.userAgent
@@ -174,7 +178,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         if state == "chats" || state == "composer" { connected = true; status = "Already connected"; return }
         if state != "qr" && state != "code" { await load("https://web.whatsapp.com/") }
         // wait for the login page
-        for _ in 0..<40 {
+        for _ in 0..<60 {
             let s = await pageState()
             if s == "qr" || s == "code" { break }
             if s == "chats" || s == "composer" { connected = true; status = "Already connected"; return }
@@ -187,7 +191,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
             status = "Type the code on your phone: WhatsApp › Settings › Linked devices › Link a device › Link with phone number instead"
             watchLink()
         } else {
-            status = "WhatsApp did not give a code (\(r)). Open the page with Show page and tap “Log in with phone number” there, or scan the QR code."
+            status = r.hasPrefix("page:") ? "WhatsApp did not offer the phone-number login. The page shows: \(r.dropFirst(5).trimmingCharacters(in: .whitespaces)). Use Show page to see it." : "WhatsApp did not give a code (\(r)). Use Show page and tap “Log in with phone number” there."
         }
     }
 
@@ -212,12 +216,14 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     /// Clicks "Log in with phone number", types the number, presses Next and reads the code WhatsApp shows.
     private static let linkScript = #"""
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const deepest = (re) => {
-      const all = [...document.querySelectorAll('button, a, [role="button"], span, div')]
-        .filter((e) => re.test((e.innerText || '').trim()) && (e.innerText || '').trim().length < 60);
+    const words = (e) => ((e.textContent || '') + ' ' + (e.getAttribute && (e.getAttribute('aria-label') || '') || '')).replace(/\s+/g, ' ').trim();
+    // the smallest element whose own text asks for the phone-number login (WhatsApp words it a few ways)
+    const find = (re) => {
+      const all = [...document.querySelectorAll('button, a, [role="button"], [role="link"], span, div')]
+        .filter((e) => re.test(words(e)) && words(e).length < 80);
       return all.length ? all[all.length - 1] : null;
     };
-    const press = (el) => { const b = el.closest('button, a, [role="button"]') || el; b.click(); };
+    const press = (el) => { const b = el.closest('button, a, [role="button"], [role="link"]') || el; b.click(); };
     const code = () => {
       const c = document.querySelector('[data-link-code]');
       if (c) return (c.getAttribute('data-link-code') || '').replace(/[^A-Za-z0-9]/g, '');
@@ -225,8 +231,8 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     };
     if (code()) return 'code:' + code();
     let link = null;
-    for (let i = 0; i < 20 && !link; i++) { link = deepest(/^(log in|link) with phone( number)?/i); if (!link) await sleep(500); }
-    if (!link) return 'no phone-number option on the page';
+    for (let i = 0; i < 30 && !link; i++) { link = find(/(log ?in|link|sign ?in)( with| using)? (your )?phone( number)?|phone number instead/i); if (!link) await sleep(500); }
+    if (!link) return 'page: ' + (document.title || '') + ' | ' + (document.body ? words(document.body).slice(0, 220) : 'empty');
     press(link);
     let input = null;
     for (let i = 0; i < 20 && !input; i++) {
@@ -240,11 +246,11 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     setter.call(input, number); input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
     await sleep(700);
-    const next = deepest(/^next$/i);
+    const next = find(/^next$/i);
     if (!next) return 'no Next button';
     press(next);
     for (let i = 0; i < 40; i++) { await sleep(500); if (code()) return 'code:' + code(); }
-    const m = (document.body.innerText || '').match(/\b([A-Z0-9]{4})[- ]?([A-Z0-9]{4})\b/);
+    const m = (document.body.textContent || '').match(/\b([A-Z0-9]{4})[- ]?([A-Z0-9]{4})\b/);
     return m ? 'code:' + m[1] + m[2] : 'no code shown';
     """#
 
@@ -422,6 +428,18 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     """#
 
     /// Keeps the page from noticing that its window is parked.
+    /// A Mac to WhatsApp Web's device checks.
+    private static let desktop = #"""
+    try {
+      const def = (o, k, v) => { try { Object.defineProperty(o, k, { get: () => v, configurable: true }); } catch (e) {} };
+      def(Navigator.prototype, 'platform', 'MacIntel');
+      def(Navigator.prototype, 'maxTouchPoints', 0);
+      def(Navigator.prototype, 'vendor', 'Apple Computer, Inc.');
+      try { delete window.ontouchstart; } catch (e) {}
+      def(window, 'ontouchstart', undefined);
+    } catch (e) {}
+    """#
+
     private static let stayAwake = #"""
     try {
       Object.defineProperty(document, 'hidden', { get: () => false });

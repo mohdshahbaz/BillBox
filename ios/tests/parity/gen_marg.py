@@ -23,6 +23,12 @@ post('/invoices', {'pay_mode': 'cash', 'date': '2026-10-25', 'lines': [{'item_id
 get('/items'); get('/parties'); get('/bills', {'fy': '2026-27', 'q': 'P0000'}); get('/debit-notes', {'fy': '2026-27'})
 get('/reports/gst-outward', {'month': '2026-05', 'fy': '2026-27'}); get('/reports/dashboard', {'fy': '2026-27'})
 get('/parties/1/ledger', {'fy': '2026-27'})
+# correcting prices of items already here: nothing to do right after an import; a price worked out per box is put back
+post('/import/marg/prices', {'path': ZIP})
+S.append({'method': 'PUT', 'path': '/items/1', 'body': {'retail_price': 0.0316, 'wholesale_price': 0.0316}})
+S.append({'method': 'PUT', 'path': '/items/2', 'body': {'retail_price': 1}})
+post('/import/marg/prices', {'path': ZIP}); post('/import/marg/prices', {'path': ZIP, 'apply': True}); post('/import/marg/prices', {'path': ZIP})
+post('/import/marg/prices', {'path': '/no/such/backup'})
 # one year's books take only that year's Marg data
 post('/companies', {'name': 'Marg Books'})
 post('/companies/2/years', {'fy': '2025-26', 'carry': False}); post('/companies/2/years', {'fy': '2026-27', 'carry': False})
