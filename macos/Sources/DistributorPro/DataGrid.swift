@@ -243,37 +243,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
     private func header(_ cols: [GridColumn<Row>], _ w: [CGFloat]) -> some View {
         HStack(spacing: 0) {
             ForEach(Array(cols.enumerated()), id: \.element.id) { i, c in
-                ZStack(alignment: .trailing) {
-                    Text(c.title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-                        .padding(.horizontal, 10)
-                        .frame(width: w[i], height: 28, alignment: c.align)
-                        .contentShape(Rectangle())
-                        .offset(x: dragging == c.id ? dragDX : 0)
-                        .zIndex(dragging == c.id ? 1 : 0)
-                        .opacity(dragging == c.id ? 0.7 : 1)
-                        .gesture(
-                            DragGesture(minimumDistance: 10)
-                                .onChanged { v in dragging = c.id; dragDX = v.translation.width }
-                                .onEnded { v in
-                                    move(c.id, dx: v.translation.width, cols: cols, widths: w)
-                                    dragging = nil; dragDX = 0
-                                }
-                        )
-                    // resize handle on the right edge
-                    Rectangle().fill(Theme.line).frame(width: 1, height: 26)
-                    Color.clear.frame(width: 8, height: 26).contentShape(Rectangle())
-                        .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
-                        .gesture(
-                            DragGesture(minimumDistance: 1)
-                                .onChanged { v in
-                                    if resizing?.id != c.id { resizing = (c.id, Double(w[i])) }
-                                    materialise()
-                                    layout.widths[c.id] = Swift.max(Double(c.min), (resizing?.start ?? Double(w[i])) + Double(v.translation.width))
-                                }
-                                .onEnded { _ in resizing = nil; layout.save() }
-                        )
-                }
-                .frame(width: w[i])
+                headerCell(c, width: w[i], cols: cols, widths: w)
             }
             Menu {
                 columnMenu
@@ -287,6 +257,47 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
         }
         .background(Color.primary.opacity(0.06))
         .contextMenu { columnMenu }
+    }
+
+    // one column heading: title (drag to move) and the resize handle on its right edge
+    private func headerCell(_ c: GridColumn<Row>, width: CGFloat, cols: [GridColumn<Row>], widths w: [CGFloat]) -> some View {
+        ZStack(alignment: .trailing) {
+            headerTitle(c, width: width, cols: cols, widths: w)
+            Rectangle().fill(Theme.line).frame(width: 1, height: 26)
+            resizeHandle(c, width: width)
+        }
+        .frame(width: width)
+    }
+
+    private func headerTitle(_ c: GridColumn<Row>, width: CGFloat, cols: [GridColumn<Row>], widths w: [CGFloat]) -> some View {
+        let moving = dragging == c.id
+        let drag = DragGesture(minimumDistance: 10)
+            .onChanged { v in dragging = c.id; dragDX = v.translation.width }
+            .onEnded { v in
+                move(c.id, dx: v.translation.width, cols: cols, widths: w)
+                dragging = nil; dragDX = 0
+            }
+        return Text(c.title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+            .padding(.horizontal, 10)
+            .frame(width: width, height: 28, alignment: c.align)
+            .contentShape(Rectangle())
+            .offset(x: moving ? dragDX : 0)
+            .zIndex(moving ? 1 : 0)
+            .opacity(moving ? 0.7 : 1)
+            .gesture(drag)
+    }
+
+    private func resizeHandle(_ c: GridColumn<Row>, width: CGFloat) -> some View {
+        let drag = DragGesture(minimumDistance: 1)
+            .onChanged { v in
+                if resizing?.id != c.id { resizing = (c.id, Double(width)) }
+                materialise()
+                layout.widths[c.id] = Swift.max(Double(c.min), (resizing?.start ?? Double(width)) + Double(v.translation.width))
+            }
+            .onEnded { _ in resizing = nil; layout.save() }
+        return Color.clear.frame(width: 8, height: 26).contentShape(Rectangle())
+            .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
+            .gesture(drag)
     }
 
     @ViewBuilder private var columnMenu: some View {

@@ -94,8 +94,8 @@ struct FoundItem: Identifiable {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Toggle("", isOn: f.include).labelsHidden()
-                TextTextField("Name", text: f.name)
-                TextTextField("MRP", text: f.mrp).frame(width: 80).multilineTextAlignment(.trailing)
+                TextField("Name", text: f.name)
+                TextField("MRP", text: f.mrp).frame(width: 80).multilineTextAlignment(.trailing)
             }
             if let ex = f.wrappedValue.exists { Text("Already in your items as \(ex)").font(.caption).foregroundStyle(.orange) }
         }

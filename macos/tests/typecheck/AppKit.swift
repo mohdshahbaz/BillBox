@@ -183,7 +183,7 @@ open class NSPasteboardItem: NSObject, NSPasteboardWriting {
 open class NSBitmapImageRep: NSObject {
     public enum FileType { case png, jpeg, tiff }
     public init?(data: Data) {}
-    public init?(bitmapDataPlanes: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?, pixelsWide: Int, pixelsHigh: Int, bitsPerSample: Int, samplesPerPixel: Int, hasAlpha: Bool, isPlanar: Bool, colorSpaceName: String, bytesPerRow: Int, bitsPerPixel: Int) {}
+    public init?(bitmapDataPlanes: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?, pixelsWide: Int, pixelsHigh: Int, bitsPerSample: Int, samplesPerPixel: Int, hasAlpha: Bool, isPlanar: Bool, colorSpaceName: NSColorSpaceName, bytesPerRow: Int, bitsPerPixel: Int) {}
     public func representation(using t: FileType, properties: [AnyHashable: Any]) -> Data? { nil }
     public var size: NSSize = .zero
     public var cgImage: CGImage? { nil }
@@ -275,3 +275,6 @@ extension Color { public init(nsColor: NSColor) { self.init(uiColor: nsColor) } 
     public var wrappedValue: D { fatalError() }
 }
 // ViewModifier now lives in the shared iOS SwiftUI stub
+
+public struct NSColorSpaceName: Hashable { public init(_ s: String) {}; public static let deviceRGB = NSColorSpaceName("NSDeviceRGBColorSpace"), calibratedRGB = NSColorSpaceName("NSCalibratedRGBColorSpace") }
+extension UIColor { public static var controlAccentColor: NSColor { .black } }

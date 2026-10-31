@@ -1,0 +1,62 @@
+// Type-check stub (Linux only): SwiftUI API that exists on macOS but not in the iOS SwiftUI stub.
+// Compiled together with the Mac sources, so files that import only SwiftUI see it too.
+import SwiftUI
+
+// macOS-only SwiftUI surface
+protocol MenuStyle {}
+struct BorderlessButtonMenuStyle: MenuStyle { init() {} }
+struct DefaultMenuStyle: MenuStyle { init() {} }
+extension MenuStyle where Self == BorderlessButtonMenuStyle { static var borderlessButton: BorderlessButtonMenuStyle { .init() } }
+extension MenuStyle where Self == DefaultMenuStyle { static var automatic: DefaultMenuStyle { .init() } }
+extension View {
+    func menuStyle<S: MenuStyle>(_ s: S) -> _MV { fatalError() }
+    func menuIndicator(_ v: Visibility) -> _MV { fatalError() }
+    func onHover(perform action: @escaping (Bool) -> Void) -> _MV { fatalError() }
+}
+
+// menu bar commands
+protocol Commands { associatedtype Body: Commands; @CommandsBuilder var body: Body { get } }
+extension Never: Commands {}
+struct _Cmds: Commands { var body: Never { fatalError() } }
+@resultBuilder struct CommandsBuilder {
+    static func buildBlock() -> _Cmds { fatalError() }
+    static func buildBlock<C: Commands>(_ c: C) -> C { c }
+    static func buildBlock<C0: Commands, C1: Commands>(_ c0: C0, _ c1: C1) -> _Cmds { fatalError() }
+    static func buildBlock<C0: Commands, C1: Commands, C2: Commands>(_ c0: C0, _ c1: C1, _ c2: C2) -> _Cmds { fatalError() }
+}
+struct CommandGroupPlacement { static let newItem = CommandGroupPlacement(); static let appInfo = CommandGroupPlacement(); static let help = CommandGroupPlacement() }
+struct CommandGroup<Content: View>: Commands {
+    init(replacing: CommandGroupPlacement, @ViewBuilder addition: () -> Content) {}
+    init(after: CommandGroupPlacement, @ViewBuilder addition: () -> Content) {}
+    init(before: CommandGroupPlacement, @ViewBuilder addition: () -> Content) {}
+    var body: Never { fatalError() }
+}
+struct CommandMenu<Content: View>: Commands {
+    init(_ name: String, @ViewBuilder content: () -> Content) {}
+    var body: Never { fatalError() }
+}
+extension Scene { func commands<C: Commands>(@CommandsBuilder content: () -> C) -> WindowGroup<EmptyView> { fatalError() } }
+extension WindowGroup { init(_ title: String, @ViewBuilder content: () -> Content) { self.init(content: content) } }
+extension View { func navigationSubtitle(_ s: String) -> _MV { fatalError() } }
+struct GroupBox<Label: View, Content: View>: View {
+    init(@ViewBuilder content: () -> Content) where Label == EmptyView {}
+    init(_ title: String, @ViewBuilder content: () -> Content) where Label == Text {}
+    init(@ViewBuilder content: () -> Content, @ViewBuilder label: () -> Label) {}
+    init(@ViewBuilder label: () -> Label, @ViewBuilder content: () -> Content) {}
+    var body: Never { fatalError() }
+}
+struct HSplitView<Content: View>: View { init(@ViewBuilder content: () -> Content) {}; var body: Never { fatalError() } }
+struct VSplitView<Content: View>: View { init(@ViewBuilder content: () -> Content) {}; var body: Never { fatalError() } }
+struct NavigationView<Content: View>: View { init(@ViewBuilder content: () -> Content) {}; var body: Never { fatalError() } }
+struct SidebarListStyle: ListStyle { init() {} }
+extension ListStyle where Self == SidebarListStyle { static var sidebar: SidebarListStyle { .init() } }
+extension List {
+    init<Data: RandomAccessCollection, RowContent: View>(_ data: Data, selection: Binding<SelectionValue?>?, @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent) where Content == ForEach<Data, Data.Element.ID, RowContent>, Data.Element: Identifiable { fatalError() }
+    init<Data: RandomAccessCollection, RowContent: View>(_ data: Data, selection: Binding<Set<SelectionValue>>?, @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent) where Content == ForEach<Data, Data.Element.ID, RowContent>, Data.Element: Identifiable { fatalError() }
+}
+// the real SDK (Xcode 15+) takes any number of views in a builder; the stub stops at 10
+extension ViewBuilder { static func buildBlock<each C: View>(_ c: repeat each C) -> TupleView<(repeat each C)> { fatalError() } }
+extension Color {
+    enum RGBColorSpace { case sRGB, sRGBLinear, displayP3 }
+    init(_ space: RGBColorSpace, red: Double, green: Double, blue: Double, opacity: Double = 1) { self.init(red: red, green: green, blue: blue, opacity: opacity) }
+}
