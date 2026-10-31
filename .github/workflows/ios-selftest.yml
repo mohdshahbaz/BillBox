@@ -108,7 +108,7 @@ jobs:
           xcrun simctl launch "$UDID" $BID -BillBoxPrintTest 1 -startPage bills > /dev/null
           for i in $(seq 1 40); do [ -f "$C/Documents/selftest/done.txt" ] && break; sleep 2; done
           cp -R "$C/Documents/selftest/." $O/ 2>/dev/null || true
-          for f in $O/bill_*.pdf; do [ -f "$f" ] && sips -s format png "$f" --out "${f%.pdf}.png" >/dev/null 2>&1 || true; done
+          for f in $O/bill_*.pdf $O/marg_*.pdf; do [ -f "$f" ] && sips -s format png "$f" --out "${f%.pdf}.png" >/dev/null 2>&1 || true; done
           xcrun simctl terminate "$UDID" $BID || true
           cat $O/done.txt 2>/dev/null || echo "no bills were drawn"
           # anything the app reported as a crash

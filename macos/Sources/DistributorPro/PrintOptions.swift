@@ -14,7 +14,50 @@ import SwiftUI
         Binding(get: { app.settings.str(k).isEmpty ? dflt : app.settings.str(k) }, set: { v in Task { await app.saveSettings([k: v]) } })
     }
 
+    /// One Marg-design column on or off (print_marg_cols lists the ones that are on).
+    private func margCol(_ key: String) -> Binding<Bool> {
+        Binding(get: { margShown(app.settings).contains(key) }, set: { v in
+            var on = margShown(app.settings)
+            if v { on.insert(key) } else { on.remove(key) }
+            let list = margOptionalColumns.map(\.key).filter { on.contains($0) }.joined(separator: ",")
+            Task { await app.saveSettings(["print_marg_cols": list.isEmpty ? "none" : list]) }
+        })
+    }
+
+    private var isMarg: Bool { printStyle(app.settings) == "marg" }
+
     var body: some View {
+        Section {
+            Picker("Bill design", selection: choice("print_style", "classic")) {
+                Text("BillBox (clean, modern)").tag("classic"); Text("Marg style (like a Marg ERP bill)").tag("marg")
+            }
+            Button { Task { await previewLatest() } } label: { Label("Preview on my latest bill", systemImage: "eye") }
+        } header: { Text("Bill design") } footer: {
+            Text("Both designs use the paper layout, copies, text size and everything else on this page. Marg style has more choices of its own below.")
+        }
+        if isMarg {
+            Section {
+                Picker("Colour", selection: choice("print_marg_colour", "blue")) { ForEach(margColours, id: \.key) { Text($0.title).tag($0.key) } }
+                Picker("Typeface", selection: choice("print_marg_font", "serif")) { Text("Classic serif (like Marg)").tag("serif"); Text("Modern").tag("sans") }
+                Picker("Rate and MRP per", selection: choice("print_marg_rate", "box")) { Text("Box (like Marg)").tag("box"); Text("Piece").tag("pcs") }
+                Picker("GST classes at the bottom", selection: choice("print_marg_classes", "all")) {
+                    Text("5, 12, 18 and 28 always (like Marg)").tag("all"); Text("Only the rates on the bill").tag("used")
+                }
+                ForEach(margOptionalColumns, id: \.key) { c in Toggle("\(c.title) column", isOn: margCol(c.key)) }
+                Group {
+                Toggle("“M/s” before the party's name", isOn: flag("print_marg_ms", true))
+                Toggle("Due date on credit bills (party's credit days)", isOn: flag("print_marg_due", true))
+                Toggle("Receiver's signature box", isOn: flag("print_marg_receiver", true))
+                Toggle("Page number", isOn: flag("print_marg_page", true))
+                Toggle("Company e-mail", isOn: flag("print_marg_email", false))
+                if app.settings.str("print_marg_email") == "1" {
+                    SettingTextField(title: "E-mail", key: "company_email", placeholder: "you@example.com", maxLength: 80)
+                }
+                }
+            } header: { Text("Marg style") } footer: {
+                Text("Title: “Bill title” on this page (blank = GST INVOICE). A bill to another state shows IGST instead of SGST and CGST. “Black only” suits printers without colour.")
+            }
+        }
         Section {
             Toggle("Party's address, GSTIN and phone", isOn: flag("print_party", true))
             Toggle("Salesman", isOn: flag("print_salesman", true))
@@ -53,6 +96,17 @@ import SwiftUI
             }
         } header: { Text("Bank details") } footer: {
             Text("Printed above the amount in words, one per line (BANK NAME:, ACCOUNT NAME:, ACCOUNT NUMBER:, IFSC CODE:, BRANCH NAME:, BRANCH CODE:, ADDRESS:). Empty ones are left out; a bill with bank details has a few rows less room for items.")
+        }
+    }
+}
+
+extension PrintOptionsSections {
+    /// Prints nothing: opens the newest sale bill in the print preview, in the design chosen now.
+    func previewLatest() async {
+        await app.guarded {
+            let r = try await API.obj("GET", "/bills", query: ["type": "SALE", "from": "2000-01-01", "to": "2100-12-31"])
+            guard let id = r.list("rows").first?.int("id") else { app.notify("There is no sale bill yet to show.", error: true); return }
+            await printInvoice(id, app: app, forcePreview: true)
         }
     }
 }

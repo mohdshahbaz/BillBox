@@ -288,7 +288,7 @@ private fun PrintingPage() {
         Choice("After saving a bill", listOf("print" to "Print it now", "ask" to "Ask: print now or later", "later" to "Keep it to print later"), afterSave, { afterSave = it })
         Hint("“Keep it to print later”: saved bills wait under All Bills › Not printed; select them and print them together.")
         SectionHeader("What the bill shows")
-        Field("Bill title (blank = TAX INVOICE)", title, { title = it })
+        Field("Bill title (blank = TAX INVOICE; GST INVOICE in Marg style)", title, { title = it })
         optionalColumns.forEach { (key, t, _) -> SwitchRow("Print the $t column", key !in hidden, { on -> if (on) hidden.remove(key) else hidden.add(key) }) }
         SwitchRow("Print the amount in words", words, { words = it })
         SwitchRow("Print “For company / Authorised Signatory”", signature, { signature = it })
@@ -797,6 +797,41 @@ private fun PrintOptions() {
     val app = LocalApp.current
     fun flag(k: String, d: Boolean) = if (app.setting(k).isEmpty()) d else app.setting(k) != "0"
     fun setFlag(k: String, v: Boolean) = app.launch { app.saveSettings(mapOf(k to if (v) "1" else "0")) }
+    SectionHeader("Bill design")
+    val (style, setStyle) = settingChoice("print_style", "classic")
+    Choice("Bill design", listOf("classic" to "BillBox (clean, modern)", "marg" to "Marg style (like a Marg ERP bill)"), style, setStyle)
+    OutlinedButton(onClick = { app.launch {
+        val r = Api.obj("GET", "/bills", query = mapOf("type" to "SALE", "from" to "2000-01-01", "to" to "2100-12-31"))
+        val id = r.list("rows").firstOrNull()?.int("id")
+        if (id == null) app.notify("There is no sale bill yet to show.", true) else com.local.billbox.print.Printing.invoice(id, app, true)
+    } }) { Text("Preview on my latest bill") }
+    Hint("Both designs use the paper layout, copies, text size and everything else on this page. Marg style has more choices of its own below.")
+    if (style == "marg") {
+        SectionHeader("Marg style")
+        val (colour, setColour) = settingChoice("print_marg_colour", "blue")
+        Choice("Colour", com.local.billbox.print.margColours, colour, setColour)
+        val (face, setFace) = settingChoice("print_marg_font", "serif")
+        Choice("Typeface", listOf("serif" to "Classic serif (like Marg)", "sans" to "Modern"), face, setFace)
+        val (per, setPer) = settingChoice("print_marg_rate", "box")
+        Choice("Rate and MRP per", listOf("box" to "Box (like Marg)", "pcs" to "Piece"), per, setPer)
+        val (cls, setCls) = settingChoice("print_marg_classes", "all")
+        Choice("GST classes at the bottom", listOf("all" to "5, 12, 18 and 28 always (like Marg)", "used" to "Only the rates on the bill"), cls, setCls)
+        val shown = com.local.billbox.print.margShown(app.settings)
+        com.local.billbox.print.margOptionalColumns.forEach { (k, title, _) ->
+            SwitchRow("$title column", k in shown, { v ->
+                val on = shown.toMutableSet(); if (v) on.add(k) else on.remove(k)
+                val list = com.local.billbox.print.margOptionalColumns.map { it.first }.filter { it in on }.joinToString(",")
+                app.launch { app.saveSettings(mapOf("print_marg_cols" to list.ifEmpty { "none" })) }
+            })
+        }
+        SwitchRow("“M/s” before the party's name", flag("print_marg_ms", true), { setFlag("print_marg_ms", it) })
+        SwitchRow("Due date on credit bills (party's credit days)", flag("print_marg_due", true), { setFlag("print_marg_due", it) })
+        SwitchRow("Receiver's signature box", flag("print_marg_receiver", true), { setFlag("print_marg_receiver", it) })
+        SwitchRow("Page number", flag("print_marg_page", true), { setFlag("print_marg_page", it) })
+        SwitchRow("Company e-mail", flag("print_marg_email", false), { setFlag("print_marg_email", it) })
+        if (app.setting("print_marg_email") == "1") SettingField("E-mail", "company_email", "you@example.com", maxLength = 80)
+        Hint("Title: “Bill title” on the Printing page (blank = GST INVOICE). A bill to another state shows IGST instead of SGST and CGST. “Black only” suits printers without colour.")
+    }
     SectionHeader("More on the bill")
     SwitchRow("Party's address, GSTIN and phone", flag("print_party", true), { setFlag("print_party", it) })
     SwitchRow("Salesman", flag("print_salesman", true), { setFlag("print_salesman", it) })

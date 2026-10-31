@@ -130,7 +130,7 @@ import AppKit
                 Picker("After saving a bill", selection: $afterSave) {
                     Text("Print it now").tag("print"); Text("Ask: print now or later").tag("ask"); Text("Keep it to print later").tag("later")
                 }
-                TextField("Bill title (blank = TAX INVOICE)", text: $title)
+                TextField("Bill title (blank = TAX INVOICE; GST INVOICE in Marg style)", text: $title)
                 ForEach(optionalColumns, id: \.key) { c in
                     Toggle("Print the \(c.title) column", isOn: Binding(get: { !hidden.contains(c.key) }, set: { on in if on { hidden.remove(c.key) } else { hidden.insert(c.key) } }))
                 }

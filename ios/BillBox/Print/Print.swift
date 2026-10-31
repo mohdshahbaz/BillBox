@@ -507,8 +507,8 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
     var g: Spec = .half
     var body: some View {
         VStack(spacing: 0) {
-            InvoiceSheetView(inv: inv, co: co, rows: 0..<inv.list("lines").count, page: 0, pages: 1, copy: copyLabelsFor(co)[0], g: g)
-            InvoiceSheetView(inv: inv, co: co, rows: 0..<inv.list("lines").count, page: 0, pages: 1, copy: copyLabelsFor(co)[1], g: g)
+            billSheet(inv, co, rows: 0..<inv.list("lines").count, page: 0, pages: 1, copy: copyLabelsFor(co)[0], g: g)
+            billSheet(inv, co, rows: 0..<inv.list("lines").count, page: 0, pages: 1, copy: copyLabelsFor(co)[1], g: g)
         }
         .frame(width: g.w, height: g.h * 2)
         .overlay(alignment: .top) {
@@ -543,10 +543,24 @@ func renderPDF(pages: [AnyView], size: CGSize) -> PDFDocument? {
     return PDFDocument(data: data as Data)
 }
 
+/// The page measurements for the company's bill design (Settings › Printing › Bill design) and text size.
+func billSpec(_ inv: JSON, _ co: JSON, full: Bool) -> Spec {
+    let base = (full ? Spec.full : Spec.half).scaled(printScale(co))
+    return printStyle(co) == "marg" ? margSpec(base, inv, co) : base.withBank(co)
+}
+
+/// One copy of one page of a bill, in the company's bill design.
+@MainActor
+func billSheet(_ inv: JSON, _ co: JSON, rows: Range<Int>, page: Int, pages: Int, copy: String, g: Spec) -> AnyView {
+    printStyle(co) == "marg"
+        ? AnyView(MargSheetView(inv: inv, co: co, rows: rows, page: page, pages: pages, copy: copy, g: g))
+        : AnyView(InvoiceSheetView(inv: inv, co: co, rows: rows, page: page, pages: pages, copy: copy, g: g))
+}
+
 @MainActor
 func invoicePDF(_ inv: JSON, company: JSON, layout: PrintLayout) -> PDFDocument? {
     let n = inv.list("lines").count
-    let g: Spec = (layout.isFullPage ? Spec.full : Spec.half).scaled(printScale(company)).withBank(company)
+    let g = billSpec(inv, company, full: layout.isFullPage)
     if layout == .a4TwoUp && paginate(n, g).count == 1 {
         return renderPDF(pages: [AnyView(TwoUpView(inv: inv, co: company, g: g))], size: CGSize(width: g.w, height: g.h * 2))
     }
@@ -557,7 +571,7 @@ func invoicePDF(_ inv: JSON, company: JSON, layout: PrintLayout) -> PDFDocument?
     var pages: [AnyView] = []
     for c in copies {
         for (i, r) in ranges.enumerated() {
-            pages.append(AnyView(InvoiceSheetView(inv: inv, co: company, rows: r, page: i, pages: ranges.count, copy: c, g: g)))
+            pages.append(billSheet(inv, company, rows: r, page: i, pages: ranges.count, copy: c, g: g))
         }
     }
     return renderPDF(pages: pages, size: g.size)

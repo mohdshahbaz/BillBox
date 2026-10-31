@@ -112,10 +112,13 @@ class Pen(val c: Canvas) {
     private val p = TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.LINEAR_TEXT_FLAG or Paint.SUBPIXEL_TEXT_FLAG)
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.BLACK }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    /** Serif letters (the Marg design's "Classic serif" typeface). */
+    var serif = false
 
     private fun font(size: Float, weight: Int, color: Int) {
         p.textSize = size; p.color = color
-        p.typeface = when { weight >= 700 -> Typeface.create(Typeface.DEFAULT, Typeface.BOLD); weight >= 600 -> Typeface.create("sans-serif-medium", Typeface.NORMAL); else -> Typeface.DEFAULT }
+        p.typeface = if (serif) Typeface.create(Typeface.SERIF, if (weight >= 600) Typeface.BOLD else Typeface.NORMAL)
+            else when { weight >= 700 -> Typeface.create(Typeface.DEFAULT, Typeface.BOLD); weight >= 600 -> Typeface.create("sans-serif-medium", Typeface.NORMAL); else -> Typeface.DEFAULT }
     }
 
     /** One line in the box [x, x+w] centred on the band [top, top+h]. align: 0 left, 1 centre, 2 right. Returns the width used. */
@@ -401,19 +404,24 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
 /** A bill as PDF in the chosen layout (A4 two-up falls back to half sheets when the bill is longer than one page). */
 fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder()): PdfBuilder {
     val n = inv.list("lines").size
-    val g = (if (layout.isFullPage) Spec.full else Spec.half).scaled(printScale(co)).withBank(co)
+    val base = (if (layout.isFullPage) Spec.full else Spec.half).scaled(printScale(co))
+    val marg = printStyle(co) == "marg"
+    val g = if (marg) margSpec(base, inv, co) else base.withBank(co)
+    // one copy of one page, in the company's bill design (Settings › Printing › Bill design)
+    fun sheet(pen: Pen, r: IntRange, i: Int, n2: Int, c: String, oy: Float = 0f) =
+        if (marg) MargSheet(inv, co, r, i, n2, c, g).draw(pen, 0f, oy) else InvoiceSheet(inv, co, r, i, n2, c, g).draw(pen, 0f, oy)
     val labels = copyLabelsFor(co)
     if (layout == PrintLayout.A4TwoUp && paginate(n, g).size == 1) {
         into.page(g.w, g.h * 2) { pen ->
-            InvoiceSheet(inv, co, 0 until n, 0, 1, labels[0], g).draw(pen)
-            InvoiceSheet(inv, co, 0 until n, 0, 1, labels[1], g).draw(pen, 0f, g.h)
+            sheet(pen, 0 until n, 0, 1, labels[0])
+            sheet(pen, 0 until n, 0, 1, labels[1], g.h)
             pen.dashed(0f, g.w, g.h + 0.5f)
         }
         return into
     }
     val copies = if (layout == PrintLayout.Single || layout == PrintLayout.A4FullOriginal) listOf(labels[0]) else labels
     val ranges = paginate(n, g)
-    for (c in copies) ranges.forEachIndexed { i, r -> into.page(g.w, g.h) { pen -> InvoiceSheet(inv, co, r, i, ranges.size, c, g).draw(pen) } }
+    for (c in copies) ranges.forEachIndexed { i, r -> into.page(g.w, g.h) { pen -> sheet(pen, r, i, ranges.size, c) } }
     return into
 }
 

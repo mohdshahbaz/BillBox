@@ -3081,7 +3081,7 @@ content-type: application/octet-stream\r
       });
       function getInvoice(id) {
         const inv = db2.prepare(
-          `SELECT i.*, p.name party_name, p.gstin party_gstin, p.address party_address, p.state_code party_state, p.phone party_phone, p.mobiles party_mobiles, p.tel party_tel, p.email party_email, p.pan party_pan, p.fssai party_fssai, s.name salesman_name
+          `SELECT i.*, p.name party_name, p.gstin party_gstin, p.address party_address, p.state_code party_state, p.phone party_phone, p.mobiles party_mobiles, p.tel party_tel, p.email party_email, p.pan party_pan, p.fssai party_fssai, p.credit_days party_credit_days, s.name salesman_name
      FROM invoices i LEFT JOIN parties p ON p.id=i.party_id LEFT JOIN salesmen s ON s.id=i.salesman_id WHERE i.id=?`
         ).get(id);
         if (!inv) return null;

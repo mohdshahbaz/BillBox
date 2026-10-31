@@ -131,6 +131,7 @@
 			); };
 		470AD526B3A4B8CA0ADFC09B /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "README.md"; sourceTree = "<group>"; };
 		48564575E899689F36D16436 /* Format.swift in app */ = {isa = PBXBuildFile; fileRef = 37E0B59E4CB5D558DD4F78AC /* Format.swift */; };
+		486C5CAC01D814145AECCE44 /* PrintMarg.swift in app */ = {isa = PBXBuildFile; fileRef = 68D238FF7A51BFEC62224C4E /* PrintMarg.swift */; };
 		488DEB2C190BDF48166B7098 /* Router.swift in tests */ = {isa = PBXBuildFile; fileRef = 1A3A9B7F26EE47A1B90457D6 /* Router.swift */; };
 		48BC085BBF9BBAAE51532390 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
 				DEVELOPMENT_TEAM = "";
@@ -212,6 +213,7 @@
 				5EFECA87EDB6D40348F6D7C5 /* Debug */,
 				A08235453F87891B35190264 /* Release */,
 			); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		68D238FF7A51BFEC62224C4E /* PrintMarg.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PrintMarg.swift"; sourceTree = "<group>"; };
 		6AFE22E70BE079CBB63426F8 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
@@ -281,6 +283,7 @@
 		A35A4482C19DA34E668899BA /* PaymentSheet.swift in app */ = {isa = PBXBuildFile; fileRef = 64FD8F6BDA24C7FF69FB370A /* PaymentSheet.swift */; };
 		A4BB36A827B2D27FB35E03F6 = {isa = PBXGroup; children = (
 				D0B625154EC011B513333950,
+				68D238FF7A51BFEC62224C4E,
 			); path = "Print"; sourceTree = "<group>"; };
 		A5459CF21EF7A48607DDD8C3 = {isa = XCConfigurationList; buildConfigurations = (
 				48BC085BBF9BBAAE51532390 /* Debug */,
@@ -306,6 +309,7 @@
 				DD6DDAF571200BFA704A9B9E,
 				FEBEE075993804789C4DED8E,
 				C4A8DF8D1B458C0EB4FD3C23,
+				486C5CAC01D814145AECCE44,
 				49106E0A0242A783370C9A7D,
 				DC68665955ABB2C7E828B9F0,
 				3EC2EB46F5DC6C5F8C4B00BA,

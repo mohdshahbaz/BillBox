@@ -120,10 +120,15 @@ object SelfTest {
         // page 1 of a printed bill, as the PDF that goes to the printer
         runCatching {
             var inv: J? = null
-            for (id in 1..8) { inv = runCatching { Api.get("/invoices/$id") }.getOrNull(); if (inv != null && inv.list("lines").isNotEmpty()) break }
+            // the bill with the most lines among the first ones
+            for (id in 1..20) { val x = runCatching { Api.get("/invoices/$id") }.getOrNull() ?: continue; if (x.list("lines").size > (inv?.list("lines")?.size ?: 0)) inv = x }
             if (inv != null) {
-                for ((tag, layout) in listOf("half" to PrintLayout.Single, "a4" to PrintLayout.A4FullOriginal)) {
-                    val bytes = invoicePdf(inv, app.settings, layout).bytes()
+                val marg = app.settings.with("print_style" to "marg")
+                val margMono = marg.with("print_marg_colour" to "mono", "print_marg_classes" to "used", "print_marg_font" to "sans")
+                for ((tag, pair) in listOf("half" to (PrintLayout.Single to app.settings), "a4" to (PrintLayout.A4FullOriginal to app.settings),
+                        "marg_half" to (PrintLayout.Single to marg), "marg_a4" to (PrintLayout.A4FullOriginal to margMono))) {
+                    val (layout, co) = pair
+                    val bytes = invoicePdf(inv, co, layout).bytes()
                     val pdf = File(dir(ctx), "bill_$tag.pdf").apply { writeBytes(bytes) }
                     renderFirstPage(pdf, File(shots, "%02d_print_%s.png".format(n++, tag)))
                 }

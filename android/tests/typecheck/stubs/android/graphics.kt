@@ -23,7 +23,7 @@ open class PathEffect
 class DashPathEffect(intervals: FloatArray, phase: Float) : PathEffect()
 class RectF(left: Float, top: Float, right: Float, bottom: Float)
 class Rect { val left = 0; val top = 0; fun centerY(): Int = 0; fun height(): Int = 0 }
-class Typeface { companion object { const val NORMAL = 0; const val BOLD = 1; val DEFAULT: Typeface = Typeface(); fun create(family: Typeface?, style: Int): Typeface = Typeface(); fun create(family: String?, style: Int): Typeface = Typeface() } }
+class Typeface { companion object { const val NORMAL = 0; const val BOLD = 1; val DEFAULT: Typeface = Typeface(); val SERIF: Typeface = Typeface(); fun create(family: Typeface?, style: Int): Typeface = Typeface(); fun create(family: String?, style: Int): Typeface = Typeface() } }
 object Color { const val WHITE = -1; const val BLACK = -16777216; fun argb(a: Int, r: Int, g: Int, b: Int): Int = 0 }
 class Canvas {
     fun drawColor(c: Int) {}

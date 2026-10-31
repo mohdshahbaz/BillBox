@@ -3,7 +3,7 @@ import PDFKit
 
 /// The iPhone Simulator self-test on GitHub (.github/workflows/ios-selftest.yml). Only runs when the app is launched with
 /// `-BillBoxPrintTest 1`: once the books are open, the newest sale bills are drawn exactly as they print and saved in
-/// Documents/selftest (bill_1.pdf …, and done.txt with a line per bill), where the workflow collects them.
+/// Documents/selftest (bill_1.pdf …, the Marg design as marg_1.pdf …, and done.txt with a line per bill), where the workflow collects them.
 @MainActor
 enum SimSelfTest {
     static var asked: Bool { UserDefaults.standard.bool(forKey: "BillBoxPrintTest") }
@@ -25,6 +25,20 @@ enum SimSelfTest {
                     log.append("bill_\(n + 1).pdf \(inv.str("invoice_no")) \(inv.str("party_name")) \(data.count) bytes")
                 } else {
                     log.append("bill_\(n + 1): no PDF for \(inv.str("invoice_no"))")
+                }
+                // the Marg design too (half sheet; the first bill also on a full A4 page, in black only)
+                var marg = app.settings.raw
+                marg["print_style"] = "marg"
+                if let data = invoicePDF(inv, company: JSON(marg), layout: .single)?.dataRepresentation() {
+                    try data.write(to: dir.appendingPathComponent("marg_\(n + 1).pdf"))
+                    log.append("marg_\(n + 1).pdf \(data.count) bytes")
+                }
+                if n == 0 {
+                    marg["print_marg_colour"] = "mono"; marg["print_marg_classes"] = "used"; marg["print_marg_font"] = "sans"
+                    if let data = invoicePDF(inv, company: JSON(marg), layout: .a4FullOriginal)?.dataRepresentation() {
+                        try data.write(to: dir.appendingPathComponent("marg_a4.pdf"))
+                        log.append("marg_a4.pdf \(data.count) bytes")
+                    }
                 }
             }
         } catch {
