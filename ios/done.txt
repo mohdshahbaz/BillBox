@@ -1,4 +1,9 @@
 bill_1.pdf A000050  46701 bytes
+marg_1.pdf 37384 bytes
+marg_a4.pdf 30542 bytes
 bill_2.pdf A000002  46520 bytes
+marg_2.pdf 37386 bytes
 bill_3.pdf INV/26-27/00011  46932 bytes
+marg_3.pdf 37583 bytes
 bill_4.pdf A0001  45559 bytes
+marg_4.pdf 37383 bytes
