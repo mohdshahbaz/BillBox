@@ -1,0 +1,40 @@
+2026-10-31 16:08:37.486 Df BillBox[10734:87dd] [com.apple.dt.xctest:Default] Registering for test daemon availability notify post.
+2026-10-31 16:08:37.487 Df BillBox[10734:87dd] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-10-31 16:08:37.487 Df BillBox[10734:87dd] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-10-31 16:08:37.487 Df BillBox[10734:87dd] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-10-31 16:08:37.814 Df BillBox[10734:87dd] [com.apple.BacklightServices:scenes] 0x600000c07000 setDelegate:<0x600000c07240 _UIBacklightEnvironment> hasDelegate:YES for environment:sceneID:com.local.billbox-default
+2026-10-31 16:08:37.819 Df BillBox[10734:87dd] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to LastOneWins
+2026-10-31 16:08:37.820 Df BillBox[10734:87dd] [com.apple.UIKit:KeyWindow] Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x1018093a0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.local.billbox-default
+2026-10-31 16:08:37.820 Df BillBox[10734:87dd] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x1018093a0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.local.billbox-default
+2026-10-31 16:08:37.821 Df BillBox[10734:87dd] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to SystemShellManaged
+2026-10-31 16:08:37.942 Df BillBox[10734:87dd] [com.apple.UIKit:KeyWindow] Window did become application key: UIWindow: 0x10180b9a0; contextId: 0xCC1AE7E7; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.local.billbox-default
+2026-10-31 16:08:37.945 Df BillBox[10734:87f2] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x60000260d3e0; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.local.billbox-default; status: ancestor> was:target
+2026-10-31 16:08:37.948 Df BillBox[10734:87dd] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.local.billbox-default  persistentID: 86ECC870-034F-4999-9A84-33DBA87E4B4F
+2026-10-31 16:08:38.083 Df BillBox[10734:87dd] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-10-31 16:08:38.083 Df BillBox[10734:87dd] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-10-31 16:08:38.084 Df BillBox[10734:87dd] [PrototypeTools:domain] Not observing PTDefaults on customer install.
+2026-10-31 16:08:38.204 Df BillBox[10734:87dd] [com.apple.network:activity] Create activity from XPC object <nw_activity 50:1 [CAC376AD-8725-4C54-83C0-75147D758B9D] (reporting strategy default)>
+2026-10-31 16:08:38.204 Df BillBox[10734:87dd] [com.apple.network:activity] Create activity from XPC object <nw_activity 50:2 [E83BABA2-B24D-48DE-94F2-78632B2AFEC8] (reporting strategy default)>
+2026-10-31 16:08:38.204 Df BillBox[10734:87dd] [com.apple.network:activity] Set activity <nw_activity 50:1 [CAC376AD-8725-4C54-83C0-75147D758B9D] (reporting strategy default)> as the global parent
+2026-10-31 16:08:38.207 Df BillBox[10734:87dd] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.local.billbox-default  persistentID: 86ECC870-034F-4999-9A84-33DBA87E4B4F
+2026-10-31 16:08:38.224 Df BillBox[10734:87dd] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x1018093a0; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.local.billbox-default
+2026-10-31 16:08:38.228 Df BillBox[10734:87dd] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.local.billbox-default  persistentID: 86ECC870-034F-4999-9A84-33DBA87E4B4F
+2026-10-31 16:08:38.287 Df BillBox[10734:87dd] [com.apple.network:activity] <nw_activity 50:1 [CAC376AD-8725-4C54-83C0-75147D758B9D] (global parent) (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 1816ms
+2026-10-31 16:08:38.287 Df BillBox[10734:87dd] [com.apple.network:activity] <nw_activity 50:2 [E83BABA2-B24D-48DE-94F2-78632B2AFEC8] (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 1816ms
+2026-10-31 16:08:38.287 Df BillBox[10734:87dd] [com.apple.network:activity] Unsetting the global parent activity <nw_activity 50:1 [CAC376AD-8725-4C54-83C0-75147D758B9D] (global parent) (reporting strategy default) complete (reason success)>
+2026-10-31 16:08:39.101 Df BillBox[10734:87dd] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-10-31 16:08:39.101 Df BillBox[10734:87dd] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-10-31 16:08:50.469 Df BillBox[11192:8d22] [com.apple.dt.xctest:Default] Registering for test daemon availability notify post.
+2026-10-31 16:08:50.470 Df BillBox[11192:8d22] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-10-31 16:08:50.470 Df BillBox[11192:8d22] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-10-31 16:08:50.470 Df BillBox[11192:8d22] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-10-31 16:08:50.534 Df BillBox[11192:8d22] [com.apple.BacklightServices:scenes] 0x600000c16c40 setDelegate:<0x600000c16c70 _UIBacklightEnvironment> hasDelegate:YES for environment:sceneID:com.local.billbox-default
+2026-10-31 16:08:50.538 Df BillBox[11192:8d22] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to LastOneWins
+2026-10-31 16:08:50.538 Df BillBox[11192:8d22] [com.apple.UIKit:KeyWindow] Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x102f0b550; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.local.billbox-default
+2026-10-31 16:08:50.538 Df BillBox[11192:8d22] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x102f0b550; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.local.billbox-default
+2026-10-31 16:08:50.538 Df BillBox[11192:8d22] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to SystemShellManaged
+2026-10-31 16:08:50.617 Df BillBox[11192:8d22] [com.apple.UIKit:KeyWindow] Window did become application key: UIWindow: 0x102e08f70; contextId: 0x33066999; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.local.billbox-default
+2026-10-31 16:08:50.622 Df BillBox[11192:8d38] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x600002605440; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.local.billbox-default; status: ancestor> was:target
+2026-10-31 16:08:50.622 Df BillBox[11192:8d22] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.local.billbox-default  persistentID: 86ECC870-034F-4999-9A84-33DBA87E4B4F
+2026-10-31 16:08:50.722 Df BillBox[11192:8d22] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-10-31 16:08:50.722 Df BillBox[11192:8d22] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView

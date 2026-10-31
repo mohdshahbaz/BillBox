@@ -1,0 +1,326 @@
+Command line invocation:
+    /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/xcodebuild test -project ios/BillBox.xcodeproj -scheme BillBox -destination id=B220EC43-535F-472F-935A-5B2D0E9F2975 -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+
+Build settings from command line:
+    CODE_SIGNING_ALLOWED = NO
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, arch:arm64, id:B220EC43-535F-472F-935A-5B2D0E9F2975, OS:26.2, name:iPhone SE (3rd generation) }
+{ platform:iOS Simulator, arch:x86_64, id:B220EC43-535F-472F-935A-5B2D0E9F2975, OS:26.2, name:iPhone SE (3rd generation) }
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (2 targets)
+    Target 'BillBoxTests' in project 'BillBox' (no dependencies)
+    Target 'BillBox' in project 'BillBox' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/actool --print-asset-tag-combinations --output-format xml1 /Users/runner/work/BillBox/BillBox/ios/BillBox/Resources/Assets.xcassets
+
+ExecuteExternalTool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+ExecuteExternalTool /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+Build description signature: 3f8dc0666d0cf143510278245cfc17b5
+Build description path: /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/XCBuildData/3f8dc0666d0cf143510278245cfc17b5.xcbuilddata
+CreateBuildDirectory /Users/runner/work/BillBox/BillBox/build/Build/Products
+    cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
+    builtin-create-build-directory /Users/runner/work/BillBox/BillBox/build/Build/Products
+
+CreateBuildDirectory /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex
+    cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
+    builtin-create-build-directory /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex
+
+ClangStatCache /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache
+    cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
+    /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -o /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox-adefded1c95deba4b613aa3501003ea6-VFS-iphonesimulator/all-product-headers.yaml
+    cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox-adefded1c95deba4b613aa3501003ea6-VFS-iphonesimulator/all-product-headers.yaml
+
+CreateBuildDirectory /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator
+    cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
+    builtin-create-build-directory /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator
+
+CreateBuildDirectory /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator
+    cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
+    builtin-create-build-directory /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/empty-BillBoxTests.plist (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/empty-BillBoxTests.plist
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests_const_extract_protocols.json (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests_const_extract_protocols.json
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.SwiftFileList (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.SwiftFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.SwiftConstValuesFileList (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.SwiftConstValuesFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.LinkFileList (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.LinkFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-OutputFileMap.json (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-OutputFileMap.json
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests.hmap (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests.DependencyStaticMetadataFileList (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests.DependencyStaticMetadataFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests.DependencyMetadataFileList (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests.DependencyMetadataFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-project-headers.hmap (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-project-headers.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-own-target-headers.hmap (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-own-target-headers.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-generated-files.hmap (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-generated-files.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-all-target-headers.hmap (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-all-target-headers.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-all-non-framework-target-headers.hmap (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-all-non-framework-target-headers.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_const_extract_protocols.json (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_const_extract_protocols.json
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftFileList (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftConstValuesFileList (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftConstValuesFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.LinkFileList (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.LinkFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-OutputFileMap.json (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-OutputFileMap.json
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.hmap (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.DependencyStaticMetadataFileList (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.DependencyStaticMetadataFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.DependencyMetadataFileList (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.DependencyMetadataFileList
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-project-headers.hmap (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-project-headers.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-own-target-headers.hmap (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-own-target-headers.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-generated-files.hmap (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-generated-files.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-all-target-headers.hmap (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-all-target-headers.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-all-non-framework-target-headers.hmap (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-all-non-framework-target-headers.hmap
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-DebugDylibPath-normal-arm64.txt (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-DebugDylibPath-normal-arm64.txt
+
+WriteAuxiliaryFile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-DebugDylibInstallName-normal-arm64.txt (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    write-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-DebugDylibInstallName-normal-arm64.txt
+
+MkDir /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    /bin/mkdir -p /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest
+
+MkDir /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    /bin/mkdir -p /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app
+
+Ld /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/__preview.dylib normal (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios16.0-simulator -dynamiclib -isysroot /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -O0 -L/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -install_name @rpath/BillBox.debug.dylib -dead_strip -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_dependency_info.dat -o /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/__preview.dylib
+
+MkDir /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/unthinned (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    /bin/mkdir -p /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/unthinned
+
+MkDir /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/thinned (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    /bin/mkdir -p /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/thinned
+
+GenerateAssetSymbols /Users/runner/work/BillBox/BillBox/ios/BillBox/Resources/Assets.xcassets (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/actool /Users/runner/work/BillBox/BillBox/ios/BillBox/Resources/Assets.xcassets --compile /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app --output-format human-readable-text --notices --warnings --export-dependency-info /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_dependencies --output-partial-info-plist /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_generated_info.plist --app-icon AppIcon --accent-color AccentColor --compress-pngs --enable-on-demand-resources YES --development-region en --target-device iphone --minimum-deployment-target 16.0 --platform iphonesimulator --bundle-identifier com.local.billbox --generate-swift-asset-symbol-extensions NO --generate-swift-asset-symbols /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols.swift --generate-objc-asset-symbols /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols.h --generate-asset-symbol-index /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols-Index.plist
+/* com.apple.actool.compilation-results */
+/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols-Index.plist
+/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols.h
+/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols.swift
+
+
+CpResource /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/PDFReader /Users/runner/work/BillBox/BillBox/ios/BillBox/Resources/PDFReader (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks /Users/runner/work/BillBox/BillBox/ios/BillBox/Resources/PDFReader /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app
+
+CompileAssetCatalogVariant thinned /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app /Users/runner/work/BillBox/BillBox/ios/BillBox/Resources/Assets.xcassets (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/actool /Users/runner/work/BillBox/BillBox/ios/BillBox/Resources/Assets.xcassets --compile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/thinned --output-format human-readable-text --notices --warnings --export-dependency-info /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_dependencies_thinned --output-partial-info-plist /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_generated_info.plist_thinned --app-icon AppIcon --accent-color AccentColor --compress-pngs --enable-on-demand-resources YES --filter-for-thinning-device-configuration iPhone14,6 --filter-for-device-os-version 26.2 --development-region en --target-device iphone --minimum-deployment-target 16.0 --platform iphonesimulator
+/* com.apple.actool.compilation-results */
+/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_generated_info.plist_thinned
+/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/thinned/AppIcon60x60@2x.png
+/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/thinned/AppIcon76x76@2x~ipad.png
+/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/thinned/Assets.car
+
+
+ProcessInfoPlistFile /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Info.plist /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/empty-BillBoxTests.plist (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-infoPlistUtility /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/empty-BillBoxTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -format binary -platform iphonesimulator -o /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Info.plist
+
+CpResource /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Golden /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/Golden (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/Golden /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest
+
+SwiftDriver BillBoxTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-SwiftDriver -- /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BillBoxTests -Onone -enforce-exclusivity\=checked @/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -target arm64-apple-ios16.0-simulator -g -module-cache-path /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/BillBox/BillBox/build/Index.noindex/DataStore -swift-version 5 -I /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -I /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk/Developer/Library/Frameworks -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache -output-file-map /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-generated-files.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-own-target-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-project-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-Swift.h -working-directory /Users/runner/work/BillBox/BillBox/ios -experimental-emit-module-separately -disable-cmo
+
+SwiftDriver BillBox normal arm64 com.apple.xcode.tools.swift.compiler (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-SwiftDriver -- /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BillBox -Onone -enforce-exclusivity\=checked @/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -target arm64-apple-ios16.0-simulator -g -module-cache-path /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/BillBox/BillBox/build/Index.noindex/DataStore -swift-version 5 -I /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache -output-file-map /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-generated-files.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-own-target-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-project-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-Swift.h -working-directory /Users/runner/work/BillBox/BillBox/ios -experimental-emit-module-separately -disable-cmo
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ BillBoxTests (in target 'BillBoxTests' from project 'BillBox')
+EmitSwiftModule normal arm64 (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/SimilarityTests.swift:2:18: error: no such module 'BillBoxCore'
+@testable import BillBoxCore
+                 ^
+
+Failed frontend command:
+/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -emit-module -experimental-skip-non-inlinable-function-bodies-without-types /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/AutoCreate.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Backup.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Billing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Category.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/DebitNotes.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Drive.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PDFParser.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PageText.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PartiesAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Pricing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Purchases.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Reports.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Router.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/SQLite.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Schema.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Unzip.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Utils.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/XLSX.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Years.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BackupFilesTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BillMathTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ConcurrencyTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/GoldenTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ParityCompare.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/SimilarityTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/ParityKit/ParityRunner.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/BillMath.swift -target arm64-apple-ios16.0-simulator -Xllvm -aarch64-use-tbi -enable-objc-interop -sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -I /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -I /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk/Developer/Library/Frameworks -no-color-diagnostics -enable-testing -g -debug-info-format\=dwarf -dwarf-version\=4 -module-cache-path /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex -swift-version 5 -enforce-exclusivity\=checked -Onone -D DEBUG -serialize-debugging-options -const-gather-protocols-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests_const_extract_protocols.json -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -empty-abi-descriptor -plugin-path /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -validate-clang-modules-once -clang-build-session-file /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex/Session.modulevalidation -Xcc -working-directory -Xcc /Users/runner/work/BillBox/BillBox/ios -resource-dir /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift -enable-anonymous-context-mangled-names -file-compilation-dir /Users/runner/work/BillBox/BillBox/ios -Xcc -ivfsstatcache -Xcc /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/swift-overrides.hmap -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-generated-files.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-own-target-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-project-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources -module-name BillBoxTests -frontend-parseable-output -disable-clang-spi -target-sdk-version 18.5 -target-sdk-name iphonesimulator18.5 -external-plugin-path /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins\#/Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server -external-plugin-path /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/local/lib/swift/host/plugins\#/Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server -in-process-plugin-server-path /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/libSwiftInProcPluginServer.dylib -plugin-path /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins -plugin-path /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/lib/swift/host/plugins -emit-module-doc-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftdoc -emit-module-source-info-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftsourceinfo -emit-objc-header-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-Swift.h -serialize-diagnostics-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-master-emit-module.dia -emit-dependencies-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-master-emit-module.d -o /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftmodule -emit-abi-descriptor-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.abi.json
+SwiftEmitModule normal arm64 Emitting\ module\ for\ BillBox (in target 'BillBox' from project 'BillBox')
+EmitSwiftModule normal arm64 (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 Compiling\ AutoCreate.swift,\ Backup.swift,\ Billing.swift,\ Category.swift,\ DebitNotes.swift,\ Drive.swift,\ Engine.swift,\ EwayBill.swift,\ ItemTools.swift,\ ItemsAPI.swift,\ JS.swift,\ MargImport.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/AutoCreate.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Backup.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Billing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Category.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/DebitNotes.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Drive.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift (in target 'BillBoxTests' from project 'BillBox')
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/AutoCreate.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Backup.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Billing.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Category.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/DebitNotes.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Drive.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 Compiling\ WebList.swift,\ XLSX.swift,\ Years.swift,\ BackupFilesTests.swift,\ BillMathTests.swift,\ ConcurrencyTests.swift,\ GoldenTests.swift,\ ParityCompare.swift,\ SimilarityTests.swift,\ ParityRunner.swift,\ BillMath.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/XLSX.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Years.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BackupFilesTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BillMathTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ConcurrencyTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/GoldenTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ParityCompare.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/SimilarityTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/ParityKit/ParityRunner.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/BillMath.swift (in target 'BillBoxTests' from project 'BillBox')
+Command SwiftCompile failed with a nonzero exit code
+
+
+Test session results, code coverage, and logs:
+	/Users/runner/work/BillBox/BillBox/build/Logs/Test/Test-BillBox-2026.10.31_16-06-31-+0000.xcresult
+
+Testing failed:
+	No such module 'BillBoxCore'
+	Command SwiftCompile failed with a nonzero exit code
+	Testing cancelled because the build failed.
+
+** TEST FAILED **
+
+
+The following build commands failed:
+	EmitSwiftModule normal arm64 (in target 'BillBoxTests' from project 'BillBox')
+	SwiftEmitModule normal arm64 Emitting\ module\ for\ BillBoxTests (in target 'BillBoxTests' from project 'BillBox')
+	SwiftCompile normal arm64 Compiling\ WebList.swift,\ XLSX.swift,\ Years.swift,\ BackupFilesTests.swift,\ BillMathTests.swift,\ ConcurrencyTests.swift,\ GoldenTests.swift,\ ParityCompare.swift,\ SimilarityTests.swift,\ ParityRunner.swift,\ BillMath.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/XLSX.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Years.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BackupFilesTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BillMathTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ConcurrencyTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/GoldenTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ParityCompare.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/SimilarityTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/ParityKit/ParityRunner.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/BillMath.swift (in target 'BillBoxTests' from project 'BillBox')
+	Testing project BillBox with scheme BillBox
+(4 failures)

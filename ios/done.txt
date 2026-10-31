@@ -1,0 +1,4 @@
+bill_1.pdf A000050  44115 bytes
+bill_2.pdf A000002  43948 bytes
+bill_3.pdf INV/26-27/00011  44341 bytes
+bill_4.pdf A0001  42959 bytes
