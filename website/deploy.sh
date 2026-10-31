@@ -7,6 +7,9 @@ BRANCH="${1:-main}"
 W() { npx --yes wrangler@4 "$@"; }
 step() { echo; echo "== $*"; }
 
+step "Cloudflare account and token"
+W whoami 2>&1 | grep -vE 'wrangler|^─|^$' | sed -E 's/[0-9a-f]{32}/<id>/g' | head -20
+
 step "Pages project"
 for i in 1 2 3; do PL="$(W pages project list 2>&1)"; echo "$PL" | grep -q 'Rate limited' || break; echo "rate limited, waiting"; sleep 20; done
 if ! echo "$PL" | grep -qE '(^|[^a-z-])billbox([^a-z-]|$)'; then
@@ -38,4 +41,9 @@ done
 rm -f secret.err
 
 step "Deploy ($BRANCH)"
-W pages deploy public --project-name billbox --branch "$BRANCH" --commit-dirty=true
+for i in 1 2 3 4; do
+  W pages deploy public --project-name billbox --branch "$BRANCH" --commit-dirty=true 2>&1 | tee deploy.out && ! grep -q 'Rate limited' deploy.out && exit 0
+  grep -q 'Rate limited' deploy.out || exit 1
+  echo "rate limited, waiting $((i * 30)) s"; sleep $((i * 30))
+done
+exit 1
