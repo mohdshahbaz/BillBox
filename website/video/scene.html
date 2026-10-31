@@ -1,0 +1,164 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  :root { --brand:#4F46E5; --brand2:#7C3AED; --ink:#111827; --muted:#6B7280; --line:#E5E7EB; --bg:#F5F5F7; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:1280px; height:720px; overflow:hidden; font-family:-apple-system,"SF Pro Display","Inter","Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif; color:var(--ink);
+    background: radial-gradient(1200px 700px at 70% 10%, #EEF0FF 0%, #F5F5F7 55%, #ECECF1 100%); }
+  .cap { position:absolute; left:64px; top:70px; width:360px; }
+  .cap .k { font-size:15px; font-weight:600; color:var(--brand); letter-spacing:.02em; text-transform:uppercase; margin-bottom:10px; }
+  .cap .h { font-size:40px; line-height:1.08; font-weight:700; letter-spacing:-.02em; }
+  .cap .s { margin-top:14px; font-size:18px; line-height:1.4; color:var(--muted); }
+  #device { position:absolute; }
+  .screen { position:absolute; overflow:hidden; background:#fff; }
+  /* desktop chrome */
+  .laptop { position:absolute; left:460px; top:110px; width:760px; height:500px; border-radius:14px; background:#fff; box-shadow:0 40px 80px -30px rgba(30,27,75,.35), 0 0 0 1px rgba(0,0,0,.06); overflow:hidden; }
+  .bar { height:38px; display:flex; align-items:center; padding:0 14px; gap:8px; border-bottom:1px solid var(--line); font-size:13px; color:#374151; background:#FAFAFB; }
+  .mac .dot { width:12px; height:12px; border-radius:50%; } .mac .dot:nth-child(1){background:#FF5F57} .mac .dot:nth-child(2){background:#FEBC2E} .mac .dot:nth-child(3){background:#28C840}
+  .bar .title { flex:1; text-align:center; font-weight:600; }
+  .win .bar { background:#F3F3F3; } .win .ctl { width:44px; text-align:center; color:#333; font-size:14px; }
+  .lin .bar { background:#EBEBEB; height:42px; } .lin .ctl { width:22px; height:22px; border-radius:50%; background:#DADADA; display:grid; place-items:center; font-size:11px; }
+  .app { position:absolute; left:0; right:0; top:38px; bottom:0; display:flex; }
+  .lin .app { top:42px; }
+  .side { width:170px; background:#F7F7F9; border-right:1px solid var(--line); padding:12px 10px; font-size:13px; }
+  .side .it { padding:8px 10px; border-radius:8px; margin-bottom:3px; color:#374151; display:flex; gap:8px; align-items:center; }
+  .side .it.on { background:var(--brand); color:#fff; font-weight:600; }
+  .main { flex:1; position:relative; overflow:hidden; }
+  .page { position:absolute; inset:0; padding:18px 20px; }
+  /* phone */
+  .phone { position:absolute; left:700px; top:40px; width:320px; height:650px; border-radius:52px; background:#111; padding:12px; box-shadow:0 40px 80px -30px rgba(30,27,75,.45); }
+  .phone .screen { left:12px; top:12px; right:12px; bottom:12px; border-radius:42px; }
+  .island { position:absolute; left:50%; top:22px; width:100px; height:28px; margin-left:-50px; background:#111; border-radius:20px; z-index:5; }
+  .punch { position:absolute; left:50%; top:24px; width:14px; height:14px; margin-left:-7px; background:#111; border-radius:50%; z-index:5; }
+  .phone .app { top:0; flex-direction:column; }
+  .phone .page { padding:62px 16px 70px; }
+  .tabs { position:absolute; left:0; right:0; bottom:0; height:62px; border-top:1px solid var(--line); background:rgba(250,250,252,.96); display:flex; justify-content:space-around; align-items:center; font-size:10px; color:var(--muted); z-index:4; }
+  .tabs .t { text-align:center; } .tabs .t b { display:block; font-size:18px; margin-bottom:2px; } .tabs .t.on { color:var(--brand); font-weight:600; }
+  .pill { position:absolute; bottom:8px; left:50%; width:110px; height:4px; margin-left:-55px; background:#111; border-radius:4px; z-index:6; opacity:.8; }
+  h3 { font-size:19px; letter-spacing:-.01em; margin-bottom:12px; }
+  .hero { border-radius:14px; padding:14px 16px; color:#fff; background:linear-gradient(135deg,var(--brand),var(--brand2)); margin-bottom:12px; }
+  .hero .a { font-size:12px; opacity:.85 } .hero .b { font-size:26px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .phone .kpis { grid-template-columns:repeat(2,1fr); }
+  .kpi { border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:#fff; }
+  .kpi .l { font-size:11px; color:var(--muted) } .kpi .v { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:3px; }
+  .chart { margin-top:12px; height:120px; border:1px solid var(--line); border-radius:12px; padding:10px 12px 22px; display:flex; align-items:flex-end; gap:8px; position:relative; }
+  .chart .bar2 { flex:1; background:var(--brand); border-radius:4px 4px 0 0; opacity:.85; }
+  .chart .lbl { position:absolute; bottom:5px; font-size:9px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:left; color:var(--muted); font-weight:600; font-size:11px; padding:6px 6px; border-bottom:1px solid var(--line); }
+  td { padding:8px 6px; border-bottom:1px solid #F1F1F4; font-variant-numeric:tabular-nums; }
+  td.r, th.r { text-align:right; }
+  .party { display:flex; gap:10px; margin-bottom:12px; }
+  .field { flex:1; border:1px solid var(--line); border-radius:10px; padding:7px 10px; font-size:12px; } .field i { display:block; font-style:normal; font-size:10px; color:var(--muted); }
+  .total { position:absolute; left:20px; right:20px; bottom:16px; display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-radius:12px; background:#F5F3FF; }
+  .phone .total { bottom:76px; left:16px; right:16px; } .phone .total .v { font-size:19px; } .phone .btn { padding:7px 10px; font-size:12px; }
+  .total .v { font-size:24px; font-weight:800; color:var(--brand); font-variant-numeric:tabular-nums; }
+  .btn { white-space:nowrap; background:var(--brand); color:#fff; border-radius:10px; padding:8px 14px; font-weight:600; font-size:13px; }
+  .sheet { position:absolute; left:50%; width:440px; margin-left:-220px; background:#fff; border:1px solid #D1D5DB; box-shadow:0 30px 60px -20px rgba(0,0,0,.35); padding:14px; font-size:9px; z-index:8; }
+  .phone .sheet { width:270px; margin-left:-135px; font-size:7px; }
+  .sheet .hd { display:flex; justify-content:space-between; border-bottom:1.5px solid #111; padding-bottom:6px; margin-bottom:6px; }
+  .sheet .co { font-weight:800; font-size:14px; color:#1E3A8A } .phone .sheet .co { font-size:11px; }
+  .sheet table { font-size:8px; } .sheet td,.sheet th { padding:3px 4px; }
+  .sheet .gt { margin-top:6px; display:flex; justify-content:space-between; font-weight:800; font-size:11px; background:#EEF2FF; padding:5px 6px; }
+  .stamp { position:absolute; right:22px; top:52px; border:3px solid #16A34A; color:#16A34A; font-weight:800; font-size:16px; padding:3px 10px; border-radius:6px; transform:rotate(-12deg); }
+  .cloud { position:absolute; inset:0; display:grid; place-items:center; background:rgba(255,255,255,.92); z-index:9; }
+  .cloud .c { text-align:center; } .cloud .ico { width:96px; height:96px; border-radius:28px; margin:0 auto 14px; background:linear-gradient(135deg,#22C55E,#16A34A); display:grid; place-items:center; color:#fff; font-size:46px; font-weight:800; }
+  .cloud .t1 { font-size:20px; font-weight:700 } .cloud .t2 { font-size:13px; color:var(--muted); margin-top:4px; }
+  .end { position:absolute; inset:0; display:grid; place-items:center; background:#fff; z-index:20; }
+  .end .logo { width:110px; height:110px; border-radius:28px; margin:0 auto 18px; background:linear-gradient(135deg,var(--brand),var(--brand2)); display:grid; place-items:center; color:#fff; font-size:54px; font-weight:800; box-shadow:0 20px 40px -14px rgba(79,70,229,.6); }
+  .end .n { font-size:54px; font-weight:800; letter-spacing:-.03em; text-align:center; } .end .u { font-size:20px; color:var(--muted); text-align:center; margin-top:6px; }
+</style></head>
+<body>
+<div class="cap" id="cap"><div class="k" id="capk"></div><div class="h" id="caph"></div><div class="s" id="caps"></div></div>
+<div id="device"></div>
+<div class="end" id="end" style="opacity:0"><div><div class="logo">B</div><div class="n" id="endn">BillBox</div><div class="u">billbox.pages.dev</div></div></div>
+<script>
+const P = new URLSearchParams(location.search).get('p') || 'mac';
+const NAMES = { mac: 'Mac', windows: 'Windows', linux: 'Linux', iphone: 'iPhone', android: 'Android' };
+const phone = P === 'iphone' || P === 'android';
+const D = document.getElementById('device');
+const items = [['Parle-G 100g', '5 box', 'Batch PG24 · Exp 03/27', 1180.00], ['Bikano Bhujia 400g', '3 box', 'Free 1 pc', 2592.36], ['Tata Salt 1kg', '10 box', '', 2640.00], ['Surf Excel 1kg', '2 box', 'Scheme 5%', 3876.20], ['Maggi 70g', '4 box', '', 1920.00]];
+const money = (v) => '₹' + Math.round(v).toLocaleString('en-IN');
+const money2 = (v) => '₹' + v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const side = ['Dashboard', 'Billing', 'Purchases', 'All bills', 'Stock', 'Parties', 'Salesmen', 'Books & GST', 'Settings'];
+const sideIco = ['◧', '₹', '⇣', '☰', '▦', '☺', '⚑', '§', '⚙'];
+
+function chrome(inner) {
+  if (phone) return `<div class="phone"><div class="${P === 'iphone' ? 'island' : 'punch'}"></div><div class="screen"><div class="app">${inner}
+    <div class="tabs">${[['₹', 'Billing'], ['☰', 'Bills'], ['▦', 'Stock'], ['☺', 'Parties'], ['⋯', 'More']].map(([i, t], k) => `<div class="t" data-tab="${k}"><b>${i}</b>${t}</div>`).join('')}</div>
+    ${P === 'iphone' ? '<div class="pill"></div>' : ''}</div></div></div>`;
+  const bar = P === 'mac' ? `<div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="title">BillBox — AK Enterprises</span><span style="width:52px"></span></div>`
+    : P === 'windows' ? `<div class="bar"><span style="font-weight:600">BillBox — AK Enterprises</span><span class="title"></span><span class="ctl">—</span><span class="ctl">☐</span><span class="ctl">✕</span></div>`
+    : `<div class="bar"><span class="ctl">≡</span><span class="title">BillBox — AK Enterprises</span><span class="ctl">–</span><span class="ctl">✕</span></div>`;
+  return `<div class="laptop ${P === 'mac' ? 'mac' : P === 'windows' ? 'win' : 'lin'}">${bar}<div class="app"><div class="side">${side.map((s, i) => `<div class="it" data-side="${i}"><span>${sideIco[i]}</span>${s}</div>`).join('')}</div><div class="main">${inner}</div></div></div>`;
+}
+const dash = `<div class="page" id="pg-dash"><h3>Dashboard</h3>
+  <div class="hero"><div class="a">Good morning · Sales today</div><div class="b" id="today">₹0</div></div>
+  <div class="kpis">${[['Sales this month', 'k1'], ['Profit', 'k2'], ['Collections', 'k3'], ['Purchases', 'k4'], ['To receive', 'k5'], ['GST to pay', 'k6']].slice(0, phone ? 4 : 6).map(([l, id]) => `<div class="kpi"><div class="l">${l}</div><div class="v" id="${id}">₹0</div></div>`).join('')}</div>
+  <div class="chart" id="chart">${'AMJJASONDJFM'.split('').map((m, i) => `<div class="bar2" data-b="${i}" style="height:0"></div><span class="lbl" style="left:${12 + i * (phone ? 21.5 : 46.5)}px">${m}</span>`).join('')}</div></div>`;
+const bill = `<div class="page" id="pg-bill" style="opacity:0"><h3>New bill <span style="font-size:12px;color:var(--muted);font-weight:500">INV/2026/1482</span></h3>
+  <div class="party"><div class="field"><i>Party</i>Sharma General Store</div>${phone ? '' : '<div class="field"><i>Salesman</i>Ravi · Beat 3</div><div class="field"><i>GST</i>CGST + SGST</div>'}</div>
+  <table><tr><th>Item</th>${phone ? '' : '<th>Qty</th>'}<th class="r">Amount</th></tr>${items.map((it, i) => `<tr data-row="${i}" style="opacity:0"><td><b>${it[0]}</b><div style="font-size:10px;color:var(--muted)">${phone ? it[1] + ' · ' : ''}${it[2]}</div></td>${phone ? '' : `<td>${it[1]}</td>`}<td class="r">${money2(it[3])}</td></tr>`).join('')}</table>
+  <div class="total"><div><div style="font-size:11px;color:var(--muted)">Total (incl. GST)</div><div class="v" id="tot">₹0.00</div></div><div class="btn">Save & print</div></div></div>`;
+const sheet = `<div class="sheet" id="sheet" style="top:900px"><div class="hd"><div><div class="co">AK ENTERPRISES</div><div>GSTIN 09ABCDE1234F1Z5 · Lucknow</div></div><div style="text-align:right"><b>GST INVOICE</b><div>INV/2026/1482</div><div>01-11-2026</div></div></div>
+  <div style="margin-bottom:5px"><b>M/s</b> Sharma General Store · GSTIN 09XYZAB9876C1Z2</div>
+  <table><tr><th>Sn</th><th>Product</th><th>Box</th><th class="r">Amount</th></tr>${items.map((it, i) => `<tr><td>${i + 1}</td><td>${it[0]}</td><td>${it[1].split(' ')[0]}</td><td class="r">${money2(it[3])}</td></tr>`).join('')}</table>
+  <div class="gt"><span>GRAND TOTAL</span><span>${money2(items.reduce((a, b) => a + b[3], 0))}</span></div><div class="stamp" id="stamp" style="opacity:0">PRINTED</div></div>`;
+const cloud = `<div class="cloud" id="cloud" style="opacity:0"><div class="c"><div class="ico">✓</div><div class="t1">Backed up</div><div class="t2">This computer · Google Drive › BillBox Backups</div></div></div>`;
+D.innerHTML = chrome(dash + bill + cloud) ;
+(phone ? D.querySelector('.screen') : D.querySelector('.main')).insertAdjacentHTML('beforeend', sheet);
+if (phone) { const c = D.querySelector('.cloud .t2'); c.textContent = 'This phone · Google Drive › BillBox Backups'; }
+document.getElementById('endn').textContent = 'BillBox for ' + NAMES[P];
+
+const caps = [
+  [0, 'BillBox for ' + NAMES[P], 'Billing that keeps up with your business.', 'GST billing, stock and accounts for FMCG distributors.'],
+  [1.2, 'Dashboard', 'Your day at a glance.', 'Sales, profit, collections, dues and GST — today, this month or the whole year.'],
+  [4.2, 'Billing', 'Bills in seconds.', 'Batches and expiry picked for you, schemes and free pieces, CGST, SGST or IGST worked out.'],
+  [7.6, 'Printing', 'Print it your way.', 'Half sheet or A4, BillBox or Marg style, or send it on WhatsApp.'],
+  [10.0, 'Backup', 'Your books, always safe.', 'Daily backups to this device and to Google Drive, restored on any BillBox.'],
+];
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const seg = (t, a, b) => ease((t - a) / (b - a));
+const $ = (id) => document.getElementById(id);
+const bars = [42, 55, 48, 63, 58, 71, 66, 80, 74, 88, 69, 92];
+function render(t) {
+  // captions: fade between beats
+  let c = caps[0];
+  for (const k of caps) if (t >= k[0]) c = k;
+  const since = t - c[0], next = caps.find((k) => k[0] > c[0]), until = next ? next[0] - t : 99;
+  const capO = clamp(since / .35) * clamp(until / .3);
+  const cap = $('cap'); cap.style.opacity = capO * (1 - seg(t, 11.3, 11.7)); cap.style.transform = `translateY(${(1 - clamp(since / .35)) * 14}px)`;
+  $('capk').textContent = c[1]; $('caph').textContent = c[2]; $('caps').textContent = c[3];
+  // device rise
+  const r = seg(t, 0, 1.0);
+  D.style.opacity = r; D.style.transform = `translateY(${(1 - r) * 60}px) scale(${.96 + .04 * r})`;
+  // sidebar / tab selection
+  const onBill = t >= 4.2;
+  D.querySelectorAll('[data-side]').forEach((e) => e.classList.toggle('on', Number(e.dataset.side) === (onBill ? 1 : 0)));
+  D.querySelectorAll('[data-tab]').forEach((e) => e.classList.toggle('on', Number(e.dataset.tab) === (onBill ? 0 : 4)));
+  // dashboard numbers and chart
+  const k = seg(t, 1.3, 3.3);
+  $('today').textContent = money(48250 * k);
+  [['k1', 482350], ['k2', 61840], ['k3', 395200], ['k4', 412600], ['k5', 128900], ['k6', 18430]].forEach(([id, v]) => { const e = $(id); if (e) e.textContent = money(v * k); });
+  D.querySelectorAll('[data-b]').forEach((e, i) => { e.style.height = `${bars[i] * seg(t, 1.5 + i * .08, 2.6 + i * .08)}%`; });
+  // dashboard → bill
+  const sw = seg(t, 4.0, 4.6);
+  $('pg-dash').style.opacity = 1 - sw; $('pg-dash').style.transform = `translateX(${-40 * sw}px)`;
+  $('pg-bill').style.opacity = sw; $('pg-bill').style.transform = `translateX(${40 * (1 - sw)}px)`;
+  let tot = 0;
+  D.querySelectorAll('[data-row]').forEach((e, i) => { const a = seg(t, 4.8 + i * .45, 5.15 + i * .45); e.style.opacity = a; e.style.transform = `translateY(${(1 - a) * 8}px)`; tot += items[i][3] * a; });
+  $('tot').textContent = money2(tot);
+  // print sheet slides up, stamp
+  const sh = seg(t, 7.6, 8.4) - seg(t, 9.8, 10.2);
+  const shEl = $('sheet'); const base = phone ? 110 : 26;
+  shEl.style.top = `${base + (1 - sh) * 600}px`; shEl.style.opacity = clamp(sh * 3);
+  const st = seg(t, 8.8, 9.0); $('stamp').style.opacity = st; $('stamp').style.transform = `rotate(-12deg) scale(${1.6 - .6 * st})`;
+  // backup
+  const cl = seg(t, 10.1, 10.5); $('cloud').style.opacity = cl; $('cloud').querySelector('.ico').style.transform = `scale(${.6 + .4 * seg(t, 10.2, 10.7)})`;
+  // end card
+  $('end').style.opacity = seg(t, 11.4, 11.8);
+}
+window.render = render; render(0);
+</script></body></html>

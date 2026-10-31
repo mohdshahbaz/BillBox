@@ -1,0 +1,9 @@
+# Cloudflare Pages project for billbox.pages.dev: the website (public/) and the licence server (functions/api).
+# The KV namespace id is filled in by the deploy workflow (.github/workflows/website.yml).
+name = "billbox"
+pages_build_output_dir = "public"
+compatibility_date = "2026-06-01"
+
+[[kv_namespaces]]
+binding = "LICENSES"
+id = "__KV_ID__"

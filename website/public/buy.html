@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buy BillBox — licence key in a minute</title>
+<meta name="description" content="Buy a BillBox licence: yearly ₹1,499, lifetime ₹3,999, or $29 a year outside India. The licence key is shown right after paying.">
+<link rel="canonical" href="https://billbox.pages.dev/buy.html"><meta name="robots" content="noindex">
+<meta name="theme-color" content="#4f46e5">
+<meta property="og:type" content="website"><meta property="og:site_name" content="BillBox"><meta property="og:title" content="Buy BillBox — licence key in a minute">
+<meta property="og:description" content="Buy a BillBox licence: yearly ₹1,499, lifetime ₹3,999, or $29 a year outside India. The licence key is shown right after paying."><meta property="og:url" content="https://billbox.pages.dev/buy.html"><meta property="og:image" content="https://billbox.pages.dev/videos/mac.jpg">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Buy BillBox — licence key in a minute"><meta name="twitter:description" content="Buy a BillBox licence: yearly ₹1,499, lifetime ₹3,999, or $29 a year outside India. The licence key is shown right after paying."><meta name="twitter:image" content="https://billbox.pages.dev/videos/mac.jpg">
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/assets/icon-32.png"><link rel="apple-touch-icon" href="/assets/icon-180.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/assets/style.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "BillBox", "url": "https://billbox.pages.dev", "logo": "https://billbox.pages.dev/assets/icon-512.png", "email": "mohdshabaz12@gmail.com"}</script>
+</head>
+<body>
+<nav class="nav" aria-label="Main"><div class="wrap">
+  <a class="brand" href="/"><img src="/assets/icon-32.png" alt="" width="22" height="22">BillBox</a>
+  <button class="menu-btn" aria-label="Menu" aria-expanded="false">☰</button>
+  <div class="links"><a href="/mac/">Mac</a><a href="/windows/">Windows</a><a href="/linux/">Linux</a><a href="/iphone/">iPhone</a><a href="/android/">Android</a><a href="/pricing/">Pricing</a><a href="/#faq">FAQ</a></div>
+  <a class="cta" href="/pricing/">Buy</a>
+</div></nav>
+<main>
+<section class="hero" style="padding-bottom:96px"><div class="wrap" style="max-width:640px">
+  <div class="center"><p class="eyebrow">Buy a licence</p><h2>Your key, in a minute.</h2>
+  <p class="lead">Pay, copy the key, paste it in BillBox › Settings › Licence.</p></div>
+  <div id="testmode" class="notice warn" hidden><b>Test mode.</b> Payments go through Razorpay's test mode and give test licence keys, which work only in the admin (test) BillBox.</div>
+  <form class="card" id="buy" style="margin-top:28px" onsubmit="return false">
+    <label>Plan</label>
+    <div class="choices" id="plans">
+      <label class="choice"><input type="radio" name="plan" value="yearly_inr" checked><b>Yearly</b><span>₹1,499</span></label>
+      <label class="choice"><input type="radio" name="plan" value="lifetime_inr"><b>Lifetime</b><span>₹3,999</span></label>
+      <label class="choice"><input type="radio" name="plan" value="yearly_usd"><b>Yearly, outside India</b><span>$29</span></label>
+    </div>
+    <label for="email">E-mail (your licence is kept for it)</label><input id="email" type="email" autocomplete="email" required placeholder="you@business.in">
+    <label for="name">Business name (optional)</label><input id="name" autocomplete="organization" placeholder="Your business">
+    <div class="btns" style="justify-content:flex-start"><button class="btn" id="pay" type="button">Pay with Razorpay</button><button class="btn ghost" id="upiBtn" type="button">Pay by UPI directly (no fees)</button></div>
+    <div id="msg"></div>
+  </form>
+  <div class="card" id="done" hidden style="margin-top:28px"><h3>Thank you! Here is your licence key</h3>
+    <p style="color:var(--muted)">Copy it into BillBox › Settings › Licence › Use this licence key. Keep it safe — it also works on your second device.</p>
+    <div class="keybox" id="key"></div><div class="btns" style="justify-content:flex-start"><button class="btn" id="copy" type="button">Copy the key</button></div>
+    <p style="color:var(--muted);font-size:14px" id="keyinfo"></p></div>
+  <div class="card" id="upi" hidden style="margin-top:28px"><h3>Pay by UPI</h3>
+    <p style="color:var(--muted)">Scan with any UPI app (GPay, PhonePe, Paytm, BHIM) or pay to <b id="vpa"></b>. Then send the UPI reference number and your e-mail to <a id="mailto"></a> — your licence key comes back by e-mail, usually within a few hours.</p>
+    <div class="center"><div id="qr"></div></div></div>
+  <div class="card" id="find" style="margin-top:28px"><h3>Find my licence key</h3>
+    <label for="femail">E-mail used when paying</label><input id="femail" type="email">
+    <label for="fpay">Razorpay payment ID (pay_…, in the receipt e-mail)</label><input id="fpay">
+    <div class="btns" style="justify-content:flex-start"><button class="btn" id="findBtn" type="button">Show my key</button></div><div id="fmsg"></div></div>
+</div></section>
+<script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script src="/assets/buy.js" defer></script>
+</main>
+<footer><div class="wrap">
+  <div class="cols">
+    <div><h4>BillBox</h4><a href="/mac/">BillBox for Mac</a><a href="/windows/">BillBox for Windows</a><a href="/linux/">BillBox for Linux</a><a href="/iphone/">BillBox for iPhone</a><a href="/android/">BillBox for Android</a></div>
+    <div><h4>Buy</h4><a href="/pricing/">Pricing</a><a href="/buy.html">Buy a licence</a><a href="/buy.html#find">Find my licence key</a></div>
+    <div><h4>Help</h4><a href="/#faq">Questions</a><a href="https://github.com/mohdshahbaz/BillBox/releases">All downloads</a><a href="/contact/">Contact</a></div>
+    <div><h4>Policies</h4><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/refunds/">Refunds and cancellation</a></div>
+  </div>
+  <div class="bottom"><span>Copyright © 2026 AK Enterprises. All rights reserved.</span><span>Made in India for Indian distributors.</span></div>
+</div></footer>
+<script src="/assets/site.js" defer></script>
+<script>window.BB_EMAIL="mohdshabaz12@gmail.com"</script></body></html>

@@ -26,3 +26,7 @@ ios/BillBoxCore/Tests/BillBoxCoreTests/Golden/parser.json
 ios/BillBoxCore/Tests/BillBoxCoreTests/Golden/parser.mac.jsonl
 ios/BillBoxCore/Tests/BillBoxCoreTests/Golden/pagetext.json
 ios/BillBoxCore/Tests/BillBoxCoreTests/Golden/pagetext.mac.jsonl
+website/video/node_modules/
+frontend/linux/
+frontend/windows/
+android/engine/node_modules/

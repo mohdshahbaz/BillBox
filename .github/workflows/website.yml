@@ -1,0 +1,63 @@
+# The website and licence server on Cloudflare Pages (billbox.pages.dev): built, checked and deployed on every push to
+# main that touches website/ (other branches get a preview address). Needs the repository secrets
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID; the licence and Razorpay secrets are copied to Cloudflare when present.
+name: Website
+
+on:
+  push:
+    branches: ['**']
+    paths: ['website/**', 'backend/src/services/license.js', 'backend/src/services/ed25519.js', '.github/workflows/website.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - name: Build the pages
+        run: python3 website/build.py
+      - name: Licence server checks (fake Razorpay, checked by the app engine)
+        run: node --disable-warning=ExperimentalWarning website/test/server.test.mjs
+      - name: Deploy to Cloudflare Pages
+        working-directory: website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LICENSE_KEY_LIVE: ${{ secrets.LICENSE_KEY_LIVE }}
+          LICENSE_KEY_TEST: ${{ secrets.LICENSE_KEY_TEST }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          RZP_KEY_ID_LIVE: ${{ secrets.RZP_KEY_ID_LIVE }}
+          RZP_KEY_SECRET_LIVE: ${{ secrets.RZP_KEY_SECRET_LIVE }}
+          RZP_KEY_ID_TEST: ${{ secrets.RZP_KEY_ID_TEST }}
+          RZP_KEY_SECRET_TEST: ${{ secrets.RZP_KEY_SECRET_TEST }}
+          RZP_WEBHOOK_SECRET: ${{ secrets.RZP_WEBHOOK_SECRET }}
+          UPI_VPA: ${{ secrets.UPI_VPA }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set: the site was built and checked but not deployed."; exit 0
+          fi
+          W="npx --yes wrangler@4"
+          $W pages project list | grep -q ' billbox ' || $W pages project create billbox --production-branch main
+          # the licence store (one KV namespace, made once)
+          ID="$($W kv namespace list | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const l=JSON.parse(s);const n=l.find(x=>x.title==="billbox-licenses");console.log(n?n.id:"")})')"
+          [ -n "$ID" ] || ID="$($W kv namespace create billbox-licenses 2>&1 | grep -oE '[0-9a-f]{32}' | head -1)"
+          sed -i "s/__KV_ID__/$ID/" wrangler.toml
+          # secrets (only those set in GitHub)
+          for s in LICENSE_KEY_LIVE LICENSE_KEY_TEST ADMIN_TOKEN RZP_KEY_ID_LIVE RZP_KEY_SECRET_LIVE RZP_KEY_ID_TEST RZP_KEY_SECRET_TEST RZP_WEBHOOK_SECRET UPI_VPA; do
+            if [ -n "${!s}" ]; then printf '%s' "${!s}" | $W pages secret put "$s" --project-name billbox >/dev/null && echo "secret $s set"; fi
+          done
+          $W pages deploy public --project-name billbox --branch "${GITHUB_REF_NAME}" --commit-dirty=true
+      - name: Check the live site
+        if: github.ref == 'refs/heads/main'
+        run: |
+          sleep 20
+          for p in / /mac/ /windows/ /pricing/ /buy.html /sitemap.xml /videos/mac.mp4; do
+            c=$(curl -s -o /dev/null -w '%{http_code}' "https://billbox.pages.dev$p"); echo "$c $p"
+          done
+          curl -s https://billbox.pages.dev/api/test/config | head -c 300; echo

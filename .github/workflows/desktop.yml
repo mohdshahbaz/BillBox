@@ -33,7 +33,7 @@ jobs:
           set -o pipefail
           desktop/build.sh linux "${{ inputs.version || '0.0.0-ci' }}" 2>&1 | tee build.log || {
             # the end of the log as an annotation, readable on the run's summary page
-            echo "::error title=Build log (linux)::$(grep -v '^\s*$' build.log | tail -40 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+            echo "::error title=Build log (linux)::$( (grep -E ' error |error:|Error:' build.log | head -15; echo ...; grep -v '^\s*$' build.log | tail -25) | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
             exit 1; }
       - name: Smoke test (the app starts its engine and the books open)
         run: |
@@ -69,7 +69,7 @@ jobs:
           set -o pipefail
           desktop/build.sh windows "${{ inputs.version || '0.0.0-ci' }}" 2>&1 | tee build.log || {
             # the end of the log as an annotation, readable on the run's summary page
-            echo "::error title=Build log (windows)::$(grep -v '^\s*$' build.log | tail -40 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+            echo "::error title=Build log (windows)::$( (grep -E ' error |error:|Error:' build.log | head -15; echo ...; grep -v '^\s*$' build.log | tail -25) | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
             exit 1; }
       - name: Smoke test (the app starts its engine and the books open)
         shell: pwsh
