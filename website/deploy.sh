@@ -8,7 +8,8 @@ W() { npx --yes wrangler@4 "$@"; }
 step() { echo; echo "== $*"; }
 
 step "Pages project"
-if ! W pages project list 2>&1 | grep -qE '(^|[^a-z-])billbox([^a-z-]|$)'; then
+for i in 1 2 3; do PL="$(W pages project list 2>&1)"; echo "$PL" | grep -q 'Rate limited' || break; echo "rate limited, waiting"; sleep 20; done
+if ! echo "$PL" | grep -qE '(^|[^a-z-])billbox([^a-z-]|$)'; then
   W pages project create billbox --production-branch main || echo "(project create said no: it may exist already)"
 fi
 
@@ -19,9 +20,13 @@ if [ -z "$ID" ]; then
   OUT="$(W kv namespace create billbox-licenses 2>&1)"; echo "$OUT"
   ID="$(printf '%s' "$OUT" | grep -oE '[0-9a-f]{32}' | head -1)"
 fi
-[ -n "$ID" ] || { echo "::error::Could not make or find the KV namespace billbox-licenses (does the API token have Workers KV Storage: Edit?)"; exit 1; }
-echo "KV namespace: $ID"
-sed -i "s/__KV_ID__/$ID/" wrangler.toml
+if [ -n "$ID" ]; then
+  echo "KV namespace: $ID"; sed -i "s/__KV_ID__/$ID/" wrangler.toml
+else
+  # the website still goes up; the licence server answers "not set up" until the token may use KV
+  echo "::warning::Could not make or find the KV namespace billbox-licenses: give the Cloudflare API token the permission Account › Workers KV Storage › Edit. The website is deployed without the licence store."
+  sed -i '/\[\[kv_namespaces\]\]/,$d' wrangler.toml
+fi
 
 step "Secrets"
 for s in LICENSE_KEY_LIVE LICENSE_KEY_TEST ADMIN_TOKEN RZP_KEY_ID_LIVE RZP_KEY_SECRET_LIVE RZP_KEY_ID_TEST RZP_KEY_SECRET_TEST RZP_WEBHOOK_SECRET UPI_VPA; do
