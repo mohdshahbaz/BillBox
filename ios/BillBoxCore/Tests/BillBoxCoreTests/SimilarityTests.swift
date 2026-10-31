@@ -1,5 +1,7 @@
 import XCTest
+#if SWIFT_PACKAGE
 @testable import BillBoxCore
+#endif
 
 /// Supplier-bill names matched to items and suppliers: the same scores as the Mac (backend/src/services/pdfParser.js similarity).
 final class SimilarityTests: XCTestCase {

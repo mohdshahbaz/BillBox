@@ -54,9 +54,11 @@ jobs:
           import json,sys
           d=json.load(sys.stdin)['devices']
           ios=[(k,x) for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]
-          ios.sort(key=lambda kx: (kx[0], 'Pro' not in kx[1]['name'], kx[1]['name']))
-          k,x=ios[-1] if ios else (None,None)
-          print(x['udid'] if x else '')
+          ios.sort(key=lambda kx: kx[0])
+          newest=[x for k,x in ios if k==ios[-1][0]] if ios else []
+          want=['iPhone 16 Pro','iPhone 16','iPhone 15 Pro','iPhone 15']
+          pick=next((x for w in want for x in newest if x['name']==w), None) or next((x for x in newest if 'SE' not in x['name']), None) or (newest[0] if newest else None)
+          print(pick['udid'] if pick else '')
           ")
           [ -n "$UDID" ] || { echo "no iPhone simulator"; exit 1; }
           xcrun simctl list devices | grep "$UDID" | tee -a st/out/xcode.txt
@@ -110,7 +112,8 @@ jobs:
           xcrun simctl terminate "$UDID" $BID || true
           cat $O/done.txt 2>/dev/null || echo "no bills were drawn"
           # anything the app reported as a crash
-          xcrun simctl spawn "$UDID" log show --last 15m --style compact --predicate 'process == "BillBox"' 2>/dev/null | grep -iE "fault|crash|fatal" | head -40 > $O/app-log.txt || true
+          xcrun simctl spawn "$UDID" log show --last 15m --style compact --predicate 'process == "BillBox" AND (messageType == error OR messageType == fault)' 2>/dev/null | grep -v "com.apple.dt.xctest" | head -60 > $O/app-log.txt || true
+          ls "$HOME/Library/Logs/DiagnosticReports" 2>/dev/null | grep -i billbox > $O/crash-reports.txt || true
           ls -la $O/shots $O | head -60
 
       - name: Publish results to the selftest-results branch

@@ -345,6 +345,10 @@ put('/companies/1', {'name': 'AK  Enterprises'}); get('/companies')
 get('/items', company=2); post('/items', {'name': 'Only In Second', 'gst_rate': 18}, company=2); get('/items', company=2); get('/fy', company=2)
 put('/companies/2', {'company_gstin': '', 'invoice_terms': 'Updated'}); get('/companies')
 
+# ---------------- bank details printed on the bill (made-up values)
+put('/settings', {'bank_name': 'Example Bank', 'bank_ac_name': 'AK Enterprises', 'bank_ac_no': '000123456789', 'bank_ifsc': 'EXMP0001234',
+                  'bank_branch': 'Main Bazar', 'bank_branch_code': '001234', 'bank_address': 'Main Bazar, Bijnor, Uttar Pradesh'}, company=1)
+
 # ---------------- Google Drive backups (offline here: both engines answer the same)
 get('/backup/drive'); post('/backup/drive/connect'); post('/backup/drive/poll'); post('/backup/drive/upload')
 put('/backup/drive/client', {'client_id': 'abc', 'client_secret': 'x'}); put('/backup/drive/client', {'client_id': '1-a.apps.googleusercontent.com'})
