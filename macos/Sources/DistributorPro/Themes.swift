@@ -24,6 +24,8 @@ struct AppTheme: Identifiable, Equatable {
     }
 
     static let all: [AppTheme] = [
+        // calm greys, white panels, one indigo accent (the default)
+        AppTheme(id: "clean", name: "Clean", accent: dyn(0x4F46E5, 0x8B8CF8), card: dyn(0xFFFFFF, 0x17171A), page: dyn(0xF6F6F7, 0x0C0C0E), swatch: [hex(0x4F46E5), hex(0xF6F6F7)]),
         AppTheme(id: "classic", name: "Classic", accent: Color(nsColor: .controlAccentColor), card: Color(nsColor: .controlBackgroundColor), page: Color(nsColor: .windowBackgroundColor), swatch: [hex(0x0A84FF), hex(0xE8E8ED)]),
         AppTheme(id: "ocean", name: "Ocean", accent: dyn(0x0E7C9B, 0x35B6D6), card: dyn(0xFFFFFF, 0x17272F), page: dyn(0xEAF4F8, 0x0F1C22), swatch: [hex(0x0E7C9B), hex(0xBFE3EE)]),
         AppTheme(id: "forest", name: "Forest", accent: dyn(0x2E7D52, 0x4FBF82), card: dyn(0xFFFFFF, 0x18261D), page: dyn(0xEBF4EE, 0x101A14), swatch: [hex(0x2E7D52), hex(0xC4E4D0)]),
@@ -35,12 +37,12 @@ struct AppTheme: Identifiable, Equatable {
     ]
 
     static func named(_ id: String) -> AppTheme { all.first { $0.id == id } ?? all[0] }
-    static var current: AppTheme { named(UserDefaults.standard.string(forKey: "theme") ?? "classic") }
+    static var current: AppTheme { named(UserDefaults.standard.string(forKey: "theme") ?? "clean") }
 }
 
 /// Settings > Appearance: pick a colour theme and light / dark / automatic.
 @MainActor struct AppearanceSettings: View {
-    @AppStorage("theme") private var themeId = "classic"
+    @AppStorage("theme") private var themeId = "clean"
     @AppStorage("appearance") private var appearance = "auto"
     @AppStorage("cardStyle") private var cardStyle = "soft"
     @AppStorage("corners") private var corners = "normal"

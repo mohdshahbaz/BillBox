@@ -5,7 +5,7 @@ import BackgroundTasks
 @main
 struct BillBoxApp: App {
     @StateObject private var app = AppModel()
-    @AppStorage("theme") private var themeId = "classic"
+    @AppStorage("theme") private var themeId = "clean"
     @AppStorage("appearance") private var appearance = "auto"
     @Environment(\.scenePhase) private var phase
 

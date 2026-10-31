@@ -18,7 +18,9 @@ for (const r of ['items', 'parties', 'salesmen', 'invoices', 'purchases', 'debit
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 app.use((err, req, res, next) => {
-  if (err && String(err.code || '').startsWith('SQLITE_CONSTRAINT')) {
+  // a constraint failure (a name or batch that already exists): node:sqlite reports it as ERR_SQLITE_ERROR with errcode 19
+  // (or an extended code whose low byte is 19), better-sqlite3 as SQLITE_CONSTRAINT_*
+  if (err && (String(err.code || '').startsWith('SQLITE_CONSTRAINT') || (err.code === 'ERR_SQLITE_ERROR' && (Number(err.errcode) & 255) === 19))) {
     const msg = /UNIQUE/.test(err.message) ? 'That value already exists (for example a duplicate batch number).' : 'Invalid reference or missing value.';
     return res.status(409).json({ error: msg });
   }

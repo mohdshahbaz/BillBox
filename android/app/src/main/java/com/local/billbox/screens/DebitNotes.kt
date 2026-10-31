@@ -128,7 +128,7 @@ fun DebitNotesScreen() {
     }
 
     ScreenScaffold("Debit Notes", fab = {
-        ExtendedFloatingActionButton(onClick = { editing = DNEdit() }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("New debit note") })
+        ExtendedFloatingActionButton(modifier = Modifier.padding(bottom = 64.dp), onClick = { editing = DNEdit() }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("New debit note") })
     }) { mod ->
         Column(mod) {
             OutlinedTextField(query, { query = it; debounce.run { load() } }, Modifier.fillMaxWidth().padding(12.dp), singleLine = true,
@@ -136,7 +136,7 @@ fun DebitNotesScreen() {
             Box(Modifier.weight(1f)) {
                 if (loading) Loading()
                 else if (rows.isEmpty()) EmptyState("No debit notes in ${app.fy}", "", Icons.AutoMirrored.Filled.Undo)
-                else DataTable(rows, "debitnotes", onOpen = { viewing = it }, menu = { r -> listOf(
+                else DataTable(rows, "debitnotes", phone = listOf("party", "total", "no", "date"), onOpen = { viewing = it }, menu = { r -> listOf(
                     RowAction("View", Icons.Default.ReceiptLong) { viewing = r },
                     RowAction("Print…", Icons.Default.Print) { app.launch { Printing.debitNote(r.id, app) } },
                     RowAction("Edit…", Icons.Default.Edit) { editing = DNEdit(noteId = r.id) },

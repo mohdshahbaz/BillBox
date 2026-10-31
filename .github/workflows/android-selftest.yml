@@ -92,6 +92,7 @@ jobs:
           git clone -q --depth 1 -b selftest-results "$URL" $R 2>/dev/null || { mkdir -p $R; git -C $R init -q -b selftest-results; git -C $R remote add origin "$URL"; }
           rm -rf $R/$API; mkdir -p $R/$API
           cp -r st/out/selftest/shots $R/$API/ 2>/dev/null || true
+          cp -r st/out/ui $R/$API/ 2>/dev/null || true
           cp st/out/compare.txt st/out/logcat.txt st/out/final-screen.png $R/$API/ 2>/dev/null || true
           cp st/out/selftest/bill_*.pdf $R/$API/ 2>/dev/null || true
           echo "${{ github.sha }}" > $R/$API/commit.txt

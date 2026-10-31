@@ -17,7 +17,7 @@ open class Paint(flags: Int = 0) {
     fun measureText(text: String): Float = 0f
     val fontMetrics: FontMetrics get() = FontMetrics()
     class FontMetrics { @JvmField var ascent = 0f; @JvmField var descent = 0f }
-    companion object { const val ANTI_ALIAS_FLAG = 1 }
+    companion object { const val ANTI_ALIAS_FLAG = 1; const val LINEAR_TEXT_FLAG = 64; const val SUBPIXEL_TEXT_FLAG = 128 }
 }
 open class PathEffect
 class DashPathEffect(intervals: FloatArray, phase: Float) : PathEffect()

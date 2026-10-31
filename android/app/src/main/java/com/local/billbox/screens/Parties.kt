@@ -129,7 +129,7 @@ fun PartiesScreen() {
     LaunchedEffect(kind) { selection.clear(); load() }
 
     ScreenScaffold("Parties", fab = {
-        ExtendedFloatingActionButton(onClick = { creating = true }, icon = { Icon(Icons.Default.PersonAdd, null) }, text = { Text(if (supplier) "New supplier" else "New customer") })
+        ExtendedFloatingActionButton(modifier = Modifier.padding(bottom = 32.dp), onClick = { creating = true }, icon = { Icon(Icons.Default.PersonAdd, null) }, text = { Text(if (supplier) "New supplier" else "New customer") })
     }) { mod ->
         Column(mod) {
             Segments(listOf("CUSTOMER" to "Customers", "SUPPLIER" to "Suppliers"), kind, { kind = it }, Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
@@ -141,7 +141,7 @@ fun PartiesScreen() {
             Box(Modifier.weight(1f)) {
                 if (loading) Loading()
                 else if (parties.isEmpty()) EmptyState(if (supplier) "No suppliers" else "No customers", if (supplier) "Suppliers are added automatically when you scan their bill." else "Add your first customer.", Icons.Default.People)
-                else DataTable(parties, "parties", selected = selection.toSet(), keyOf = { it.id }, selecting = selecting,
+                else DataTable(parties, "parties", phone = listOf("name", "balance", "contact", "type"), selected = selection.toSet(), keyOf = { it.id }, selecting = selecting,
                     onToggle = { p -> if (p.id in selection) selection.remove(p.id) else selection.add(p.id) },
                     onOpen = { ledgerFor = it },
                     menu = { p -> listOfNotNull(

@@ -54,7 +54,7 @@ function request(step) {
       },
     };
     const onError = (err) => {   // backend/src/server.js error handler
-      if (err && String(err.code || '').startsWith('SQLITE_CONSTRAINT')) {
+      if (err && (String(err.code || '').startsWith('SQLITE_CONSTRAINT') || (err.code === 'ERR_SQLITE_ERROR' && (Number(err.errcode) & 255) === 19))) {
         const msg = /UNIQUE/.test(err.message) ? 'That value already exists (for example a duplicate batch number).' : 'Invalid reference or missing value.';
         return res.status(409).json({ error: msg });
       }

@@ -255,7 +255,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
             .frame(width: 28)
             .help("Show or hide columns")
         }
-        .background(Color.primary.opacity(0.06))
+        .background(Theme.card)
         .contextMenu { columnMenu }
     }
 
@@ -277,7 +277,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                 move(c.id, dx: v.translation.width, cols: cols, widths: w)
                 dragging = nil; dragDX = 0
             }
-        return Text(c.title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+        return Text(c.title).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).lineLimit(1)
             .padding(.horizontal, 10)
             .frame(width: width, height: 28, alignment: c.align)
             .contentShape(Rectangle())
@@ -323,13 +323,13 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                         .padding(.horizontal, 10)
                         .frame(width: w[i], height: rh, alignment: c.align)
                         .clipped()
-                        .overlay(alignment: .trailing) { Rectangle().fill(Theme.line.opacity(0.6)).frame(width: 0.5) }
+                        
                 }
                 Color.clear.frame(width: 28, height: rh)   // same width as the heading's column-menu button
             }
             Rectangle().fill(Theme.line.opacity(0.7)).frame(height: 0.5)
         }
-        .background(selected ? Color.accentColor.opacity(0.22) : (idx % 2 == 1 ? Color.primary.opacity(0.03) : Color.clear))
+        .background(selected ? Color.accentColor.opacity(0.14) : Theme.card)
         .contentShape(Rectangle())
         .modifier(RowTaps(enabled: selection != nil, single: { click(row, idx) }, double: { onOpen?(row) }))
         .contextMenu { if let menu { menu(row) } }

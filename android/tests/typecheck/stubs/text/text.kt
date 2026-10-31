@@ -8,6 +8,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnit
 class TextStyle {
     fun copy(color: Color = Color.Unspecified, fontSize: TextUnit = TextUnit(0), fontWeight: FontWeight? = null, fontFamily: FontFamily? = null,
-             textAlign: TextAlign = TextAlign.Start, textDecoration: TextDecoration? = null): TextStyle = this
+             textAlign: TextAlign = TextAlign.Start, textDecoration: TextDecoration? = null, lineHeight: TextUnit = TextUnit(0)): TextStyle = this
 }
 @JvmInline value class TextRange(val packed: Long) { constructor(index: Int) : this(0L) }

@@ -384,7 +384,7 @@ fun BillingScreen() {
                         Row(Modifier.weight(1f).clickable { detailsOpen = !detailsOpen }, verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(party?.str("name") ?: "Walk-in cash customer", style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Hint("${payModeTitle(st.payMode)} · ${st.lines.size} item${if (st.lines.size == 1) "" else "s"} · $pcs pcs")
+                                Hint("${payModeTitle(st.effectiveMode)} · ${st.lines.size} item${if (st.lines.size == 1) "" else "s"} · $pcs pcs")
                             }
                             Icon(if (detailsOpen) Icons.Default.ExpandMore else Icons.Default.ExpandLess, if (detailsOpen) "Hide party, payment and totals" else "Show party, payment and totals")
                         }

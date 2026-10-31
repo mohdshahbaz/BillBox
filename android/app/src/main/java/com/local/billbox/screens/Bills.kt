@@ -181,7 +181,7 @@ fun BillsScreen() {
             Box(Modifier.weight(1f)) {
                 if (loading) Loading()
                 else if (rows.isEmpty()) EmptyState("No bills match these filters", "", Icons.Default.FindInPage)
-                else DataTable(rows, "bills", selected = selection.toSet(), keyOf = { it.id }, selecting = selecting,
+                else DataTable(rows, "bills", phone = listOf("party", "total", "due", "no", "date", "type"), selected = selection.toSet(), keyOf = { it.id }, selecting = selecting,
                     onToggle = { r -> if (r.id in selection) selection.remove(r.id) else selection.add(r.id) }, onOpen = { viewing = it },
                     menu = { r -> listOfNotNull(
                         RowAction("View", Icons.Default.ReceiptLong) { viewing = r },

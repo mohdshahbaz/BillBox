@@ -49,7 +49,7 @@ function request(step) {
       send(v) { if (!sent) { sent = true; resolve({ status, file: (/filename="([^"]+)"/.exec(hdr['Content-Disposition'] || '') || [])[1], bytes: Buffer.isBuffer(v) ? v : Buffer.from(String(v)) }); } return res; },
     };
     const onError = (err) => {   // server.js error handler
-      if (err && String(err.code || '').startsWith('SQLITE_CONSTRAINT')) {
+      if (err && (String(err.code || '').startsWith('SQLITE_CONSTRAINT') || (err.code === 'ERR_SQLITE_ERROR' && (Number(err.errcode) & 255) === 19))) {
         const msg = /UNIQUE/.test(err.message) ? 'That value already exists (for example a duplicate batch number).' : 'Invalid reference or missing value.';
         return res.status(409).json({ error: msg });
       }

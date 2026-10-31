@@ -104,7 +104,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Book(type: String) {
     Box(Modifier.weight(1f)) {
         if (data == null) Loading()
         else if (rows.isEmpty()) EmptyState("No entries in this period", "", Icons.Default.MenuBook)
-        else DataTable(rows, "book-$type", columns = listOf(
+        else DataTable(rows, "book-$type", phone = listOf("party", "total", "no", "date", "taxable"), columns = listOf(
             Col("Date", "date", 95) { r -> Cell(Fmt.dmy(r.str("date"))) },
             Col(if (sales) "Invoice" else if (type == "debit") "Note no" else "Our ref", "no", 120) { r -> Cell(r.str("no")) },
             Col(if (type == "debit") "Against bill" else "Supplier bill", "ref", 110) { r -> Cell(r.str("ref")) },

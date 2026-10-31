@@ -29,18 +29,29 @@ class ColorScheme(val primary: Color, val onPrimary: Color, val primaryContainer
                   val background: Color, val surface: Color, val onSurface: Color, val onSurfaceVariant: Color, val surfaceContainer: Color,
                   val surfaceContainerLow: Color, val surfaceContainerHigh: Color, val outline: Color, val outlineVariant: Color, val error: Color,
                   val inverseSurface: Color, val inverseOnSurface: Color)
-fun lightColorScheme(primary: Color = Color.Unspecified, onPrimary: Color = Color.Unspecified, secondary: Color = Color.Unspecified, tertiary: Color = Color.Unspecified,
-                     background: Color = Color.Unspecified, surface: Color = Color.Unspecified, surfaceContainer: Color = Color.Unspecified,
-                     surfaceContainerLow: Color = Color.Unspecified, surfaceContainerHigh: Color = Color.Unspecified): ColorScheme = TODO()
-fun darkColorScheme(primary: Color = Color.Unspecified, onPrimary: Color = Color.Unspecified, secondary: Color = Color.Unspecified, tertiary: Color = Color.Unspecified,
-                    background: Color = Color.Unspecified, surface: Color = Color.Unspecified, surfaceContainer: Color = Color.Unspecified,
-                    surfaceContainerLow: Color = Color.Unspecified, surfaceContainerHigh: Color = Color.Unspecified): ColorScheme = TODO()
+fun lightColorScheme(primary: Color = Color.Unspecified, onPrimary: Color = Color.Unspecified, primaryContainer: Color = Color.Unspecified, onPrimaryContainer: Color = Color.Unspecified,
+                     secondary: Color = Color.Unspecified, secondaryContainer: Color = Color.Unspecified, onSecondaryContainer: Color = Color.Unspecified, tertiary: Color = Color.Unspecified,
+                     background: Color = Color.Unspecified, onBackground: Color = Color.Unspecified, surface: Color = Color.Unspecified, onSurface: Color = Color.Unspecified,
+                     onSurfaceVariant: Color = Color.Unspecified, surfaceContainerLowest: Color = Color.Unspecified, surfaceContainer: Color = Color.Unspecified,
+                     surfaceContainerLow: Color = Color.Unspecified, surfaceContainerHigh: Color = Color.Unspecified, surfaceContainerHighest: Color = Color.Unspecified,
+                     outline: Color = Color.Unspecified, outlineVariant: Color = Color.Unspecified, error: Color = Color.Unspecified): ColorScheme = TODO()
+fun darkColorScheme(primary: Color = Color.Unspecified, onPrimary: Color = Color.Unspecified, primaryContainer: Color = Color.Unspecified, onPrimaryContainer: Color = Color.Unspecified,
+                     secondary: Color = Color.Unspecified, secondaryContainer: Color = Color.Unspecified, onSecondaryContainer: Color = Color.Unspecified, tertiary: Color = Color.Unspecified,
+                     background: Color = Color.Unspecified, onBackground: Color = Color.Unspecified, surface: Color = Color.Unspecified, onSurface: Color = Color.Unspecified,
+                     onSurfaceVariant: Color = Color.Unspecified, surfaceContainerLowest: Color = Color.Unspecified, surfaceContainer: Color = Color.Unspecified,
+                     surfaceContainerLow: Color = Color.Unspecified, surfaceContainerHigh: Color = Color.Unspecified, surfaceContainerHighest: Color = Color.Unspecified,
+                     outline: Color = Color.Unspecified, outlineVariant: Color = Color.Unspecified, error: Color = Color.Unspecified): ColorScheme = TODO()
 fun dynamicLightColorScheme(context: android.content.Context): ColorScheme = TODO()
 fun dynamicDarkColorScheme(context: android.content.Context): ColorScheme = TODO()
 class Typography(val headlineMedium: TextStyle = TextStyle(), val headlineSmall: TextStyle = TextStyle(), val titleLarge: TextStyle = TextStyle(),
                  val titleMedium: TextStyle = TextStyle(), val titleSmall: TextStyle = TextStyle(), val bodyLarge: TextStyle = TextStyle(),
                  val bodyMedium: TextStyle = TextStyle(), val bodySmall: TextStyle = TextStyle(), val labelLarge: TextStyle = TextStyle(),
-                 val labelMedium: TextStyle = TextStyle(), val labelSmall: TextStyle = TextStyle())
+                 val labelMedium: TextStyle = TextStyle(), val labelSmall: TextStyle = TextStyle()) {
+    fun copy(headlineSmall: TextStyle = this.headlineSmall, titleLarge: TextStyle = this.titleLarge, titleMedium: TextStyle = this.titleMedium,
+             titleSmall: TextStyle = this.titleSmall, bodyLarge: TextStyle = this.bodyLarge, bodyMedium: TextStyle = this.bodyMedium,
+             bodySmall: TextStyle = this.bodySmall, labelLarge: TextStyle = this.labelLarge, labelMedium: TextStyle = this.labelMedium,
+             labelSmall: TextStyle = this.labelSmall): Typography = this
+}
 class Shapes(val small: Shape, val medium: Shape, val large: Shape)
 object MaterialTheme {
     val colorScheme: ColorScheme @Composable get() = TODO()

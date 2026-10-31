@@ -146,6 +146,7 @@ fun <R> DataTable(
     rows: List<R>, layoutKey: String, modifier: Modifier = Modifier, rowHeight: Int = 40, lazy: Boolean = true, numbered: Boolean = true,
     selected: Set<Any>? = null, keyOf: (R) -> Any = { it as Any }, selecting: Boolean = false, onToggle: ((R) -> Unit)? = null,
     onOpen: ((R) -> Unit)? = null, menu: ((R) -> List<RowAction>)? = null, footer: (@Composable () -> Unit)? = null,
+    phone: List<String> = emptyList(),
     columns: List<Col<R>>,
 ) {
     val ctx = LocalContext.current
@@ -154,7 +155,13 @@ fun <R> DataTable(
     val cols = run {
         if (numbered && columns.none { it.id == "sno" }) listOf(Col<R>("S.No", "sno", 48, end = true) {}.also { it.isIndex = true }) + columns else columns
     }
-    val visible = layout.ordered(cols).filter { !layout.isHidden(it) }
+    // On a phone (narrower than 600 dp), until the columns are arranged by hand: the columns that matter first (`phone`),
+    // without the S.No column, so the party and the amount are on screen instead of off to the right.
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600
+    val shown = layout.ordered(cols).filter { !layout.isHidden(it) }
+    val visible = if (compact && !layout.touched && phone.isNotEmpty()) {
+        phone.mapNotNull { id -> shown.firstOrNull { it.id == id } } + shown.filter { it.id !in phone && !it.isIndex }
+    } else shown
     val h = rememberScrollState()
     var showColumns by remember { mutableStateOf(false) }
     val rh = (rowHeight * ui.rowFactor).dp
@@ -162,11 +169,11 @@ fun <R> DataTable(
     fun w(c: Col<R>): Dp = (layout.widths[c.id] ?: c.width.toFloat()).dp
 
     val header: @Composable () -> Unit = {
-        Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f).horizontalScroll(h)) {
                 visible.forEach { c ->
                     Box(Modifier.width(w(c)).heightIn(min = 34.dp)) {
-                        Text(c.title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, maxLines = 2,
+                        Text(c.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
                             textAlign = if (c.end) TextAlign.End else TextAlign.Start,
                             modifier = Modifier.fillMaxWidth().align(Alignment.CenterStart).padding(horizontal = 8.dp, vertical = 6.dp))
                         Box(Modifier.align(Alignment.CenterEnd).width(14.dp).fillMaxHeight().pointerInput(c.id) {
@@ -188,7 +195,7 @@ fun <R> DataTable(
         var menuOpen by remember { mutableStateOf(false) }
         Box {
             Row(Modifier.fillMaxWidth()
-                .background(when { isSel -> MaterialTheme.colorScheme.primaryContainer; idx % 2 == 1 -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f); else -> Color.Transparent })
+                .background(if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
                 .combinedClickable(onClick = { if ((selecting || onOpen == null) && onToggle != null) onToggle(row) else onOpen?.invoke(row) },
                     onLongClick = if (menu != null) ({ menuOpen = true }) else null)
                 .heightIn(min = rh), verticalAlignment = Alignment.CenterVertically) {

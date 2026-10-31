@@ -62,9 +62,12 @@ public final class Router {
             if let c = e.code { o["code"] = c }
             if e.status == 500 { o["detail"] = e.message }   // the reason of a failure the app itself reports
             return .json(e.status, o)
-        } catch is SQLiteError {
-            // node:sqlite reports every SQLite failure (constraint ones included) with code ERR_SQLITE_ERROR, which the server
-            // answers with 500 "Server error"
+        } catch let e as SQLiteError {
+            // a constraint failure (a name or batch that already exists) is answered 409 with a plain reason, as by the server
+            if (e.code & 255) == 19 {
+                let msg = e.message.contains("UNIQUE") ? "That value already exists (for example a duplicate batch number)." : "Invalid reference or missing value."
+                return .json(409, ["error": msg] as Row)
+            }
             return .json(500, ["error": "Server error", "code": "ERR_SQLITE_ERROR"] as Row)
         } catch {
             return .json(500, ["error": "Server error"] as Row)

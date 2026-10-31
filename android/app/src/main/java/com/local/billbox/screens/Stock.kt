@@ -134,7 +134,7 @@ fun StockScreen() {
                 }
             }
         }
-    }, fab = { ExtendedFloatingActionButton(onClick = { creating = true }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("New item") }) }) { mod ->
+    }, fab = { ExtendedFloatingActionButton(modifier = Modifier.padding(bottom = 32.dp), onClick = { creating = true }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("New item") }) }) { mod ->
         Column(mod) {
             OutlinedTextField(query, { query = it; debounce.run { load() } }, Modifier.fillMaxWidth().padding(12.dp), singleLine = true,
                 placeholder = { Text("Search item or HSN") }, leadingIcon = { Icon(Icons.Default.Search, null) }, shape = RoundedCornerShape(28.dp))
@@ -143,7 +143,7 @@ fun StockScreen() {
             Box(Modifier.weight(1f)) {
                 if (loading) Loading()
                 else if (items.isEmpty()) EmptyState("No items", "Add an item, or scan a supplier bill in Purchases and items are created for you.", Icons.Default.Inventory2)
-                else DataTable(items, "stock", selected = selection.toSet(), keyOf = { it.id }, selecting = selecting,
+                else DataTable(items, "stock", phone = listOf("item", "stock", "mrp", "retail", "wholesale"), selected = selection.toSet(), keyOf = { it.id }, selecting = selecting,
                     onToggle = { r -> if (r.id in selection) selection.remove(r.id) else selection.add(r.id) }, onOpen = { editing = it },
                     menu = { it -> listOfNotNull(
                         RowAction("Edit…", Icons.Default.Edit) { editing = it },

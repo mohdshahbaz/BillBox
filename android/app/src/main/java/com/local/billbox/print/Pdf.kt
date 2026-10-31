@@ -94,7 +94,9 @@ private val MUTED = Color.argb(158, 0, 0, 0)
 
 /** Text drawing in points: shrinks to fit (down to minScale), then cuts with "…". */
 class Pen(val c: Canvas) {
-    private val p = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    // linear + subpixel text: a PDF page is measured in points, and at 6-7 pt Android otherwise rounds every letter's width
+    // to whole units, which squeezed small lines (address, terms, GST table) together
+    private val p = TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.LINEAR_TEXT_FLAG or Paint.SUBPIXEL_TEXT_FLAG)
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.BLACK }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 

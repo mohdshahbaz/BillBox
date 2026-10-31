@@ -27,7 +27,7 @@ import AppKit
 struct DistributorProApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var app = AppModel()
-    @AppStorage("theme") private var themeId = "classic"
+    @AppStorage("theme") private var themeId = "clean"
     @AppStorage("appearance") private var appearance = "auto"
 
     var body: some Scene {

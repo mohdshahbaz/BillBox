@@ -9,8 +9,14 @@ import java.net.URL
 
 /** Internet look-ups for the engine (category guesses, price lists): plain HTTPS from the app, any site. */
 class NetBridge {
+    companion object {
+        /** Set by the emulator self-test: the Mac run it is compared with has no internet either. */
+        @Volatile var offline = false
+    }
+
     @JavascriptInterface
     fun request(url: String, optsJson: String): String = try {
+        if (offline) throw java.net.UnknownHostException("offline (self-test)")
         val opts = JSONObject(optsJson)
         val c = URL(url).openConnection() as HttpURLConnection
         c.instanceFollowRedirects = true

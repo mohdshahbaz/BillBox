@@ -19,6 +19,34 @@ for i in $(seq 1 240); do
   sleep 5
 done
 adb exec-out "run-as $PKG tar -c -C files selftest" | tar -x -C "$OUT" || echo "::warning::could not copy files/selftest"
+
+# ---- the real screens, tapped like a person would (uiautomator finds the buttons by their text)
+HERE="$(cd "$(dirname "$0")" && pwd)"
+UI="$OUT/ui"; mkdir -p "$UI"; N=20
+dump() { adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb exec-out cat /sdcard/ui.xml; }
+shot() { sleep "${2:-2}"; adb exec-out screencap -p > "$UI/${N}_$1.png"; N=$((N + 1)); }
+tap() {   # tap <text> [--edit] [--skip=n]
+  local xy; xy=$(dump | python3 "$HERE/ui_find.py" "$@") || { echo "::warning::UI step: nothing called '$1' on screen"; echo "missing: $1" >> "$UI/steps.txt"; return 1; }
+  adb shell input tap $xy; echo "tapped: $1 at $xy" >> "$UI/steps.txt"; sleep 1.5
+}
+typetext() { adb shell input text "$(echo "$1" | sed 's/ /%s/g')"; sleep 2; }
+back() { adb shell input keyevent KEYCODE_BACK; sleep 1.5; }
+
+tap "Billing" ; shot billing 1
+tap "Type an item name" --edit && typetext "bikano" && shot search
+tap "Bikano" --skip=1 && shot line_added
+tap "Save & print" && shot after_save 4
+back; back
+tap "Parties" && shot parties
+tap "City Mart" && shot party_open 3
+back; back
+tap "Stock" && tap "New item" && shot new_item
+back; back
+tap "More" && tap "Settings" && tap "Companies" && shot companies
+back; tap "Printing" && shot printing
+adb shell input swipe 500 1600 500 500 400; shot printing_more 1
+back; tap "WhatsApp" && shot whatsapp
+adb logcat -d -v time | grep -E "AndroidRuntime|FATAL|BillBoxEngine" > "$UI/logcat-ui.txt" || true
 adb logcat -d -v time > "$OUT/logcat-full.txt" || true
 grep -E "SELFTEST|BillBoxEngine|AndroidRuntime|FATAL|chromium.*(Uncaught|Error)|System.err" "$OUT/logcat-full.txt" > "$OUT/logcat.txt" || true
 adb exec-out screencap -p > "$OUT/final-screen.png" || true

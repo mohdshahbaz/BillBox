@@ -47,6 +47,7 @@ object SelfTest {
         val f = File(d, "scenario.json")
         if (!f.exists()) { Log.w(TAG, "no scenario.json, replay skipped"); return }
         val steps = JSONArray(f.readText())
+        com.local.billbox.engine.NetBridge.offline = true   // as the Mac run it is compared with
         val out = File(d, "android.jsonl").bufferedWriter()
         var fails = 0
         for (i in 0 until steps.length()) {
@@ -73,6 +74,7 @@ object SelfTest {
             if (i % 50 == 0) out.flush()
         }
         out.close()
+        com.local.billbox.engine.NetBridge.offline = false
         Log.i(TAG, "replay done: ${steps.length()} steps, $fails server errors")
     }
 
