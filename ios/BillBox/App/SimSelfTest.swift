@@ -41,6 +41,22 @@ enum SimSelfTest {
                     }
                 }
             }
+            // the bill with the most lines, in both designs
+            var busy: JSON?
+            for row in r.list("rows").prefix(25) {
+                let inv = try await API.obj("GET", "/invoices/\(row.int("id"))")
+                if inv.list("lines").count > (busy?.list("lines").count ?? 0) { busy = inv }
+            }
+            if let inv = busy {
+                var marg = app.settings.raw
+                marg["print_style"] = "marg"
+                for (name, co) in [("busy_classic", app.settings), ("busy_marg", JSON(marg))] {
+                    if let data = invoicePDF(inv, company: co, layout: .single)?.dataRepresentation() {
+                        try data.write(to: dir.appendingPathComponent("\(name).pdf"))
+                        log.append("\(name).pdf \(inv.str("invoice_no")) \(inv.list("lines").count) lines")
+                    }
+                }
+            }
         } catch {
             log.append("failed: \(error.localizedDescription)")
         }

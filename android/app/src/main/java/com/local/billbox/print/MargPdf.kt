@@ -293,10 +293,11 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         if (inter) sums.add("IGST PAYABLE" to inv.num("igst")) else { sums.add("SGST PAYABLE" to inv.num("sgst")); sums.add("CGST PAYABLE" to inv.num("cgst")) }
         sums.add("ROUND OFF" to inv.num("round_off"))
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) sums.add("PAID" to inv.num("paid"))
-        var sy = y + 3
-        val sh = 8.9f * fs
-        for ((a, v) in sums) { pen.text(a, sx + 6, sy, sumW - 12, sh, 7.5f * fs); pen.text(Fmt.amount(v), sx + 6, sy, sumW - 12, sh, 7.5f * fs, align = 2); sy += sh }
         val gh = 17 * fs
+        var sy = y + 2
+        val sh = minOf(9f * fs, (upperH - gh - 4) / sums.size)
+        val ss = minOf(7.5f * fs, sh * 0.85f)
+        for ((a, v) in sums) { pen.text(a, sx + 6, sy, sumW - 12, sh, ss); pen.text(Fmt.amount(v), sx + 6, sy, sumW - 12, sh, ss, align = 2); sy += sh }
         val gy = y + upperH - gh
         pen.shade(RectF(sx, gy, x + w, y + upperH), band)
         pen.hLine(sx, x + w, gy, 0.6f)

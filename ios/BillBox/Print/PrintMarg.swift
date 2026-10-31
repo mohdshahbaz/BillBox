@@ -106,6 +106,8 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
     /// rate and MRP per box (like Marg) unless set to per piece
     private var perBox: Bool { co.str("print_marg_rate") != "pcs" && co.str("print_qty") != "pcs" }
     private var tableHeight: CGFloat { g.inner - (first ? g.headFirst : g.headNext) - g.foot - (last ? g.totals : 0) }
+    /// width inside the frame; the header and totals are laid out in fixed shares of it
+    private var W: CGFloat { g.w - 2 * g.m }
 
     private func t(_ s: String, _ size: CGFloat, bold: Bool = false, weight: Font.Weight? = nil) -> Text {
         Text(s).font(.system(size: size * g.fs, weight: weight ?? (bold ? .bold : .regular), design: serif ? .serif : .default))
@@ -145,8 +147,8 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
                     if !co.str("company_phone").isEmpty { t("Phone : \(co.str("company_phone"))", 7.5).foregroundStyle(accent).lineLimit(1) }
                 }
                 .padding(.horizontal, 6).padding(.vertical, 3)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .layoutPriority(1.1)
+                .frame(width: W * 0.55, alignment: .topLeading)
+                .frame(maxHeight: .infinity, alignment: .top)
                 vLine()
                 VStack(alignment: .leading, spacing: 0.5) {
                     HStack(alignment: .firstTextBaseline) {
@@ -159,7 +161,8 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
                     }
                 }
                 .padding(.horizontal, 6).padding(.vertical, 3)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(width: W * 0.45 - 0.8, alignment: .topLeading)
+                .frame(maxHeight: .infinity, alignment: .top)
             }
             .frame(height: g.sellerBand)
             .clipped()
@@ -171,7 +174,8 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
                     if !co.str("state_code").isEmpty { t("State code : \(co.str("state_code"))", 6.5).foregroundStyle(accent).lineLimit(1) }
                 }
                 .padding(.horizontal, 6)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .frame(width: W * 0.34, alignment: .leading)
+                .frame(maxHeight: .infinity)
                 vLine()
                 VStack(spacing: 0) {
                     t(docTitle, 12.5, bold: true).lineLimit(1).minimumScaleFactor(0.6)
@@ -183,12 +187,14 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
                 .background(band)
                 vLine()
                 // label : value, lined up in two groups (no Grid: the Mac app still runs on macOS 12)
-                HStack(alignment: .top, spacing: 10) {
-                    detailGroup(detailPairs.map(\.0))
-                    detailGroup(detailPairs.compactMap(\.1))
+                let rest = W - W * 0.34 - 150 * g.cw - 1.6 - 12
+                HStack(alignment: .top, spacing: 0) {
+                    detailGroup(detailPairs.map(\.0)).frame(width: rest * 0.56, alignment: .leading)
+                    detailGroup(detailPairs.compactMap(\.1)).frame(width: rest * 0.44, alignment: .leading)
                 }
                 .padding(.horizontal, 6)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .frame(width: W - W * 0.34 - 150 * g.cw - 1.6, alignment: .leading)
+                .frame(maxHeight: .infinity)
             }
             .frame(height: g.strip)
         }
@@ -245,7 +251,9 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
     private func detailGroup(_ kv: [(String, String)]) -> some View {
         HStack(alignment: .top, spacing: 3) {
             VStack(alignment: .leading, spacing: 1.5) { ForEach(Array(kv.enumerated()), id: \.offset) { _, p in t(p.0, 7.5).lineLimit(1) } }
+                .fixedSize()
             VStack(spacing: 1.5) { ForEach(Array(kv.enumerated()), id: \.offset) { _, p in t(p.0.isEmpty ? "" : ":", 7.5) } }
+                .fixedSize()
             VStack(alignment: .leading, spacing: 1.5) { ForEach(Array(kv.enumerated()), id: \.offset) { _, p in t(p.1, 7.5, bold: true).lineLimit(1).minimumScaleFactor(0.6) } }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -360,12 +368,13 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
             HStack(spacing: 0) {
                 // the GST class table
                 VStack(spacing: 0) {
-                    classLine(heads, bold: true, size: 7.5).frame(height: rh + 1).background(band)
+                    classLine(heads, bold: true, size: 7.5).frame(height: rh + 1).frame(maxWidth: .infinity).background(band)
                     ForEach(Array(rows.enumerated()), id: \.offset) { _, r in classLine(vals(r)).frame(height: rh) }
                     hLine(0.6)
                     classLine(vals(tot), bold: true).frame(height: rh)
                     Spacer(minLength: 0)
                 }
+                .frame(width: W - 172 * g.cw - 0.8)
                 .overlay(classGrid(count: heads.count))
                 vLine()
                 summary.frame(width: 172 * g.cw)
@@ -394,8 +403,7 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
             ForEach(Array(v.enumerated()), id: \.offset) { i, s in
                 t(s, size, bold: bold).lineLimit(1).minimumScaleFactor(0.6)
                     .padding(.horizontal, 3)
-                    .frame(maxWidth: .infinity, alignment: i == 0 ? .leading : .trailing)
-                    .layoutPriority(i == 0 ? 0.9 : 1)
+                    .frame(width: (W - 172 * g.cw - 0.8) / CGFloat(v.count), alignment: i == 0 ? .leading : .trailing)
             }
         }
     }
@@ -418,12 +426,14 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
         rows.append(("ROUND OFF", inv.num("round_off")))
         if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { rows.append(("PAID", inv.num("paid"))) }
         return VStack(spacing: 0) {
-            VStack(spacing: 1.2) {
+            VStack(spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
-                    HStack { t(r.0, 7.5); Spacer(); t(Fmt.amount(r.1), 7.5) }
+                    HStack { t(r.0, 7.5).lineLimit(1); Spacer(); t(Fmt.amount(r.1), 7.5).lineLimit(1) }
+                        .frame(height: min(9 * g.fs, (summaryRoom - 4) / CGFloat(rows.count)))
+                        .minimumScaleFactor(0.7)
                 }
             }
-            .padding(.horizontal, 6).padding(.top, 3)
+            .padding(.horizontal, 6).padding(.top, 2)
             Spacer(minLength: 0)
             hLine(0.6)
             HStack {
@@ -435,6 +445,13 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
             .frame(height: 17 * g.fs)
             .background(band)
         }
+    }
+
+    /// height of the totals area above the amount in words, less the GRAND TOTAL band
+    private var summaryRoom: CGFloat {
+        let bank = bankRows(co)
+        let bankH: CGFloat = bank.isEmpty ? 0 : CGFloat((bank.count + 1) / 2) * 8.2 * g.fs + 5 + 0.6
+        return g.totals - 13 * g.fs - 0.6 - bankH - 17 * g.fs - 0.6
     }
 
     private func bankBand(_ rows: [(String, String)]) -> some View {
