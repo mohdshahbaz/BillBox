@@ -97,15 +97,15 @@ struct AppTheme: Identifiable, Equatable {
                 .pickerStyle(.segmented).labelsHidden()
                 Group {
                     Text("Letters").font(.headline)
-                    Picker("Letters", selection: $fontStyle) {
-                        Text("System").tag("system"); Text("Rounded").tag("rounded"); Text("Serif").tag("serif"); Text("Mono").tag("mono")
+                    Picker("Typeface", selection: $fontStyle) {
+                        ForEach(FontChoice.families, id: \.id) { f in Text(f.name).font(FontChoice.sample(f.id)).tag(f.id) }
                     }
-                    .pickerStyle(.segmented).labelsHidden()
+                    .pickerStyle(.menu)
                     Picker("Weight", selection: $fontWeight) {
                         Text("Light").tag("light"); Text("Regular").tag("regular"); Text("Medium").tag("medium"); Text("Bold").tag("bold")
                     }
                     .pickerStyle(.segmented).labelsHidden()
-                    Text("Letters change at once in the whole app: System is San Francisco (Apple's own), Serif is New York.")
+                    Text("Letters change at once in the whole app. System, Rounded, Serif (New York), Mono, Condensed, Expanded and Compressed change every word; the named typefaces (Avenir Next, Georgia …) change the text of lists, fields and buttons, with headings in the matching system style.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Group {
@@ -146,13 +146,67 @@ struct AppTheme: Identifiable, Equatable {
 struct FontChoice: ViewModifier {
     @AppStorage("fontStyle") private var style = "system"
     @AppStorage("fontWeight") private var weight = "regular"
-    func body(content: Content) -> some View {
-        if #available(iOS 16.1, *) {
-            content
-                .fontDesign(style == "rounded" ? .rounded : style == "serif" ? .serif : style == "mono" ? .monospaced : .default)
-                .fontWeight(weight == "light" ? .light : weight == "medium" ? .medium : weight == "bold" ? .semibold : nil)
-        } else {
-            content
+
+    struct Family { let id: String; let name: String; let custom: String?; let design: String }
+    /// The choices. System styles change every word; a named typeface (built into iPhone, iPad and Mac) becomes the
+    /// text of the app, and headings take the system style closest to it.
+    static let families: [Family] = [
+        Family(id: "system", name: "System (San Francisco)", custom: nil, design: "default"),
+        Family(id: "rounded", name: "Rounded", custom: nil, design: "rounded"),
+        Family(id: "serif", name: "Serif (New York)", custom: nil, design: "serif"),
+        Family(id: "mono", name: "Mono", custom: nil, design: "mono"),
+        Family(id: "condensed", name: "Condensed", custom: nil, design: "condensed"),
+        Family(id: "expanded", name: "Expanded", custom: nil, design: "expanded"),
+        Family(id: "compressed", name: "Compressed", custom: nil, design: "compressed"),
+        Family(id: "avenir", name: "Avenir Next", custom: "AvenirNext-Regular", design: "default"),
+        Family(id: "helvetica", name: "Helvetica Neue", custom: "HelveticaNeue", design: "default"),
+        Family(id: "futura", name: "Futura", custom: "Futura-Medium", design: "default"),
+        Family(id: "gillsans", name: "Gill Sans", custom: "GillSans", design: "default"),
+        Family(id: "optima", name: "Optima", custom: "Optima-Regular", design: "default"),
+        Family(id: "georgia", name: "Georgia", custom: "Georgia", design: "serif"),
+        Family(id: "palatino", name: "Palatino", custom: "Palatino-Roman", design: "serif"),
+        Family(id: "baskerville", name: "Baskerville", custom: "Baskerville", design: "serif"),
+        Family(id: "typewriter", name: "American Typewriter", custom: "AmericanTypewriter", design: "serif"),
+        Family(id: "menlo", name: "Menlo", custom: "Menlo-Regular", design: "mono"),
+    ]
+    static func family(_ id: String) -> Family { families.first { $0.id == id } ?? families[0] }
+
+    /// The name in the menu, written in its own letters.
+    static func sample(_ id: String) -> Font {
+        let f = family(id)
+        if let c = f.custom { return .custom(c, size: 15) }
+        switch f.design {
+        case "rounded": return .system(size: 15, design: .rounded)
+        case "serif": return .system(size: 15, design: .serif)
+        case "mono": return .system(size: 15, design: .monospaced)
+        default: return .system(size: 15)
         }
+    }
+
+    @ViewBuilder func body(content: Content) -> some View {
+        let f = Self.family(style)
+        let w: Font.Weight? = weight == "light" ? .light : weight == "medium" ? .medium : weight == "bold" ? .semibold : nil
+        let base = f.custom.map { Font.custom($0, size: 17, relativeTo: .body) }
+        if #available(iOS 16.4, *) {
+            content
+                .fontDesign(f.design == "rounded" ? .rounded : f.design == "serif" ? .serif : f.design == "mono" ? .monospaced : .default)
+                .fontWidth(f.design == "condensed" ? .condensed : f.design == "expanded" ? .expanded : f.design == "compressed" ? .compressed : nil)
+                .fontWeight(w)
+                .optionalFont(base)
+        } else if #available(iOS 16.1, *) {
+            content
+                .fontDesign(f.design == "rounded" ? .rounded : f.design == "serif" ? .serif : f.design == "mono" ? .monospaced : .default)
+                .fontWeight(w)
+                .optionalFont(base)
+        } else {
+            content.optionalFont(base)
+        }
+    }
+}
+
+extension View {
+    /// `.font(f)` only when there is one (a nil font would undo the text size chosen around it).
+    @ViewBuilder func optionalFont(_ f: Font?) -> some View {
+        if let f { self.font(f) } else { self }
     }
 }

@@ -11,7 +11,7 @@ cd "$(dirname "$0")"
 HERE="$(pwd)"
 APP="$HERE/BillBox.app"
 
-VERSION="${VERSION:-15.7.0}"
+VERSION="${VERSION:-15.8.0}"
 case "${ARCH:-$(uname -m)}" in
   universal) ARCHS="arm64 x64" ;;
   arm64)     ARCHS="arm64" ;;

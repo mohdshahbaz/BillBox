@@ -123,13 +123,32 @@ async function makeFolder(tok, name, parent) {
   return r.json.id;
 }
 
-/** The "BillBox Backups" folder (made again if it was deleted from Drive). */
+/** Every file or folder BillBox can see in Drive matching a query (drive.file: only what BillBox made with these keys). */
+async function search(tok, q, fields = 'id,name,createdTime,size') {
+  const out = [];
+  let page = '';
+  do {
+    const u = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent(`nextPageToken,files(${fields})`)}&orderBy=createdTime%20desc&pageSize=200${page ? `&pageToken=${encodeURIComponent(page)}` : ''}`;
+    const r = await call(u, { headers: { authorization: `Bearer ${tok}` } });
+    if (r.status !== 200 || !Array.isArray(r.json.files)) break;
+    out.push(...r.json.files);
+    page = r.json.nextPageToken || '';
+  } while (page);
+  return out;
+}
+
+/** The "BillBox Backups" folders in Drive (one normally; a reinstall used to make another). */
+const findFolders = (tok) => search(tok, `name='${FOLDER}' and mimeType='${FOLDER_TYPE}' and trashed=false`, 'id,name,createdTime');
+
+/** The "BillBox Backups" folder: the one already in Drive (after a reinstall or on another device), else made. */
 async function folder(tok) {
   const id = get('drive_folder_id');
   if (id) {
     const r = await call(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,trashed`, { headers: { authorization: `Bearer ${tok}` } });
     if (r.status === 200 && !r.json.trashed) return id;
   }
+  const found = await findFolders(tok);
+  if (found.length) { set('drive_folder_id', found[found.length - 1].id); return found[found.length - 1].id; }
   const made = await makeFolder(tok, FOLDER, null);
   set('drive_folder_id', made);
   return made;
@@ -167,10 +186,57 @@ async function upload(b = {}) {
   return { folder: name, files: files.length, bytes, drive_folder: FOLDER };
 }
 
+/** The backups in Drive › BillBox Backups, newest first: [{id, name, created}]. */
+async function list() {
+  const tok = await token();
+  const parents = await findFolders(tok);
+  const own = get('drive_folder_id');
+  if (own && !parents.some((p) => p.id === own)) parents.push({ id: own });
+  const seen = new Set(), out = [];
+  for (const p of parents) {
+    for (const f of await search(tok, `'${p.id}' in parents and mimeType='${FOLDER_TYPE}' and trashed=false`, 'id,name,createdTime')) {
+      if (seen.has(f.name)) continue;
+      seen.add(f.name);
+      out.push({ id: f.id, name: f.name, created: f.createdTime || '' });
+    }
+  }
+  out.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
+  const local = new Set(B.listBackups().map((b) => b.name));
+  return out.map((b) => ({ ...b, on_device: local.has(b.name) }));
+}
+
+/** Downloads one backup from Drive into the backup folder on this device (kept as it is when already there); the usual
+ *  restore (POST /backup/restore {name}) then checks and restores it. */
+async function download(b = {}) {
+  const id = String(b.id || ''), name = path.basename(String(b.name || ''));
+  if (!id || !/^FMCG_Backup_|^[\w .()-]+$/.test(name)) throw new HttpError(400, 'Choose a backup from Google Drive.');
+  const dir = path.join(B.config().dir, name);
+  if (B.listBackups().some((x) => x.name === name)) return { name, downloaded: 0, on_device: true };
+  const tok = await token();
+  const files = await search(tok, `'${id}' in parents and trashed=false and mimeType!='${FOLDER_TYPE}'`, 'id,name,size');
+  if (!files.length) throw new HttpError(404, `The backup ${name} in Google Drive is empty.`);
+  const tmp = `${dir}.part`;
+  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.mkdirSync(tmp, { recursive: true });
+  let bytes = 0;
+  try {
+    for (const f of files) {
+      let r;
+      try { r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}?alt=media`, { headers: { authorization: `Bearer ${tok}` } }); } catch (_) { throw offline(); }
+      if (r.status !== 200) throw new HttpError(502, `Google Drive did not give ${f.name} (${r.status}).`);
+      const data = Buffer.from(await r.arrayBuffer());
+      fs.writeFileSync(path.join(tmp, path.basename(f.name)), data);
+      bytes += data.length;
+    }
+    fs.renameSync(tmp, dir);
+  } catch (e) { fs.rmSync(tmp, { recursive: true, force: true }); throw e; }
+  return { name, downloaded: files.length, bytes, on_device: true };
+}
+
 /** After an automatic backup: upload it too when Drive is connected; a failure is only recorded. */
 async function afterBackup(folderName) {
   if (!get('drive_refresh')) return null;
   try { return await upload({ folder: folderName }); } catch (e) { set('drive_last_status', `failed: ${e.message}`); return null; }
 }
 
-module.exports = { status, saveClient, connect, poll, disconnect, upload, afterBackup };
+module.exports = { status, saveClient, connect, poll, disconnect, upload, list, download, afterBackup };

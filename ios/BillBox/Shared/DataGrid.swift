@@ -256,7 +256,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                         if c.isIndex {
                             HStack(spacing: 4) {
                                 // the tick circle always in the same place, the number on the right
-                                if isSelecting { Image(systemName: selected ? "checkmark.circle.fill" : "circle").foregroundStyle(selected ? Color.accentColor : Color.secondary) }
+                                if isSelecting { Image(systemName: selected ? "checkmark.circle.fill" : "circle").foregroundStyle(selected ? Theme.accent : Color.secondary) }
                                 Spacer(minLength: 0)
                                 Text("\(idx + 1)").monospacedDigit().foregroundStyle(.secondary).lineLimit(1).fixedSize()
                             }
@@ -273,7 +273,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
             }
             Rectangle().fill(Theme.line.opacity(0.7)).frame(height: 0.5)
         }
-        .background(selected ? Color.accentColor.opacity(0.14) : Theme.card)
+        .background(selected ? Theme.accent.opacity(0.14) : Theme.card)
         .contentShape(Rectangle())
         .onTapGesture { tap(row) }
         .contextMenu { if let menu { menu(row) } }
@@ -296,7 +296,7 @@ private struct ColumnSheet<Row>: View {
                         Button { layout.toggle(c, columns) } label: {
                             HStack {
                                 Image(systemName: layout.isHidden(c) ? "circle" : "checkmark.circle.fill")
-                                    .foregroundStyle(layout.isHidden(c) ? Color.secondary : Color.accentColor)
+                                    .foregroundStyle(layout.isHidden(c) ? Color.secondary : Theme.accent)
                                 Text(c.title).foregroundColor(.primary)
                             }
                         }

@@ -56,15 +56,26 @@ fun margCols(co: J, inter: Boolean): List<MargColumn> {
 }
 fun margClasses(inv: J, co: J): List<Double> {
     val used = inv.list("lines").map { it.num("gst_rate") }.toSet()
-    val all = (if (co.str("print_marg_classes") == "used") emptySet() else setOf(5.0, 12.0, 18.0, 28.0)) + used
+    // compact totals: only the bill's classes, unless "all classes" was chosen
+    val only = co.str("print_marg_classes") == "used" || (co.str("print_marg_classes").isEmpty() && compactPrint(co))
+    val all = (if (only) emptySet() else setOf(5.0, 12.0, 18.0, 28.0)) + used
     return if (all.isEmpty()) listOf(0.0) else all.sorted()
 }
 fun margSpec(base: Spec, inv: J, co: J): Spec {
     val f = base.fs
     // the bank details go under the GST classes, in room the totals beside them need anyway
-    val bankH = if (bankLines(co).isEmpty()) 0f else bankLines(co).size * 8f * f + 4
-    val classH = (margClasses(inv, co).size + 2) * 8.6f * f + 4
-    val totals = max(classH + bankH, 9 * 8.6f * f) + 13 * f + 1.2f
+    val compact = compactPrint(co)
+    val bankH = if (bankLines(co).isEmpty() || compact) 0f else bankLines(co).size * 8f * f + 4
+    val classH = (margClasses(inv, co).size + 2) * (if (compact) 7.6f else 8.6f) * f + 4
+    var totals = max(classH + bankH, 9 * 8.6f * f) + 13 * f + 1.2f
+    if (compact) {
+        val inter = inv.num("igst") > 0
+        var n = 2 + (if (inter) 1 else 2)
+        if (inv.num("discount") > 0) n += 1
+        if (inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005) n += 1
+        if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) n += 1
+        totals = max(classH, n * 8f * f + 4 + 17 * f + 0.6f) + 13 * f + 1.2f
+    }
     return base.copy(tableHead = 15 * f, foot = 36 * f, totals = totals, strip = 26 * f, sellerBand = 52 * f, buyerBand = 0f, headNext = 18 * f)
 }
 fun expText(d: String): String { val p = d.split('-'); return if (p.size >= 2 && p[0].length == 4) "${p[1]}/${p[0].takeLast(2)}" else "" }
@@ -275,8 +286,8 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         val heads = if (inter) listOf("CLASS", "TAXABLE", "DISC.", "IGST", "TOTAL GST", "AMOUNT") else listOf("CLASS", "TAXABLE", "DISC.", "SGST", "CGST", "TOTAL GST", "AMOUNT")
         fun vals(r: ClassRow) = if (inter) listOf(r.label, Fmt.amount(r.taxable), Fmt.amount(r.disc), Fmt.amount(r.igst), Fmt.amount(r.gst), Fmt.amount(r.total))
             else listOf(r.label, Fmt.amount(r.taxable), Fmt.amount(r.disc), Fmt.amount(r.sgst), Fmt.amount(r.cgst), Fmt.amount(r.gst), Fmt.amount(r.total))
-        val rh = 8.6f * fs
-        val bank = bankLines(co)
+        val rh = (if (compactPrint(co)) 7.6f else 8.6f) * fs
+        val bank = if (compactPrint(co)) emptyList() else bankLines(co)
         val wordsH = 13 * fs
         val upperH = g.totals - wordsH - 1.2f
         val sumW = 172 * g.cw
@@ -333,13 +344,17 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         val recW = if (on("print_marg_receiver")) 140 * g.cw else 0f
         val tw = w - sigW - recW
         var ty = y + 3
+        val bank = if (compactPrint(co)) bankLines(co) else emptyList()
         if (on("print_terms") && co.str("invoice_terms").isNotEmpty()) {
             val tt = "Terms & Conditions"
-            pen.text(tt, x + 6, ty, tw - 12, 10 * fs, 8 * fs, 700, minScale = 1f)
-            pen.hLine(x + 6, x + 6 + pen.width(tt, 8 * fs, 700), ty + 9.3f * fs, 0.5f)
-            ty += 10 * fs
-            ty += pen.para(co.str("invoice_terms"), x + 6, ty, tw - 12, 6.5f * fs, 3)
+            val ts = if (bank.isEmpty()) 8f else 7f
+            pen.text(tt, x + 6, ty, tw - 12, (ts + 2) * fs, ts * fs, 700, minScale = 1f)
+            pen.hLine(x + 6, x + 6 + pen.width(tt, ts * fs, 700), ty + (ts + 1.3f) * fs, 0.5f)
+            ty += (ts + 2) * fs
+            ty += pen.para(co.str("invoice_terms"), x + 6, ty, tw - 12, 6.5f * fs, if (bank.isEmpty()) 3 else 1)
         }
+        // compact totals: the bank details here, in up to three short lines, instead of under the GST classes
+        for (l in bank) { if (ty + 7.2f * fs <= y + h) { bankLine(pen, l, x + 6, ty, tw - 12, 7.2f * fs, 6.2f * fs); ty += 7.2f * fs } }
         if (co.str("print_bank").isNotEmpty()) { pen.text(co.str("print_bank"), x + 6, ty, tw - 12, 8 * fs, 6.5f * fs, 600, minScale = 0.7f); ty += 8 * fs }
         if (co.str("print_note").isNotEmpty() && ty + 8 * fs <= y + h) pen.text(co.str("print_note"), x + 6, ty, tw - 12, 8 * fs, 7 * fs, 700, minScale = 0.7f)
         var cx = x + tw

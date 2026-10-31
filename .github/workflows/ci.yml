@@ -4,7 +4,8 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: ['**']
+    paths-ignore: ['website/**', 'license-server/**']
   pull_request:
   workflow_dispatch:
 

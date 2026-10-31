@@ -70,10 +70,27 @@ struct Spec {
                              strip: strip * k, sellerBand: sellerBand * k, buyerBand: buyerBand, headNext: headNext * k, fs: fs * k, cw: cw)
     }
 
-    /// Room for the bank details under the GST table (Settings › Printing › Bank details), when the bill prints them.
-    func withBank(_ co: JSON) -> Spec {
-        // the bank details now sit in the footer, in the room it already has
-        return self
+    /// The bank details sit in the footer, in the room it already has. With compact totals (Settings › Printing, on unless
+    /// switched off) the totals take only the height their lines need, and the rest goes to item rows.
+    func withBank(_ co: JSON, _ inv: JSON = JSON()) -> Spec {
+        guard compactPrint(co) else { return self }
+        func on(_ k: String) -> Bool { co.str(k).isEmpty || co.str(k) != "0" }
+        let f = fs
+        var n = 1                                                               // items total
+        if inv.num("discount") > 0 { n += 2 }                                   // less discount, taxable value
+        if inv.num("cgst") > 0 { n += 2 }
+        if inv.num("igst") > 0 { n += 1 }
+        if abs(inv.num("round_off")) > 0 { n += 1 }
+        if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { n += 1 }
+        let right = CGFloat(n) * 9 * f + 6 + 17 * f
+        let rates = max(1, inv.list("gst_summary").count)
+        var left: CGFloat = 8
+        if on("print_gst_table") { left += CGFloat(rates + 1) * 8.6 * f + 3 }
+        if co.str("print_balance") == "1" && inv.has("party_prev_balance") { left += 9 * f }
+        if on("print_words") { left += 7 * f + 2 * 9.2 * f }
+        let need = (max(right, left) + 2).rounded(.up)
+        return Spec(w: w, h: h, m: m, rowH: rowH, tableHead: tableHead, foot: foot, totals: min(totals, need),
+                    strip: strip, sellerBand: sellerBand, buyerBand: buyerBand, headNext: headNext, fs: fs, cw: cw)
     }
 
     func withBankBlock(_ co: JSON) -> Spec {
@@ -89,6 +106,9 @@ struct Spec {
     static let full = Spec(w: 595.276, h: 841.89, m: 34, rowH: 16, tableHead: 20, foot: 32, totals: 112,
                            strip: 19, sellerBand: 68, buyerBand: 0, headNext: 24, fs: 1.15, cw: 1.0)
 }
+
+/// Settings › Printing › Compact totals (on unless switched off): the GST and bank details take less room, for more item rows.
+func compactPrint(_ co: JSON) -> Bool { co.str("print_compact") != "0" }
 
 /// The bank details printed above the amount in words, one per line, in this order; empty ones are left out.
 let bankFields: [(key: String, label: String, title: String)] = [
@@ -474,10 +494,11 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
     /// The totals on the right, ending in the grand total.
     private var sumColumn: some View {
             VStack(spacing: 0) {
-                VStack(spacing: 1) {
+                VStack(spacing: compactPrint(co) ? 0 : 1) {
                     sumRow("Items total", inv.num("subtotal"))
                     if inv.num("discount") > 0 { sumRow("Less discount", -inv.num("discount")) }
-                    sumRow("Taxable value", inv.num("taxable"))
+                    // compact: the taxable value only when it differs from the items total
+                    if !compactPrint(co) || inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005 { sumRow("Taxable value", inv.num("taxable")) }
                     if inv.num("cgst") > 0 { sumRow("CGST", inv.num("cgst")); sumRow("SGST", inv.num("sgst")) }
                     if inv.num("igst") > 0 { sumRow("IGST", inv.num("igst")) }
                     if abs(inv.num("round_off")) > 0 { sumRow("Round off", inv.num("round_off")) }
@@ -492,7 +513,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                     t("₹ " + Fmt.amount(inv.num("total")), 11, bold: true)
                 }
                 .padding(.horizontal, 6)
-                .frame(height: 19 * g.fs)
+                .frame(height: (compactPrint(co) ? 17 : 19) * g.fs)
                 .background(shade)
             }
             .frame(width: 186 * g.cw)
@@ -500,6 +521,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
 
     private func sumRow(_ a: String, _ v: Double) -> some View {
         HStack { t(a, 7).foregroundStyle(muted); Spacer(); t(Fmt.amount(v), 7.5) }
+            .frame(height: compactPrint(co) ? 9 * g.fs : nil)
     }
 
     /// Terms (and your own lines) on the left, the bank details in the middle, the company's signature block on the right.
@@ -595,7 +617,7 @@ func renderPDF(pages: [AnyView], size: CGSize) -> PDFDocument? {
 /// The page measurements for the company's bill design (Settings › Printing › Bill design) and text size.
 func billSpec(_ inv: JSON, _ co: JSON, full: Bool) -> Spec {
     let base = (full ? Spec.full : Spec.half).scaled(printScale(co))
-    return printStyle(co) == "marg" ? margSpec(base, inv, co) : base.withBank(co)
+    return printStyle(co) == "marg" ? margSpec(base, inv, co) : base.withBank(co, inv)
 }
 
 /// One copy of one page of a bill, in the company's bill design.

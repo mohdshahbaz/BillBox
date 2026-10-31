@@ -139,6 +139,8 @@ public struct Font: Hashable {
     public static func system(_ style: TextStyle, design: Design = .default) -> Font { Font() }
     public static func system(_ style: TextStyle, design: Design? = nil, weight: Weight? = nil) -> Font { Font() }
     public static func custom(_ name: String, size: CGFloat) -> Font { Font() }
+    public static func custom(_ name: String, size: CGFloat, relativeTo: TextStyle) -> Font { Font() }
+    public struct Width: Hashable { public static let compressed = Width(), condensed = Width(), standard = Width(), expanded = Width() }
     public func weight(_ w: Weight) -> Font { self }
     public func bold() -> Font { self }
     public func italic() -> Font { self }
@@ -814,6 +816,7 @@ extension View {
     public func environmentObject<O: ObservableObject>(_ o: O) -> _MV { _MV() }
     public func dynamicTypeSize(_ s: DynamicTypeSize) -> _MV { _MV() }
     public func fontDesign(_ d: Font.Design?) -> _MV { _MV() }
+    public func fontWidth(_ w: Font.Width?) -> _MV { _MV() }
     public func dynamicTypeSize<T: RangeExpression>(_ r: T) -> _MV where T.Bound == DynamicTypeSize { _MV() }
     public func ignoresSafeArea(_ regions: SafeAreaRegions = .all, edges: Edge.Set = .all) -> _MV { _MV() }
     public func safeAreaInset<V: View>(edge: VerticalEdge, alignment: HorizontalAlignment = .center, spacing: CGFloat? = nil, @ViewBuilder content: () -> V) -> _MV { _MV() }
@@ -923,3 +926,11 @@ public enum NavigationBarItem { public enum TitleDisplayMode { case automatic, i
 public struct _ViewModifierContent<M>: _Leaf {}
 public protocol ViewModifier { associatedtype Body: View; typealias Content = _ViewModifierContent<Self>; @ViewBuilder @MainActor func body(content: Content) -> Body }
 extension View { public func modifier<M: ViewModifier>(_ m: M) -> _MV { fatalError() } }
+
+extension UIColor {
+    public convenience init(_ color: Color) { self.init(white: 0, alpha: 1) }
+}
+
+extension View where Self: Equatable {
+    public func equatable() -> Self { self }
+}

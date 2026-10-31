@@ -4,6 +4,9 @@ import SwiftUI
 /// Sign-in is Google's code sign-in: BillBox shows a short code, the user enters it at google.com/device on any phone or
 /// computer and allows BillBox; BillBox notices by itself. (Same file on iPhone and Mac.)
 @MainActor struct DriveBackupSection: View {
+    /// Called with the name of a backup brought back from Drive into this device's backup folder: the screen then asks
+    /// Replace or Merge and restores it like any other backup.
+    var onRestore: ((String) -> Void)? = nil
     @EnvironmentObject private var app: AppModel
     @Environment(\.openURL) private var openURL
     @State private var status = JSON()
@@ -14,6 +17,13 @@ import SwiftUI
     @State private var link = "https://www.google.com/device"
     @State private var busy = false
     @State private var polling: Task<Void, Never>?
+    @State private var showDrive = false
+    @State private var driveList: [JSON] = []
+    @State private var listing = false
+    @State private var fetching = ""
+    /// Changes whenever the keys or the connection change, so the rows are rebuilt (iOS kept the old rows after the
+    /// Files picker closed: Connect did not appear until BillBox was opened again).
+    private var phase: String { "\(connected)-\(hasKeys)-\(editingKeys)-\(code.isEmpty)" }
 
     private var connected: Bool { status.bool("connected") }
     private var hasKeys: Bool { !status.str("client_id").isEmpty && status.bool("has_secret") }
@@ -33,46 +43,38 @@ import SwiftUI
                     }
                 }
             }
-            if !code.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("1. Open google.com/device on any phone or computer.\n2. Enter this code and allow BillBox:").font(.callout)
-                    Text(code).font(.system(size: 30, weight: .bold, design: .monospaced)).frame(maxWidth: .infinity).textSelection(.enabled)
-                    HStack {
-                        Button { if let u = URL(string: link) { openURL(u) } } label: { Label("Open google.com/device", systemImage: "safari") }
-                            .buttonStyle(.borderedProminent)
-                        Button { copy(code) } label: { Label("Copy code", systemImage: "doc.on.doc") }.buttonStyle(.bordered)
+            Group {
+                if !code.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("1. Open google.com/device on any phone or computer.\n2. Enter this code and allow BillBox:").font(.callout)
+                        Text(code).font(.system(size: 30, weight: .bold, design: .monospaced)).frame(maxWidth: .infinity).textSelection(.enabled)
                     }
-                    Button("Cancel", role: .cancel) { stopPolling() }.buttonStyle(.borderless)
-                }
-                .padding(.vertical, 4)
-            }
-            if connected {
-                Button { Task { await upload() } } label: { Label(busy ? "Uploading…" : "Upload the newest backup now", systemImage: "icloud.and.arrow.up") }
-                    .disabled(busy)
-                Button(role: .destructive) { Task { await disconnect() } } label: { Label("Disconnect Google Drive", systemImage: "xmark.icloud") }
-                    .disabled(busy)
-            } else if code.isEmpty {
-                if hasKeys && !editingKeys {
-                    Button { Task { await connect() } } label: {
-                        Label(busy ? "Connecting…" : "Connect Google Drive", systemImage: "link.icloud").font(.body.weight(.semibold))
-                    }
-                    .disabled(busy)
+                    .padding(.vertical, 4)
+                    DriveButton("Open google.com/device", "safari", prominent: true) { if let u = URL(string: link) { openURL(u) } }
+                    DriveButton("Copy code", "doc.on.doc") { copy(code) }
+                    DriveButton("Cancel", "xmark") { stopPolling() }
+                } else if connected {
+                    DriveButton(busy ? "Uploading…" : "Upload the newest backup now", "icloud.and.arrow.up", prominent: true, disabled: busy) { Task { await upload() } }
+                    DriveButton("Restore from Google Drive…", "icloud.and.arrow.down", disabled: busy) { Task { await openDriveList() } }
+                    DriveButton("Disconnect Google Drive", "xmark.icloud", destructive: true, disabled: busy) { Task { await disconnect() } }
+                } else if hasKeys && !editingKeys {
+                    DriveButton(busy ? "Connecting…" : "Connect Google Drive", "link.icloud", prominent: true, disabled: busy) { Task { await connect() } }
                     HStack {
                         Text("Client ID").foregroundStyle(.secondary)
                         Spacer()
                         Text(shortId(status.str("client_id"))).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     }
-                    Button { editingKeys = true; clientId = status.str("client_id") } label: { Label("Change Google keys…", systemImage: "key") }
+                    DriveButton("Change Google keys…", "key", disabled: busy) { editingKeys = true; clientId = status.str("client_id") }
                 } else {
-                    Button { Task { await importJSON() } } label: { Label("Import the downloaded JSON file…", systemImage: "doc.badge.plus") }
-                        .disabled(busy)
+                    DriveButton("Import the downloaded JSON file…", "doc.badge.plus", prominent: true, disabled: busy) { Task { await importJSON() } }
                     TextField("Client ID (…apps.googleusercontent.com)", text: $clientId).autocorrectionDisabled()
                     SecureField("Client secret", text: $secret)
-                    Button { Task { await saveKeys() } } label: { Label("Save keys", systemImage: "checkmark.circle") }
-                        .disabled(busy || clientId.trimmingCharacters(in: .whitespaces).isEmpty || secret.trimmingCharacters(in: .whitespaces).isEmpty)
-                    if hasKeys { Button("Cancel") { editingKeys = false } }
+                    DriveButton("Save keys", "checkmark.circle",
+                                disabled: busy || clientId.trimmingCharacters(in: .whitespaces).isEmpty || secret.trimmingCharacters(in: .whitespaces).isEmpty) { Task { await saveKeys() } }
+                    if hasKeys { DriveButton("Cancel", "xmark") { editingKeys = false } }
                 }
             }
+            .id(phase)
         } header: {
             Text("Google Drive")
         } footer: {
@@ -82,6 +84,65 @@ import SwiftUI
         }
         .task { await load() }
         .onDisappear { polling?.cancel() }
+        .sheet(isPresented: $showDrive) { driveSheet }
+    }
+
+    /// Drive › BillBox Backups, newest first; choosing one brings it to this device and restores it.
+    private var driveSheet: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Restore from Google Drive").font(.headline)
+                Spacer()
+                Button("Close") { showDrive = false }.keyboardShortcut(.cancelAction)
+            }
+            .padding()
+            List {
+                if listing {
+                    HStack { ProgressView(); Text("Asking Google Drive…").foregroundStyle(.secondary) }
+                } else if driveList.isEmpty {
+                    Text("No backups in Google Drive › BillBox Backups yet.").foregroundStyle(.secondary)
+                }
+                ForEach(driveList, id: \.rid) { b in
+                    Button { Task { await fetch(b) } } label: {
+                        HStack {
+                            Image(systemName: b.bool("on_device") ? "checkmark.circle" : "icloud.and.arrow.down").foregroundStyle(Theme.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(b.str("name")).font(.callout.monospaced())
+                                Text(b.bool("on_device") ? "Also on this device" : "Only in Google Drive").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if fetching == b.str("name") { ProgressView() }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!fetching.isEmpty)
+                }
+            }
+        }
+        .frame(minWidth: 420, minHeight: 360)
+    }
+
+    private func openDriveList() async {
+        driveList = []; listing = true; showDrive = true
+        defer { listing = false }
+        do {
+            driveList = try await API.list("/backup/drive/list")
+        } catch {
+            showDrive = false
+            app.notify(error.localizedDescription, error: true)
+        }
+    }
+
+    private func fetch(_ b: JSON) async {
+        fetching = b.str("name"); defer { fetching = "" }
+        await app.guarded {
+            let r = try await API.obj("POST", "/backup/drive/download", body: ["id": b.str("id"), "name": b.str("name")])
+            showDrive = false
+            try? await Task.sleep(nanoseconds: 400_000_000)   // let the sheet close before the Replace / Merge question
+            if r.int("downloaded") > 0 { app.notify("Brought \(r.str("name")) from Google Drive (\(r.int("downloaded")) files).") }
+            onRestore?(r.str("name"))
+        }
     }
 
     private func shortId(_ id: String) -> String {
@@ -92,12 +153,15 @@ import SwiftUI
     /// Settings › Google Drive › Import: the client_secret_….json downloaded from Google Cloud holds both keys.
     private func importJSON() async {
         guard let text = await Files.pickJSON() else { return }
+        // the Files picker is still closing: changes made now were lost on iPhone, so wait for it to finish
+        try? await Task.sleep(nanoseconds: 450_000_000)
         busy = true; defer { busy = false }
         await app.guarded {
             status = try await API.obj("PUT", "/backup/drive/client", body: ["json": text])
             editingKeys = false; secret = ""; clientId = ""
             app.notify("Google keys imported. Now press Connect Google Drive.")
         }
+        await load()
     }
 
     private func copy(_ text: String) {
@@ -116,6 +180,7 @@ import SwiftUI
             editingKeys = false; secret = ""
             app.notify("Google keys saved. Now press Connect Google Drive.")
         }
+        await load()
     }
 
     private func connect() async {
@@ -169,5 +234,29 @@ import SwiftUI
     private func disconnect() async {
         await app.guarded { status = try await API.obj("POST", "/backup/drive/disconnect", body: [:]) }
         app.notify("Google Drive disconnected. Backups stay on this device; the copies already in Drive are not touched.")
+    }
+}
+
+/// The one button style of the Google Drive section (iPhone and Mac): full width, same height, icon and title.
+struct DriveButton: View {
+    let title: String, icon: String
+    var prominent = false, destructive = false, disabled = false
+    let action: () -> Void
+    init(_ title: String, _ icon: String, prominent: Bool = false, destructive: Bool = false, disabled: Bool = false, action: @escaping () -> Void) {
+        self.title = title; self.icon = icon; self.prominent = prominent; self.destructive = destructive; self.disabled = disabled; self.action = action
+    }
+    var body: some View {
+        Group {
+            if prominent {
+                Button(role: destructive ? .destructive : nil, action: action) { label }.buttonStyle(.borderedProminent)
+            } else {
+                Button(role: destructive ? .destructive : nil, action: action) { label }.buttonStyle(.bordered)
+            }
+        }
+        .controlSize(.large)
+        .disabled(disabled)
+    }
+    private var label: some View {
+        Label(title, systemImage: icon).font(.body.weight(prominent ? .semibold : .regular)).frame(maxWidth: .infinity, minHeight: 22)
     }
 }

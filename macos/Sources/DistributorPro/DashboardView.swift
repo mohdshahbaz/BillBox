@@ -93,7 +93,7 @@ import SwiftUI
         }
         .foregroundStyle(.white)
         .padding(16)
-        .background(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.72)], startPoint: .topLeading, endPoint: .bottomTrailing),
+        .background(LinearGradient(colors: [Theme.accent, Theme.accent.opacity(0.72)], startPoint: .topLeading, endPoint: .bottomTrailing),
                     in: RoundedRectangle(cornerRadius: 16))
     }
 

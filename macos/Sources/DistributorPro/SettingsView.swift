@@ -235,7 +235,7 @@ import AppKit
             }
             .groupedForm()
             .frame(minWidth: 380, maxWidth: .infinity)
-            Form { DriveBackupSection() }
+            Form { DriveBackupSection(onRestore: { n in Task { await load(); await restore(name: n, label: n) } }) }
                 .groupedForm()
                 .frame(minWidth: 340, maxWidth: .infinity)
           }

@@ -24,6 +24,26 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.8 — Restore from Google Drive, Connect right after importing, faster iPhone dashboard, typefaces, compact totals
+
+- **Restore from Google Drive** (iPhone, Mac, Android): Settings › Backup › Google Drive › *Restore from Google Drive…* lists the
+  backups in Drive › BillBox Backups; choosing one brings it to this device and asks Replace or Merge like any backup. A new
+  install (or another device with the same Google keys) finds the BillBox Backups folder already in Drive instead of making a
+  second one.
+- **Google Drive buttons**: one style everywhere (full width, same height); after importing the JSON file **Connect Google
+  Drive** appears at once (on iPhone it only appeared after opening BillBox again).
+- **iPhone dashboard is faster**: figures are worked out once per load, kept per company and year (shown at once, refreshed
+  behind), and the screen no longer redraws for every message in the app; card shadows are drawn from the card shape only, so
+  every list scrolls more smoothly (Mac too).
+- **More typefaces** (Settings › Appearance › Typeface): System, Rounded, Serif (New York), Mono, Condensed, Expanded,
+  Compressed, Avenir Next, Helvetica Neue, Futura, Gill Sans, Optima, Georgia, Palatino, Baskerville, American Typewriter,
+  Menlo. The chosen letters and weight now apply to the whole app (before, the choice was saved but not used).
+- **Compact totals** (Settings › Printing, on by default): the totals take only the height their lines need; the Marg style
+  shows only the bill's GST classes (unless "all" is chosen) and puts the bank details in the footer. More item rows fit on
+  each page, so fewer bills run to a second page.
+- **Icons follow the theme on iPhone**: every coloured icon (Settings, dashboard cards, ticks, the bill total, the Files
+  picker and alerts) now takes the theme colour; before, iPhone kept the fixed indigo.
+
 ## v15.7 — Google keys from the downloaded file, tick boxes, compact bank details, more themes, Android icon
 
 - **Google Drive**: import the `client_secret_….json` downloaded from Google Cloud instead of pasting the keys; Google's

@@ -331,7 +331,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                                 // a tick box per row, always in the same place: tick several rows, then act on them (print, delete…)
                                 if let selection, !clickSelects {
                                     Button { if selected { selection.wrappedValue.remove(row.id) } else { selection.wrappedValue.insert(row.id) } } label: {
-                                        Image(systemName: selected ? "checkmark.square.fill" : "square").foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                                        Image(systemName: selected ? "checkmark.square.fill" : "square").foregroundStyle(selected ? Theme.accent : Color.secondary)
                                     }
                                     .buttonStyle(.plain)
                                     .frame(width: 18, height: rh)
@@ -353,7 +353,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
             }
             Rectangle().fill(Theme.line.opacity(0.7)).frame(height: 0.5)
         }
-        .background(selected ? Color.accentColor.opacity(0.14) : (highlighted == row.id && !clickSelects ? Color.primary.opacity(0.06) : Theme.card))
+        .background(selected ? Theme.accent.opacity(0.14) : (highlighted == row.id && !clickSelects ? Color.primary.opacity(0.06) : Theme.card))
         .contentShape(Rectangle())
         .modifier(RowTaps(enabled: selection != nil || onOpen != nil, single: { click(row, idx) }, double: { onOpen?(row) }))
         .contextMenu { if let menu { menu(row) } }

@@ -8,6 +8,9 @@ enum Theme {
     /// Card / panel background and page background follow the chosen theme (Settings > Appearance) and light / dark mode.
     static var card: Color { AppTheme.current.card }
     static var page: Color { AppTheme.current.page }
+    /// The theme's accent. On iPhone `Color.accentColor` is the colour fixed in the app (Assets), not the chosen theme,
+    /// so icons drawn with it stayed indigo whatever the theme: every coloured icon uses this instead.
+    static var accent: Color { AppTheme.current.accent }
     static let line = Color(UIColor.separator)
 }
 
@@ -134,7 +137,7 @@ struct DayPicker: View {
                 } label: {
                     Text(short[i]).font(.caption).lineLimit(1).minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity, minHeight: 30)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(on ? Color.accentColor : Color.gray.opacity(0.18)))
+                        .background(RoundedRectangle(cornerRadius: 6).fill(on ? Theme.accent : Color.gray.opacity(0.18)))
                         .foregroundColor(on ? .white : .primary)
                 }
                 .buttonStyle(.plain)
@@ -183,10 +186,15 @@ struct CardBackground: ViewModifier {
 
     func body(content: Content) -> some View {
         let r = radius * (corners == "square" ? 0.45 : (corners == "round" ? 1.6 : 1))
+        // the shadow is drawn from the card's shape only: a shadow on the whole content (every text and icon in it) was
+        // worked out again on each frame while scrolling, which made the dashboard and lists stutter on iPhone
         return content
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: r, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: r, style: .continuous)
+                    .fill(Theme.card)
+                    .shadow(color: Color.black.opacity(style == "soft" ? 0.08 : 0), radius: style == "soft" ? 7 : 0, x: 0, y: style == "soft" ? 3 : 0)
+            )
             .overlay(RoundedRectangle(cornerRadius: r, style: .continuous).stroke(Color.primary.opacity(style == "outline" ? 0.16 : 0.06), lineWidth: style == "outline" ? 1 : 0.5))
-            .shadow(color: Color.black.opacity(style == "soft" ? 0.08 : 0), radius: style == "soft" ? 7 : 0, x: 0, y: style == "soft" ? 3 : 0)
     }
 }
 

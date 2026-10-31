@@ -272,7 +272,7 @@ struct BillLine: Identifiable {
                     }
                     .padding(.horizontal, 10).padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(i == highlight ? Color.accentColor.opacity(0.18) : Color.clear)
+                    .background(i == highlight ? Theme.accent.opacity(0.18) : Color.clear)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -438,7 +438,7 @@ struct BillLine: Identifiable {
                     Spacer(minLength: 4)
                     VStack(alignment: .trailing, spacing: 0) {
                         ProgressView().controlSize(.mini).opacity(calculating ? 1 : 0)
-                        Text(t.map { Fmt.money($0.total) } ?? "₹0.00").font(.title3.weight(.bold)).monospacedDigit().foregroundStyle(Color.accentColor)
+                        Text(t.map { Fmt.money($0.total) } ?? "₹0.00").font(.title3.weight(.bold)).monospacedDigit().foregroundStyle(Theme.accent)
                             .lineLimit(1).minimumScaleFactor(0.5)
                     }
                     saveButton(ready: ready)
@@ -543,7 +543,7 @@ struct BillLine: Identifiable {
                     ProgressView().controlSize(.small).opacity(calculating ? 1 : 0)
                 }
                 Text(t.map { Fmt.money($0.total) } ?? "₹0.00")
-                    .font(.system(.title, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(Color.accentColor)
+                    .font(.system(.title, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(Theme.accent)
                     .lineLimit(1).minimumScaleFactor(0.5)
                 Text("\(lines.count) item\(lines.count == 1 ? "" : "s") · \(lines.reduce(0) { $0 + $1.totalPcs }) pcs").font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 8) {

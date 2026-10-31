@@ -232,7 +232,7 @@ struct FoundItem: Identifiable {
                 let id = m.int("id")
                 HStack(spacing: 10) {
                     Button { if leaveOut.contains(id) { leaveOut.remove(id) } else { leaveOut.insert(id) } } label: {
-                        Image(systemName: leaveOut.contains(id) ? "circle" : "checkmark.circle.fill").foregroundStyle(leaveOut.contains(id) ? Color.secondary : Color.accentColor)
+                        Image(systemName: leaveOut.contains(id) ? "circle" : "checkmark.circle.fill").foregroundStyle(leaveOut.contains(id) ? Color.secondary : Theme.accent)
                     }
                     .buttonStyle(.borderless)
                     VStack(alignment: .leading, spacing: 1) {
@@ -242,7 +242,7 @@ struct FoundItem: Identifiable {
                     }
                     Spacer()
                     if id == k {
-                        Text("Keep").font(.caption.weight(.semibold)).foregroundStyle(.white).padding(.horizontal, 8).padding(.vertical, 3).background(Color.accentColor, in: Capsule())
+                        Text("Keep").font(.caption.weight(.semibold)).foregroundStyle(.white).padding(.horizontal, 8).padding(.vertical, 3).background(Theme.accent, in: Capsule())
                     } else if !leaveOut.contains(id) {
                         Button("Keep this") { keepFor[g.str("key")] = id }.buttonStyle(.borderless).font(.caption)
                     }
@@ -314,7 +314,7 @@ struct FoundItem: Identifiable {
                 ForEach(items) { it in
                     Button { keep = it.id } label: {
                         HStack {
-                            Image(systemName: (keep ?? items.first?.id) == it.id ? "largecircle.fill.circle" : "circle").foregroundStyle(Color.accentColor)
+                            Image(systemName: (keep ?? items.first?.id) == it.id ? "largecircle.fill.circle" : "circle").foregroundStyle(Theme.accent)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(it.str("name")).foregroundStyle(.primary)
                                 Text("MRP \(it.num("mrp") > 0 ? Fmt.money(it.num("mrp")) : "–") · \(max(1, it.int("pcs_per_box"))) per box · stock \(Fmt.qty(it.num("stock")))")

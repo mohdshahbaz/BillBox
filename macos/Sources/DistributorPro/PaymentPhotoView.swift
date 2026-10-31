@@ -192,16 +192,16 @@ struct PhotoSourceTile: View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: symbol).font(.system(size: 26, weight: .medium))
-                    .foregroundStyle(prominent ? Color.white : Color.accentColor)
+                    .foregroundStyle(prominent ? Color.white : Theme.accent)
                     .frame(width: 52, height: 52)
-                    .background(prominent ? Color.accentColor : Color.accentColor.opacity(0.14), in: Circle())
+                    .background(prominent ? Theme.accent : Theme.accent.opacity(0.14), in: Circle())
                 Text(title).font(.callout.weight(.semibold)).foregroundStyle(.primary)
                 Text(detail).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).lineLimit(2)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14).padding(.horizontal, 8)
-            .background(Color.accentColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.accentColor.opacity(0.25), lineWidth: 1))
+            .background(Theme.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.accent.opacity(0.25), lineWidth: 1))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)   // each tile is its own tap target inside the form row
@@ -216,14 +216,14 @@ struct PhotoPaymentsCard: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: "camera.viewfinder").font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
-                    .frame(width: 40, height: 40).background(Color.accentColor, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(width: 40, height: 40).background(Theme.accent, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Payments from a photo").font(.callout.weight(.semibold)).foregroundStyle(.primary)
                     Text("Photograph the handwritten list: every party's payment is recorded together.").font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
                 Spacer(minLength: 8)
-                Text("Start").font(.callout.weight(.semibold)).foregroundStyle(Color.accentColor)
-                    .padding(.horizontal, 12).padding(.vertical, 6).background(Color.accentColor.opacity(0.12), in: Capsule())
+                Text("Start").font(.callout.weight(.semibold)).foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 12).padding(.vertical, 6).background(Theme.accent.opacity(0.12), in: Capsule())
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)

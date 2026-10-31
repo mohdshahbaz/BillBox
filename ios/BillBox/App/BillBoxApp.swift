@@ -9,6 +9,15 @@ struct BillBoxApp: App {
     @AppStorage("appearance") private var appearance = "auto"
     @Environment(\.scenePhase) private var phase
 
+    /// The theme colour for what UIKit draws itself (alerts, the Files picker, the share sheet, the keyboard bar), which
+    /// SwiftUI's tint does not reach.
+    @MainActor static func tintWindows(_ id: String) {
+        let c = UIColor(AppTheme.named(id).accent)
+        for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+            for w in scene.windows { w.tintColor = c }
+        }
+    }
+
     init() {
         CrashCatcher.install()
         BackupScheduler.register()
@@ -22,7 +31,10 @@ struct BillBoxApp: App {
                 .tint(AppTheme.named(themeId).accent)
                 .preferredColorScheme(appearance == "light" ? .light : (appearance == "dark" ? .dark : nil))
                 .modifier(TextSizeChoice())
+                .modifier(FontChoice())
                 .id(themeId)
+                .onAppear { BillBoxApp.tintWindows(themeId) }
+                .onChange(of: themeId) { BillBoxApp.tintWindows($0) }
         }
         .onChange(of: phase) { p in
             switch p {

@@ -440,8 +440,18 @@ private data class RestoreTarget(val name: String? = null, val folder: String? =
  * Settings › Backup › Google Drive: every backup also goes into "BillBox Backups" in the user's Google Drive. Sign-in is
  * Google's code sign-in (a short code entered at google.com/device); the engine does the rest (services/drive.js).
  */
+/** The one button style of the Google Drive section: full width, same height. */
 @Composable
-private fun DriveSection() {
+private fun DriveBtn(title: String, prominent: Boolean = false, destructive: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+    val m = Modifier.fillMaxWidth().height(48.dp)
+    if (prominent) Button(onClick = onClick, enabled = enabled, modifier = m) { Text(title) }
+    else OutlinedButton(onClick = onClick, enabled = enabled, modifier = m) {
+        if (destructive) Text(title, color = MaterialTheme.colorScheme.error) else Text(title)
+    }
+}
+
+@Composable
+private fun DriveSection(onRestore: (String) -> Unit = {}) {
     val app = LocalApp.current
     var status by remember { mutableStateOf(J()) }
     var clientId by remember { mutableStateOf("") }
@@ -452,6 +462,8 @@ private fun DriveSection() {
     var every by remember { mutableIntStateOf(5) }
     var until by remember { mutableStateOf(0L) }
     var busy by remember { mutableStateOf(false) }
+    var driveList by remember { mutableStateOf<List<J>?>(null) }
+    var fetching by remember { mutableStateOf("") }
     suspend fun load() { try { status = Api.get("/backup/drive") } catch (_: Exception) {} }
     LaunchedEffect(Unit) { load() }
     LaunchedEffect(code) {
@@ -479,55 +491,76 @@ private fun DriveSection() {
     if (code.isNotEmpty()) {
         Text("1. Open google.com/device on any phone or computer.\n2. Enter this code and allow BillBox:")
         Text(code, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { com.local.billbox.system.Platform.openUrl(link) }) { Text("Open google.com/device") }
-            OutlinedButton(onClick = { com.local.billbox.ui.copyText(code); app.notify("Code copied.") }) { Text("Copy code") }
-            TextButton(onClick = { code = "" }) { Text("Cancel") }
-        }
+        DriveBtn("Open google.com/device", prominent = true) { com.local.billbox.system.Platform.openUrl(link) }
+        DriveBtn("Copy code") { com.local.billbox.ui.copyText(code); app.notify("Code copied.") }
+        DriveBtn("Cancel") { code = "" }
     } else if (connected) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { app.launch {
-                busy = true
-                try { val r = Api.obj("POST", "/backup/drive/upload", body = emptyMap<String, Any>()); app.notify("Uploaded ${r.str("folder")} to Google Drive (${r.int("files")} files).") }
-                finally { busy = false; load() }
-            } }, enabled = !busy) { Text(if (busy) "Uploading…" else "Upload the newest backup now") }
-            OutlinedButton(onClick = { app.launch {
-                status = Api.obj("POST", "/backup/drive/disconnect", body = emptyMap<String, Any>())
-                app.notify("Google Drive disconnected. Backups stay on this phone; the copies already in Drive are not touched.")
-            } }, enabled = !busy) { Text("Disconnect") }
-        }
+        DriveBtn(if (busy) "Uploading…" else "Upload the newest backup now", prominent = true, enabled = !busy) { app.launch {
+            busy = true
+            try { val r = Api.obj("POST", "/backup/drive/upload", body = emptyMap<String, Any>()); app.notify("Uploaded ${r.str("folder")} to Google Drive (${r.int("files")} files).") }
+            finally { busy = false; load() }
+        } }
+        DriveBtn("Restore from Google Drive…", enabled = !busy) { app.launch {
+            driveList = emptyList(); busy = true
+            try { driveList = Api.list("/backup/drive/list") } catch (e: Exception) { driveList = null; throw e } finally { busy = false }
+        } }
+        DriveBtn("Disconnect Google Drive", destructive = true, enabled = !busy) { app.launch {
+            status = Api.obj("POST", "/backup/drive/disconnect", body = emptyMap<String, Any>())
+            app.notify("Google Drive disconnected. Backups stay on this phone; the copies already in Drive are not touched.")
+        } }
     } else if (hasKeys && !editing) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { app.launch {
-                busy = true
-                try {
-                    val r = Api.obj("POST", "/backup/drive/connect", body = emptyMap<String, Any>())
-                    if (r.str("verification_url").isNotEmpty()) link = r.str("verification_url")
-                    every = maxOf(5, r.int("interval")); until = System.currentTimeMillis() + maxOf(60, r.int("expires_in")) * 1000L
-                    code = r.str("user_code")
-                } finally { busy = false }
-            } }, enabled = !busy) { Text(if (busy) "Connecting…" else "Connect Google Drive") }
-            TextButton(onClick = { editing = true; clientId = status.str("client_id") }) { Text("Change Google keys…") }
-        }
+        DriveBtn(if (busy) "Connecting…" else "Connect Google Drive", prominent = true, enabled = !busy) { app.launch {
+            busy = true
+            try {
+                val r = Api.obj("POST", "/backup/drive/connect", body = emptyMap<String, Any>())
+                if (r.str("verification_url").isNotEmpty()) link = r.str("verification_url")
+                every = maxOf(5, r.int("interval")); until = System.currentTimeMillis() + maxOf(60, r.int("expires_in")) * 1000L
+                code = r.str("user_code")
+            } finally { busy = false }
+        } }
         Hint("Client ID: " + status.str("client_id").substringBefore(".apps.googleusercontent.com").let { if (it.length > 22) it.take(10) + "…" + it.takeLast(8) else it })
+        DriveBtn("Change Google keys…", enabled = !busy) { editing = true; clientId = status.str("client_id") }
     } else {
-        Button(onClick = { app.launch {
+        DriveBtn("Import the downloaded JSON file…", prominent = true, enabled = !busy) { app.launch {
             val (dir, name) = com.local.billbox.system.Platform.importPicked(false, "application/json", "*/*") ?: return@launch
             val text = java.io.File(dir, name).takeIf { it.exists() }?.readText() ?: ""
             status = Api.obj("PUT", "/backup/drive/client", body = mapOf("json" to text))
             editing = false; secret = ""; clientId = ""
+            load()
             app.notify("Google keys imported. Now press Connect Google Drive.")
-        } }, enabled = !busy) { Text("Import the downloaded JSON file…") }
+        } }
         Hint("or paste the two keys:")
         Field("Client ID (…apps.googleusercontent.com)", clientId, { clientId = it })
         Field("Client secret", secret, { secret = it })
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { app.launch {
-                status = Api.obj("PUT", "/backup/drive/client", body = mapOf("client_id" to clientId, "client_secret" to secret))
-                editing = false; secret = ""; app.notify("Google keys saved. Now press Connect Google Drive.")
-            } }, enabled = clientId.isNotBlank() && secret.isNotBlank()) { Text("Save keys") }
-            if (hasKeys) OutlinedButton(onClick = { editing = false }) { Text("Cancel") }
-        }
+        DriveBtn("Save keys", enabled = clientId.isNotBlank() && secret.isNotBlank()) { app.launch {
+            status = Api.obj("PUT", "/backup/drive/client", body = mapOf("client_id" to clientId, "client_secret" to secret))
+            editing = false; secret = ""; load(); app.notify("Google keys saved. Now press Connect Google Drive.")
+        } }
+        if (hasKeys) DriveBtn("Cancel") { editing = false }
+    }
+    driveList?.let { list ->
+        AlertDialog(onDismissRequest = { if (fetching.isEmpty()) driveList = null }, title = { Text("Restore from Google Drive") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    if (busy) Text("Asking Google Drive…") else if (list.isEmpty()) Text("No backups in Google Drive › BillBox Backups yet.")
+                    list.forEach { b ->
+                        Column(Modifier.fillMaxWidth().clickable(enabled = fetching.isEmpty()) { app.launch {
+                            fetching = b.str("name")
+                            try {
+                                val r = Api.obj("POST", "/backup/drive/download", body = mapOf("id" to b.str("id"), "name" to b.str("name")))
+                                driveList = null
+                                if (r.int("downloaded") > 0) app.notify("Brought ${r.str("name")} from Google Drive (${r.int("downloaded")} files).")
+                                onRestore(r.str("name"))
+                            } finally { fetching = "" }
+                        } }.padding(vertical = 10.dp)) {
+                            Text(b.str("name"), fontFamily = FontFamily.Monospace)
+                            Hint(if (fetching == b.str("name")) "Downloading…" else if (b.bool("on_device")) "Also on this phone" else "Only in Google Drive")
+                        }
+                        HorizontalDivider()
+                    }
+                }
+            },
+            confirmButton = { TextButton({ driveList = null }, enabled = fetching.isEmpty()) { Text("Close") } })
     }
     Hint(if (connected) "Every backup (Back up now, the daily backup and the backup on leaving) is also uploaded to your Google Drive, into a folder with the backup's name inside BillBox Backups. The copy on this phone stays as well. BillBox can see only the files it made itself in your Drive."
         else "One-time setup (about 5 minutes, free): in console.cloud.google.com make a project, turn on the Google Drive API, set up the consent screen (External; add your Gmail as a test user), then Credentials › Create credentials › OAuth client ID › type “TVs and Limited Input devices”. Download its JSON and import it here (or paste the Client ID and secret), then Connect. A client made a minute ago can take a few minutes before Google knows it. The same keys work on the Mac, iPhone and Android.")
@@ -614,7 +647,7 @@ private fun BackupPage() {
         }
         Hint("Every backup is kept for good; nothing is deleted automatically. While BillBox is open the daily backup runs at its time; when BillBox is closed Android runs it within about an hour of the time. Leaving the app counts as quitting. To keep a copy off the phone, select a backup below and use Save a copy (Drive, a USB drive, Downloads…).")
 
-        DriveSection()
+        DriveSection(onRestore = { n -> restoreTarget = RestoreTarget(name = n, label = n); app.launch { load() } })
 
         SectionHeader("Restore")
         val picked = backups.firstOrNull { it.str("name") in sel }
@@ -869,6 +902,7 @@ private fun PrintOptions() {
     Hint("Leave a line empty to leave it off the bill.")
     SectionHeader("Bank details")
     SwitchRow("Print the bank details", flag("print_bank_block", true), { setFlag("print_bank_block", it) })
+    SwitchRow("Compact totals (more item rows on each page)", flag("print_compact", true), { setFlag("print_compact", it) })
     listOf("bank_name" to "Bank name", "bank_ac_name" to "Account name", "bank_ac_no" to "Account number", "bank_ifsc" to "IFSC code",
         "bank_branch" to "Branch name", "bank_branch_code" to "Branch code", "bank_address" to "Branch address").forEach { (k, title) ->
         SettingField(title, k, "", maxLength = if (k == "bank_address") 200 else 60)

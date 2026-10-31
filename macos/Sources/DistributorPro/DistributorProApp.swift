@@ -39,6 +39,7 @@ struct DistributorProApp: App {
                 .tint(AppTheme.named(themeId).accent)
                 .accentColor(AppTheme.named(themeId).accent)
                 .preferredColorScheme(appearance == "light" ? .light : (appearance == "dark" ? .dark : nil))
+                .modifier(FontChoice())
                 .modifier(InterfaceSizeChoice())
                 .id(themeId)
         }

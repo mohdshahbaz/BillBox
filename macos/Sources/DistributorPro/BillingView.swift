@@ -223,7 +223,7 @@ struct BillLine: Identifiable {
                     }
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(i == highlight ? Color.accentColor.opacity(0.18) : Color.clear)
+                    .background(i == highlight ? Theme.accent.opacity(0.18) : Color.clear)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -482,7 +482,7 @@ struct BillLine: Identifiable {
                     ProgressView().controlSize(.small).opacity(calculating ? 1 : 0)
                 }
                 Text(t.map { Fmt.money($0.total) } ?? "₹0.00")
-                    .font(.system(size: 28, weight: .bold, design: .rounded)).mono().foregroundStyle(Color.accentColor)
+                    .font(.system(size: 28, weight: .bold, design: .rounded)).mono().foregroundStyle(Theme.accent)
                     .lineLimit(1).minimumScaleFactor(0.5)
                 Text("\(lines.count) item\(lines.count == 1 ? "" : "s") · \(lines.reduce(0) { $0 + $1.totalPcs }) pcs").font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 2)

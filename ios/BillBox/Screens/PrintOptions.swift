@@ -92,11 +92,12 @@ import SwiftUI
         } header: { Text("Your own lines") } footer: { Text("Leave a line empty to leave it off the bill. These are saved as you press Save beside each.") }
         Section {
             Toggle("Print the bank details", isOn: flag("print_bank_block", true))
+            Toggle("Compact totals (more item rows on each page)", isOn: flag("print_compact", true))
             ForEach(bankFields, id: \.key) { f in
                 SettingTextField(title: f.title, key: f.key, placeholder: f.key == "bank_address" ? "Branch address" : "", maxLength: f.key == "bank_address" ? 200 : 60)
             }
         } header: { Text("Bank details") } footer: {
-            Text("Printed in three short lines (Bank · A/c name / A/c no. · IFSC / Branch · address) where the bill has room anyway: in the footer of the BillBox design, under the GST classes of the Marg style. Item rows are not reduced. Empty ones are left out.")
+            Text("Printed in three short lines (Bank · A/c name / A/c no. · IFSC / Branch · address) where the bill has room anyway: in the footer. Empty ones are left out. Compact totals: the totals and GST table take only the height they need, the Marg style shows only the bill's GST classes (unless “all” is chosen) and its bank details move to the footer, so more item rows fit on each page.")
         }
     }
 }

@@ -159,12 +159,42 @@ public final class Drive {
         return id
     }
 
+    static func q(_ s: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        return s.addingPercentEncoding(withAllowedCharacters: allowed) ?? s
+    }
+
+    /// Every file or folder BillBox can see in Drive matching a query (drive.file: only what BillBox made with these keys).
+    func search(_ tok: String, _ query: String, _ fields: String = "id,name,createdTime,size") async throws -> [[String: Any]] {
+        var out: [[String: Any]] = [], page = ""
+        repeat {
+            let u = "https://www.googleapis.com/drive/v3/files?q=\(Drive.q(query))&fields=\(Drive.q("nextPageToken,files(\(fields))"))&orderBy=createdTime%20desc&pageSize=200"
+                + (page.isEmpty ? "" : "&pageToken=\(Drive.q(page))")
+            let r = try await call(u, headers: ["authorization": "Bearer \(tok)"])
+            guard r.status == 200, let files = r.json["files"] as? [[String: Any]] else { break }
+            out += files
+            page = r.json["nextPageToken"] as? String ?? ""
+        } while !page.isEmpty
+        return out
+    }
+
+    /// The "BillBox Backups" folders in Drive (one normally; a reinstall used to make another).
+    func findFolders(_ tok: String) async throws -> [[String: Any]] {
+        try await search(tok, "name='\(Drive.FOLDER)' and mimeType='\(Drive.FOLDER_TYPE)' and trashed=false", "id,name,createdTime")
+    }
+
+    /// The "BillBox Backups" folder: the one already in Drive (after a reinstall or on another device), else made.
     func folder(_ tok: String) async throws -> String {
         let id = try await get("drive_folder_id")
         if !id.isEmpty {
             let r = try await call("https://www.googleapis.com/drive/v3/files/\(id.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? id)?fields=id,trashed",
                                    headers: ["authorization": "Bearer \(tok)"])
             if r.status == 200 && !JS.truthy(r.json["trashed"]) { return id }
+        }
+        if let last = try await findFolders(tok).last, let fid = last["id"] as? String {
+            try await set("drive_folder_id", fid)
+            return fid
         }
         let made = try await makeFolder(tok, Drive.FOLDER, nil)
         try await set("drive_folder_id", made)
@@ -215,6 +245,67 @@ public final class Drive {
         return ["folder": name, "files": files.count, "bytes": bytes, "drive_folder": Drive.FOLDER]
     }
 
+    /// The backups in Drive › BillBox Backups, newest first: [{id, name, created, on_device}].
+    func list() async throws -> [Row] {
+        let tok = try await token()
+        var parents = try await findFolders(tok).compactMap { $0["id"] as? String }
+        let own = try await get("drive_folder_id")
+        if !own.isEmpty && !parents.contains(own) { parents.append(own) }
+        var seen = Set<String>(), out: [Row] = []
+        for p in parents {
+            for f in try await search(tok, "'\(p)' in parents and mimeType='\(Drive.FOLDER_TYPE)' and trashed=false", "id,name,createdTime") {
+                let name = f["name"] as? String ?? ""
+                if name.isEmpty || seen.contains(name) { continue }
+                seen.insert(name)
+                out.append(["id": f["id"] as? String ?? "", "name": name, "created": f["createdTime"] as? String ?? ""])
+            }
+        }
+        out.sort { $0.str("name") > $1.str("name") }
+        let local = Set(((try await db { try self.backup.listBackups() }) as? [Row] ?? []).map { $0.str("name") })
+        return out.map { var b = $0; b["on_device"] = local.contains($0.str("name")); return b }
+    }
+
+    /// Downloads one backup from Drive into the backup folder on this device (kept as it is when already there); the usual
+    /// restore (POST /backup/restore {name}) then checks and restores it.
+    func download(_ b: Row) async throws -> Row {
+        let id = JS.truthy(b["id"] ?? nil) ? JS.string(b.v("id")) : ""
+        let name = ((JS.truthy(b["name"] ?? nil) ? JS.string(b.v("name")) : "") as NSString).lastPathComponent
+        if id.isEmpty || name.isEmpty || name.hasPrefix(".") { throw HttpError(400, "Choose a backup from Google Drive.") }
+        let local = ((try await db { try self.backup.listBackups() }) as? [Row] ?? []).map { $0.str("name") }
+        if local.contains(name) { return ["name": name, "downloaded": 0, "on_device": true] }
+        let tok = try await token()
+        let files = try await search(tok, "'\(id)' in parents and trashed=false and mimeType!='\(Drive.FOLDER_TYPE)'", "id,name,size")
+        if files.isEmpty { throw HttpError(404, "The backup \(name) in Google Drive is empty.") }
+        var got: [(String, Data)] = []
+        for f in files {
+            guard let fid = f["id"] as? String, let u = URL(string: "https://www.googleapis.com/drive/v3/files/\(Drive.q(fid))?alt=media"), Category.internetAllowed else { throw Drive.offline() }
+            var req = URLRequest(url: u, timeoutInterval: 300)
+            req.setValue("Bearer \(tok)", forHTTPHeaderField: "authorization")
+            let (data, resp): (Data, URLResponse?) = try await withCheckedThrowingContinuation { c in
+                URLSession.shared.dataTask(with: req) { d, r, e in
+                    if e != nil { c.resume(throwing: Drive.offline()) } else { c.resume(returning: (d ?? Data(), r)) }
+                }.resume()
+            }
+            let st = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            if st != 200 { throw HttpError(502, "Google Drive did not give \(f["name"] as? String ?? "a file") (\(st)).") }
+            got.append(((((f["name"] as? String) ?? fid) as NSString).lastPathComponent, data))
+        }
+        let root = ((try await db { try self.backup.config() }) as? Row)?.str("dir") ?? ""
+        let dir = (root as NSString).appendingPathComponent(name), tmp = dir + ".part"
+        let bytes: Int = try backup.withFolderAccess(root) {
+            let fm = FileManager.default
+            try? fm.removeItem(atPath: tmp)
+            try fm.createDirectory(atPath: tmp, withIntermediateDirectories: true)
+            do {
+                var n = 0
+                for (f, data) in got { try data.write(to: URL(fileURLWithPath: (tmp as NSString).appendingPathComponent(f))); n += data.count }
+                try fm.moveItem(atPath: tmp, toPath: dir)
+                return n
+            } catch { try? fm.removeItem(atPath: tmp); throw error }
+        }
+        return ["name": name, "downloaded": got.count, "bytes": bytes, "on_device": true]
+    }
+
     /// After a backup: upload it too when Drive is connected; a failure is only recorded.
     public func afterBackup(_ folder: String) async {
         guard (try? await get("drive_refresh"))?.isEmpty == false else { return }
@@ -228,6 +319,8 @@ public final class Drive {
         if n == 2 && m == "GET" { return ok(try await status()) }
         guard n == 3 else { return nil }
         switch (m, s[2]) {
+        case ("GET", "list"): return ok(try await list())
+        case ("POST", "download"): return ok(try await download(b))
         case ("PUT", "client"): return ok(try await saveClient(b))
         case ("POST", "connect"): return ok(try await connect())
         case ("POST", "poll"): return ok(try await poll())

@@ -17,6 +17,8 @@ router.put('/backup/drive/client', h((req, res) => res.json(D.saveClient(req.bod
 router.post('/backup/drive/connect', ha(async (req, res) => res.json(await D.connect())));
 router.post('/backup/drive/poll', ha(async (req, res) => res.json(await D.poll())));
 router.post('/backup/drive/disconnect', h((req, res) => res.json(D.disconnect())));
+router.get('/backup/drive/list', ha(async (req, res) => res.json(await D.list())));
+router.post('/backup/drive/download', ha(async (req, res) => res.json(await D.download(req.body || {}))));
 router.post('/backup/drive/upload', ha(async (req, res) => res.json(await D.upload(req.body || {}))));
 
 router.delete('/backup/:name', h((req, res) => { const r = B.deleteBackup(req.params.name); res.json({ ...r, backups: B.listBackups() }); }));

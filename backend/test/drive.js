@@ -21,11 +21,24 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.pathname === '/drive/v3/files' && opts.method === 'POST') {
     const m = JSON.parse(body); const id = 'F' + nextId++; files[id] = m; return json(200, { id });
   }
+  if (u.pathname === '/drive/v3/files' && (opts.method || 'GET') === 'GET') {
+    const q = u.searchParams.get('q');
+    const parent = (q.match(/'([^']+)' in parents/) || [])[1], name = (q.match(/name='([^']+)'/) || [])[1];
+    const wantFolder = /mimeType='application\/vnd.google-apps.folder'/.test(q), noFolder = /mimeType!=/.test(q);
+    const list = Object.entries(files).filter(([, f]) => (!parent || (f.parents && f.parents[0] === parent)) && (!name || f.name === name)
+      && (!wantFolder || f.mimeType === 'application/vnd.google-apps.folder') && (!noFolder || f.mimeType !== 'application/vnd.google-apps.folder'))
+      .map(([id, f]) => ({ id, name: f.name }));
+    return json(200, { files: list });
+  }
+  if (u.pathname.startsWith('/drive/v3/files/') && u.searchParams.get('alt') === 'media') {
+    const id = decodeURIComponent(u.pathname.split('/').pop());
+    return files[id] ? { status: 200, arrayBuffer: async () => files[id].data } : json(404, {});
+  }
   if (u.pathname.startsWith('/drive/v3/files/')) { const id = decodeURIComponent(u.pathname.split('/').pop()); return files[id] ? json(200, { id, trashed: false }) : json(404, {}); }
   if (u.pathname === '/upload/drive/v3/files') {
     assert.match(opts.headers['content-type'], /^multipart\/related; boundary=/);
     const meta = JSON.parse(String(body).split('\r\n\r\n')[1].split('\r\n')[0]);
-    const id = 'F' + nextId++; files[id] = { ...meta, bytes: body.length }; return json(200, { id });
+    const id = 'F' + nextId++; files[id] = { ...meta, bytes: body.length, data: (() => { const b = Buffer.from(body); const sep = Buffer.from('\r\n\r\n'); const start = b.indexOf(sep, b.indexOf(sep) + 4) + 4; return b.subarray(start, b.lastIndexOf(Buffer.from('\r\n--billbox'))); })() }; return json(200, { id });
   }
   return json(404, {});
 };
@@ -79,6 +92,24 @@ const fails = async (fn, status) => { try { await fn(); } catch (e) { return e.s
     const up = Object.values(files).filter((f) => f.parents && f.parents[0] === sub[0]).map((f) => f.name).sort();
     assert.deepStrictEqual(up, fs.readdirSync(b.folder).sort());
     assert.strictEqual(D.status().last_status, 'ok');
+  });
+  await ok('restore from Drive: list shows the backup; download brings it back to this device', async () => {
+    const l = await D.list();
+    assert.ok(l.length >= 1 && l[0].on_device);
+    const name = l[0].name;
+    fs.rmSync(path.join(B.config().dir, name), { recursive: true, force: true });
+    assert.strictEqual((await D.list())[0].on_device, false);
+    const r = await D.download({ id: l[0].id, name });
+    assert.ok(r.downloaded >= 2 && r.on_device);
+    assert.ok(B.listBackups().some((b) => b.name === name && b.files >= 1));
+    const back = B.restore({ name });
+    assert.ok(back.restored.length >= 1);
+  });
+  await ok('a new install finds the BillBox Backups folder already in Drive', async () => {
+    const before = Object.values(files).filter((f) => f.name === 'BillBox Backups').length;
+    require('../src/db').registry.prepare("DELETE FROM app_settings WHERE key='drive_folder_id'").run();
+    await D.upload({});
+    assert.strictEqual(Object.values(files).filter((f) => f.name === 'BillBox Backups').length, before);
   });
   await ok('the Drive folder is made again when it was deleted', async () => {
     delete files.F1;

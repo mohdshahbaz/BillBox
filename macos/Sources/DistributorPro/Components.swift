@@ -229,7 +229,7 @@ struct Choice: Identifiable, Hashable {
     let title: String
     let value: String
     var note: String = ""
-    var tint: Color = .accentColor
+    var tint: Color = Theme.accent
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {

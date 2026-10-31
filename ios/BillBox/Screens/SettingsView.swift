@@ -286,7 +286,7 @@ import UniformTypeIdentifiers
     var body: some View {
         List {
             settingsSection
-            DriveBackupSection()
+            DriveBackupSection(onRestore: { n in Task { await load() }; restoreTarget = RestoreTarget(name: n, label: n) })
             restoreSection
             backupsSection
         }
@@ -643,7 +643,7 @@ struct SettingsRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
-                .frame(width: 30, height: 30).background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .frame(width: 30, height: 30).background(Theme.accent, in: RoundedRectangle(cornerRadius: 7, style: .continuous))   // the theme colour, like every icon
             Text(title)
         }
         .padding(.vertical, 2)

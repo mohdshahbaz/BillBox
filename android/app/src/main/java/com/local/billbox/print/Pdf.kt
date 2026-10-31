@@ -16,6 +16,7 @@ import com.local.billbox.data.J
 import com.local.billbox.ui.balanceText
 import java.io.ByteArrayOutputStream
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -64,7 +65,25 @@ data class Spec(val w: Float, val h: Float, val m: Float, val rowH: Float, val t
     fun scaled(k: Float): Spec = if (k == 1f) this else copy(rowH = rowH * k, tableHead = tableHead * k, foot = foot * k, totals = totals * k,
         strip = strip * k, sellerBand = sellerBand * k, headNext = headNext * k, fs = fs * k)
     /** Room for the bank details under the GST table, when the bill prints them. */
-    fun withBank(co: J): Spec = this   // the bank details now sit in the footer, in the room it already has
+    /** The bank details sit in the footer, in the room it already has. With compact totals (on unless switched off) the
+     *  totals take only the height their lines need, and the rest goes to item rows. */
+    fun withBank(co: J, inv: J = J()): Spec {
+        if (!compactPrint(co)) return this
+        fun on(k: String) = co.str(k).isEmpty() || co.str(k) != "0"
+        val f = fs
+        var n = 1
+        if (inv.num("discount") > 0) n += 2
+        if (inv.num("cgst") > 0) n += 2
+        if (inv.num("igst") > 0) n += 1
+        if (abs(inv.num("round_off")) > 0) n += 1
+        if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) n += 1
+        val right = 4 + n * 9f * f + 4 + 19f * f
+        var left = 8f
+        if (on("print_gst_table")) left += (maxOf(1, inv.list("gst_summary").size) + 1) * 8.5f * f + 1
+        if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) left += 10f * f
+        if (on("print_words")) left += 8f * f + 18f * f
+        return copy(totals = minOf(totals, ceil(maxOf(right, left) + 2)))
+    }
     fun withBankBlock(co: J): Spec {
         val rows = bankRows(co)
         if (rows.isEmpty()) return this
@@ -86,6 +105,9 @@ fun bankRows(co: J): List<Pair<String, String>> =
     if (co.str("print_bank_block") == "0") emptyList() else bankFields.mapNotNull { (k, label) -> co.str(k).trim().takeIf { it.isNotEmpty() }?.let { label to it } }
 
 /** The bank details in at most three short lines of (label, value) pairs (Bank · A/c name / A/c no. · IFSC / Branch · address). */
+/** Settings › Printing › Compact totals (on unless switched off): GST and bank details take less room, for more item rows. */
+fun compactPrint(co: J): Boolean = co.str("print_compact") != "0"
+
 fun bankLines(co: J): List<List<Pair<String, String>>> {
     if (co.str("print_bank_block") == "0") return emptyList()
     fun v(k: String) = co.str(k).trim()
@@ -376,7 +398,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         fun sum(a: String, v: Double) { pen.text(a, rx + 6, ry, rightW - 12, sh, 7 * fs, color = MUTED); pen.text(Fmt.amount(v), rx + 6, ry, rightW - 12, sh, 7.5f * fs, align = 2); ry += sh }
         sum("Items total", inv.num("subtotal"))
         if (inv.num("discount") > 0) sum("Less discount", -inv.num("discount"))
-        sum("Taxable value", inv.num("taxable"))
+        if (!compactPrint(co) || inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005) sum("Taxable value", inv.num("taxable"))
         if (inv.num("cgst") > 0) { sum("CGST", inv.num("cgst")); sum("SGST", inv.num("sgst")) }
         if (inv.num("igst") > 0) sum("IGST", inv.num("igst"))
         if (abs(inv.num("round_off")) > 0) sum("Round off", inv.num("round_off"))
@@ -429,7 +451,7 @@ fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder
     val n = inv.list("lines").size
     val base = (if (layout.isFullPage) Spec.full else Spec.half).scaled(printScale(co))
     val marg = printStyle(co) == "marg"
-    val g = if (marg) margSpec(base, inv, co) else base.withBank(co)
+    val g = if (marg) margSpec(base, inv, co) else base.withBank(co, inv)
     // one copy of one page, in the company's bill design (Settings › Printing › Bill design)
     fun sheet(pen: Pen, r: IntRange, i: Int, n2: Int, label: String, oy: Float = 0f) {
         val c = if (co.str("print_copy_label") == "0") "" else label   // Settings › Printing › ORIGINAL / DUPLICATE on each copy

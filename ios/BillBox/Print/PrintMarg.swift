@@ -62,7 +62,9 @@ func margCols(_ co: JSON, inter: Bool) -> [MargColumn] {
 /// GST classes in the table at the bottom: 5, 12, 18 and 28 always (like Marg) plus any other rate on the bill, or only the bill's.
 func margClasses(_ inv: JSON, _ co: JSON) -> [Double] {
     let used = Set(inv.list("lines").map { $0.num("gst_rate") })
-    let base: Set<Double> = co.str("print_marg_classes") == "used" ? [] : [5, 12, 18, 28]
+    // compact totals: only the bill's classes, unless "all classes" was chosen
+    let only = co.str("print_marg_classes") == "used" || (co.str("print_marg_classes").isEmpty && compactPrint(co))
+    let base: Set<Double> = only ? [] : [5, 12, 18, 28]
     let all = base.union(used)
     return all.isEmpty ? [0] : all.sorted()
 }
@@ -70,10 +72,21 @@ func margClasses(_ inv: JSON, _ co: JSON) -> [Double] {
 /// The page for the Marg design: heights follow the text size, the GST classes and the bank details.
 func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
     let f = base.fs
-    // the bank details go under the GST classes, in room the totals beside them need anyway
-    let bankH: CGFloat = bankLines(co).isEmpty ? 0 : CGFloat(bankLines(co).count) * 8 * f + 4
-    let classH = CGFloat(margClasses(inv, co).count + 2) * 8.6 * f + 4
-    let totals = max(classH + bankH, 9 * 8.6 * f) + 13 * f + 1.2
+    let compact = compactPrint(co)
+    // the bank details go under the GST classes, in room the totals beside them need anyway; compact: in the footer
+    let bankH: CGFloat = bankLines(co).isEmpty || compact ? 0 : CGFloat(bankLines(co).count) * 8 * f + 4
+    let classH = CGFloat(margClasses(inv, co).count + 2) * (compact ? 7.6 : 8.6) * f + 4
+    var totals = max(classH + bankH, 9 * 8.6 * f) + 13 * f + 1.2
+    if compact {
+        // the summary beside the classes: its lines plus GRAND TOTAL
+        let inter = inv.num("igst") > 0
+        var n = 2 + (inter ? 1 : 2)                                          // sub total, round off, the GST lines
+        if inv.num("discount") > 0 { n += 1 }
+        if inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005 { n += 1 }
+        if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { n += 1 }
+        let summary = CGFloat(n) * 8 * f + 4 + 17 * f + 0.6
+        totals = max(classH, summary) + 13 * f + 1.2
+    }
     return Spec(w: base.w, h: base.h, m: base.m, rowH: base.rowH, tableHead: 15 * f, foot: 36 * f, totals: totals,
                 strip: 26 * f, sellerBand: 52 * f, buyerBand: 0, headNext: 18 * f, fs: f, cw: base.cw)
 }
@@ -368,8 +381,8 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
             inter ? [r.label, Fmt.amount(r.taxable), Fmt.amount(r.disc), Fmt.amount(r.igst), Fmt.amount(r.gst), Fmt.amount(r.total)]
                   : [r.label, Fmt.amount(r.taxable), Fmt.amount(r.disc), Fmt.amount(r.sgst), Fmt.amount(r.cgst), Fmt.amount(r.gst), Fmt.amount(r.total)]
         }
-        let rh = 8.6 * g.fs
-        let bank = bankLines(co)
+        let rh = (compactPrint(co) ? 7.6 : 8.6) * g.fs
+        let bank = compactPrint(co) ? [] : bankLines(co)
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
                 // the GST class table
@@ -470,9 +483,14 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
     private var footer: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 1) {
+                let bank = compactPrint(co) ? bankLines(co) : []
                 if on("print_terms") && !co.str("invoice_terms").isEmpty {
-                    t("Terms & Conditions", 8, bold: true).underline()
-                    t(co.str("invoice_terms"), 6.5).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                    t("Terms & Conditions", bank.isEmpty ? 8 : 7, bold: true).underline()
+                    t(co.str("invoice_terms"), 6.5).lineLimit(bank.isEmpty ? 3 : 1).fixedSize(horizontal: false, vertical: true)
+                }
+                // compact totals: the bank details here, in up to three short lines, instead of under the GST classes
+                ForEach(Array(bank.enumerated()), id: \.offset) { _, l in
+                    bankLineText(l, size: 6.2 * g.fs, serif: serif).lineLimit(1).minimumScaleFactor(0.6)
                 }
                 if !co.str("print_bank").isEmpty { t(co.str("print_bank"), 6.5, weight: .semibold).lineLimit(1).minimumScaleFactor(0.7) }
                 if !co.str("print_note").isEmpty { t(co.str("print_note"), 7, bold: true).lineLimit(1).minimumScaleFactor(0.7) }
