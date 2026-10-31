@@ -24,6 +24,17 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.6 — Marg style bill design
+
+- **Settings › Printing › Bill design**: "BillBox (clean, modern)" or **"Marg style"**, laid out like a Marg ERP bill: firm and
+  M/s party side by side, GSTIN | GST INVOICE | Invoice No., Date, Sales Man, Due Date, then Sn. Box Pcs Free Pack Product
+  MRP Exp. HSN Rate Dis SGST CGST Amount, the GST CLASS table with SUB TOTAL … GRAND TOTAL beside it, the amount in words,
+  bank details, and Terms & Conditions | Receiver | Authorised signatory.
+- Marg style choices: colour (Marg blue, black only, green, maroon), serif or modern letters, rate and MRP per box or per
+  piece, all GST classes or only the bill's, each optional column, M/s, due date (party's credit days), receiver box,
+  page number, company e-mail. IGST replaces SGST and CGST on bills to another state.
+- **Preview on my latest bill** shows the chosen design at once.
+
 ## v15.5 — Google Drive backups, bank details on bills, ledger by year, many bills at once
 
 - **Google Drive backups** (Mac, iPhone, Android): Settings › Backup › Google Drive. Sign in once with a short code at
