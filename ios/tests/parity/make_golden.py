@@ -5,6 +5,9 @@ The unit tests replay the same steps on the iOS engine inside the simulator and 
 with what the Mac answered. Run this again whenever the Mac backend changes:  python3 make_golden.py
 Paths inside the steps use {work} (a temporary folder), {engine} and {macbackup} (the bundled Mac backup folder)."""
 import json, os, subprocess, sys, shutil, tempfile, datetime
+# the answers are labelled as recorded in India (meta.json); the Mac engine must work out "today" in that time zone too,
+# whatever this computer's own zone is (otherwise answers recorded between midnight UTC and 05:30 IST carry yesterday)
+os.environ['TZ'] = 'Asia/Kolkata'
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, '../../BillBoxCore/Tests/BillBoxCoreTests/Golden')

@@ -23,6 +23,8 @@ final class GoldenTests: XCTestCase {
 
     override func setUpWithError() throws {
         // the Mac recorded these in India; "today", financial years and printed dates depend on the local day
+        setenv("TZ", "Asia/Kolkata", 1); tzset()   // also for code that asks the system's zone (a simulator on a UTC machine)
+        NSTimeZone.resetSystemTimeZone()
         NSTimeZone.default = TimeZone(identifier: "Asia/Kolkata")!
         Category.internetAllowed = false
         let meta = try ParityCompare.parse(String(contentsOf: Self.golden.appendingPathComponent("meta.json"), encoding: .utf8)) as! [String: Any]

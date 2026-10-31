@@ -505,6 +505,11 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
     /// Terms (and your own lines) on the left, the bank details in the middle, the company's signature block on the right.
     private var footer: some View {
         let bank = bankLines(co)
+        // fixed shares of the width, so long bank lines can never push the terms or the signature off the page
+        let W = g.w - 2 * g.m - 4
+        let sigW: CGFloat = bank.isEmpty ? (W - 16) / 3 : 130 * g.cw
+        let leftW: CGFloat = bank.isEmpty ? (W - 16) / 3 : (W - sigW - 16) * 0.40
+        let midW: CGFloat = W - sigW - leftW - 16
         return HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
                 if on("print_terms") && !co.str("invoice_terms").isEmpty {
@@ -514,12 +519,13 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                 if !co.str("print_bank").isEmpty { t(co.str("print_bank"), 6.5, weight: .semibold).lineLimit(1).minimumScaleFactor(0.7) }
                 if !bank.isEmpty && !co.str("print_note").isEmpty { t(co.str("print_note"), 6.5, bold: true).lineLimit(1).minimumScaleFactor(0.7) }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: leftW, alignment: .leading)
             if bank.isEmpty {
                 VStack(spacing: 1) {
                     if !co.str("print_note").isEmpty { t(co.str("print_note"), 7, bold: true).lineLimit(1).minimumScaleFactor(0.7) }
                     t(pages > 1 ? "Page \(page + 1) of \(pages)" : "", 6.5).foregroundStyle(muted)
                 }
+                .frame(width: midW)
             } else {
                 // the bank details, in three short lines in the footer: no room is taken from the items
                 VStack(alignment: .leading, spacing: 0) {
@@ -528,8 +534,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                     }
                     if pages > 1 { t("Page \(page + 1) of \(pages)", 6).foregroundStyle(muted) }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .layoutPriority(1)
+                .frame(width: midW, alignment: .leading)
             }
             VStack(alignment: .trailing, spacing: 0) {
                 if on("print_signature") {
@@ -538,7 +543,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                     t("Authorised Signatory", 6.5).foregroundStyle(muted)
                 }
             }
-            .frame(maxWidth: bank.isEmpty ? .infinity : 130 * g.cw, alignment: .trailing)
+            .frame(width: sigW, alignment: .trailing)
         }
         .padding(.horizontal, 2).padding(.top, 3)
         .frame(height: g.foot, alignment: .top)
