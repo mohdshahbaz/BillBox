@@ -81,7 +81,7 @@ public final class Backup {
         return ["file": (dest as NSString).lastPathComponent, "bytes": Backup.fileSize(dest), "sha256": try Backup.sha256(dest)]
     }
 
-    private func withFolderAccess<T>(_ dir: String, _ body: () throws -> T) rethrows -> T {
+    func withFolderAccess<T>(_ dir: String, _ body: () throws -> T) rethrows -> T {
         let release = Backup.accessFolder?(dir)
         defer { release?() }
         return try body()

@@ -22,7 +22,7 @@ import AppKit
     var body: some View {
         VStack(spacing: 0) {
             filters
-            SelectionBar(ids: rows.map(\.id), selection: $selection, actionLabel: "Delete selected bills…", busy: busy) { confirmBulkDelete = true }
+            SelectionBar(ids: rows.map(\.id), selection: $selection, actionLabel: "Delete selected bills…", busy: busy, extra: selectedActions) { confirmBulkDelete = true }
             table
             footer
         }
@@ -175,6 +175,27 @@ import AppKit
         return picked.sorted { ($0.str("date"), $0.int("bill_id")) < ($1.str("date"), $1.int("bill_id")) }.map { $0.int("bill_id") }
     }
     private var printLabel: String { printIds.isEmpty ? "Print bills" : "Print \(printIds.count) bill\(printIds.count == 1 ? "" : "s")" }
+
+    /// Buttons for the ticked bills (sale bills only: print, mark printed, send each on WhatsApp).
+    private var selectedActions: AnyView {
+        let sales = rows.filter { selection.contains($0.id) && $0.str("type") == "SALE" }
+            .sorted { ($0.str("date"), $0.int("bill_id")) < ($1.str("date"), $1.int("bill_id")) }.map { $0.int("bill_id") }
+        return AnyView(HStack(spacing: 12) {
+            Button { Task { await printInvoices(sales, app: app) } } label: { Label("Print \(sales.count)", systemImage: "printer") }
+            Button { markPrinted(sales, app: app); app.notify("\(sales.count) bill\(sales.count == 1 ? "" : "s") marked printed."); Task { await pause(ms: 400); await load() } } label: {
+                Label("Mark printed", systemImage: "checkmark.seal")
+            }
+            Button {
+                Task {
+                    busy = true
+                    for id in sales { await WhatsApp.send(id, app: app, quiet: true) }
+                    busy = false
+                    app.notify("Sent \(sales.count) bill\(sales.count == 1 ? "" : "s") on WhatsApp.")
+                }
+            } label: { Label("WhatsApp", systemImage: "paperplane") }
+        }
+        .disabled(sales.isEmpty || busy))
+    }
 
     private func printSelected() async {
         let ids = printIds

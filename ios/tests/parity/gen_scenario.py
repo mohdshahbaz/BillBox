@@ -345,6 +345,12 @@ put('/companies/1', {'name': 'AK  Enterprises'}); get('/companies')
 get('/items', company=2); post('/items', {'name': 'Only In Second', 'gst_rate': 18}, company=2); get('/items', company=2); get('/fy', company=2)
 put('/companies/2', {'company_gstin': '', 'invoice_terms': 'Updated'}); get('/companies')
 
+# ---------------- Google Drive backups (offline here: both engines answer the same)
+get('/backup/drive'); post('/backup/drive/connect'); post('/backup/drive/poll'); post('/backup/drive/upload')
+put('/backup/drive/client', {'client_id': 'abc', 'client_secret': 'x'}); put('/backup/drive/client', {'client_id': '1-a.apps.googleusercontent.com'})
+put('/backup/drive/client', {'client_id': ' 1-a.apps.googleusercontent.com ', 'client_secret': ' s '})
+post('/backup/drive/connect'); post('/backup/drive/upload'); post('/backup/drive/disconnect'); get('/backup/drive'); post('/backup/drive/nope')
+
 # ---------------- deleting a company (a throwaway one, so the books above stay for the backup tests)
 post('/companies', {'name': 'Temp Traders'}); get('/companies')
 post('/companies/5/delete', {}); post('/companies/5/delete', {'confirm': 'Wrong Name'}); post('/companies/99/delete', {'confirm': 'x'})

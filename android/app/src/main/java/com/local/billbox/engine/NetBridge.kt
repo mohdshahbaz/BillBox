@@ -7,7 +7,7 @@ import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Internet look-ups for the engine (category guesses, price lists): plain HTTPS from the app, any site. */
+/** Internet look-ups for the engine (category guesses, price lists, Google Drive backups): plain HTTPS from the app, any site. */
 class NetBridge {
     companion object {
         /** Set by the emulator self-test: the Mac run it is compared with has no internet either. */
@@ -27,6 +27,13 @@ class NetBridge {
         c.readTimeout = t
         c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
         opts.optJSONObject("headers")?.let { h -> h.keys().forEach { k -> c.setRequestProperty(k, h.getString(k)) } }
+        // a request body (Google Drive: sign-in forms and backup uploads)
+        opts.optString("b64", "").takeIf { it.isNotEmpty() }?.let { b ->
+            val bytes = Base64.decode(b, Base64.DEFAULT)
+            c.doOutput = true
+            c.setFixedLengthStreamingMode(bytes.size)
+            c.outputStream.use { it.write(bytes) }
+        }
         val status = c.responseCode
         val stream = if (status >= 400) c.errorStream else c.inputStream
         val out = ByteArrayOutputStream()

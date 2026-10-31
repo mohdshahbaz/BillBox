@@ -29,7 +29,8 @@ enum API {
         if watched.contains(where: { path.hasPrefix($0) }) { onItemsChanged?() }
     }
 
-    static func send(_ method: String, _ path: String, query: [String: Any?] = [:], body: Any? = nil) async throws -> (Data, Any?) {
+    /// `company`: another company's books for this one request (an earlier year kept in its own file); nil = the open one.
+    static func send(_ method: String, _ path: String, query: [String: Any?] = [:], body: Any? = nil, company: Int? = nil) async throws -> (Data, Any?) {
         guard var comps = URLComponents(string: root + path) else { throw APIError(message: "Bad address \(path)", status: 0, code: nil) }
         var q = query
         if q["fy"] == nil, let fy { q["fy"] = fy }
@@ -43,7 +44,7 @@ enum API {
         req.httpMethod = method
         req.timeoutInterval = 180
         req.setValue("application/json", forHTTPHeaderField: "content-type")
-        if let id = companyId { req.setValue("\(id)", forHTTPHeaderField: "x-company-id") }
+        if let id = company ?? companyId { req.setValue("\(id)", forHTTPHeaderField: "x-company-id") }
         if let body { req.httpBody = try JSONSerialization.data(withJSONObject: body) }
         let data: Data
         let resp: URLResponse
@@ -63,14 +64,14 @@ enum API {
     }
 
     /// A JSON object reply.
-    static func obj(_ method: String = "GET", _ path: String, query: [String: Any?] = [:], body: [String: Any?]? = nil) async throws -> JSON {
-        let (_, p) = try await send(method, path, query: query, body: body.map(clean))
+    static func obj(_ method: String = "GET", _ path: String, query: [String: Any?] = [:], body: [String: Any?]? = nil, company: Int? = nil) async throws -> JSON {
+        let (_, p) = try await send(method, path, query: query, body: body.map(clean), company: company)
         return JSON((p as? [String: Any]) ?? [:])
     }
 
     /// A JSON array reply.
-    static func list(_ path: String, query: [String: Any?] = [:]) async throws -> [JSON] {
-        let (_, p) = try await send("GET", path, query: query)
+    static func list(_ path: String, query: [String: Any?] = [:], company: Int? = nil) async throws -> [JSON] {
+        let (_, p) = try await send("GET", path, query: query, company: company)
         return JSON.rows(p)
     }
 

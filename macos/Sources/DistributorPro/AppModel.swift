@@ -182,6 +182,22 @@ final class AppModel: ObservableObject {
         return out
     }
 
+    /// A party's ledger for one financial year. A year kept in its own file has its own copy of the party: it is found there
+    /// by name (Parties › ledger › Year).
+    func ledger(for party: JSON, year: String) async throws -> JSON {
+        let choice = yearChoices.first { $0.label == year }
+        if choice == nil || choice!.bookId == companyId {
+            return try await API.obj("GET", "/parties/\(party.id)/ledger", query: ["fy": year])
+        }
+        let book = choice!.bookId
+        let name = party.str("name").lowercased()
+        let found = try await API.list("/parties", query: ["q": party.str("name"), "fy": year], company: book)
+        guard let p = found.first(where: { $0.str("name").lowercased() == name }) else {
+            throw APIError(message: "\(party.str("name")) is not in the FY \(year) books.", status: 0, code: nil)
+        }
+        return try await API.obj("GET", "/parties/\(p.id)/ledger", query: ["fy": year], company: book)
+    }
+
     func chooseYear(_ y: YearChoice) async {
         if y.bookId != companyId { await switchCompany(y.bookId) }
         if !y.label.isEmpty { setYear(y.label) }

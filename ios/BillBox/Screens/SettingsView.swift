@@ -269,6 +269,7 @@ import UniformTypeIdentifiers
     var body: some View {
         List {
             settingsSection
+            DriveBackupSection()
             restoreSection
             backupsSection
         }

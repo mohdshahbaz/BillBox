@@ -251,6 +251,8 @@ struct Choice: Identifiable, Hashable {
     @Binding var selection: Set<ID>
     var actionLabel = "Delete selected…"
     var busy = false
+    /// More buttons for the ticked rows (print, mark printed, WhatsApp…), shown before Delete.
+    var extra: AnyView? = nil
     let action: () -> Void
 
     var body: some View {
@@ -261,6 +263,7 @@ struct Choice: Identifiable, Hashable {
                     selection = selection.count == ids.count ? [] : Set(ids)
                 }
                 Spacer()
+                if let extra { extra }
                 Button(role: .destructive) { action() } label: { Label(actionLabel, systemImage: "trash") }
                     .disabled(busy)
             }

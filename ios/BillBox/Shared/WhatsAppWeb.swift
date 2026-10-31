@@ -174,6 +174,8 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         status = "Asking WhatsApp for a link code…"
         watcher?.cancel()
         _ = ensure()
+        // linking runs with the page on screen: WhatsApp can refuse a page that is hidden while it links
+        showing = true
         let state = await pageState()
         if state == "chats" || state == "composer" { connected = true; status = "Already connected"; return }
         if state != "qr" && state != "code" { await load("https://web.whatsapp.com/") }
@@ -188,7 +190,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         if r.hasPrefix("code:") {
             let c = String(r.dropFirst(5)).uppercased().filter { $0.isLetter || $0.isNumber }
             linkCode = c.count == 8 ? String(c.prefix(4)) + "-" + String(c.suffix(4)) : c
-            status = "Type the code on your phone: WhatsApp › Settings › Linked devices › Link a device › Link with phone number instead"
+            status = "Code \(linkCode) — on your phone: WhatsApp › Settings › Linked devices › Link a device › Link with phone number instead, and type it"
             watchLink()
         } else {
             status = r.hasPrefix("page:") ? "WhatsApp did not offer the phone-number login. The page shows: \(r.dropFirst(5).trimmingCharacters(in: .whitespaces)). Use Show page to see it." : "WhatsApp did not give a code (\(r)). Use Show page and tap “Log in with phone number” there."

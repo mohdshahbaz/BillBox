@@ -133,7 +133,11 @@ function tick(now = new Date()) {
   const today = now.toLocaleDateString('en-CA');
   const lastDay = c.last_run ? new Date(c.last_run).toLocaleDateString('en-CA') : '';
   if (hhmm >= c.time && lastDay !== today) {
-    try { return backupNow({ reason: 'scheduled' }); } catch (e) { console.error('Scheduled backup failed:', e.message); }
+    try {
+      const r = backupNow({ reason: 'scheduled' });
+      require('./drive').afterBackup(r.folder); // to Google Drive too, when connected (in the background)
+      return r;
+    } catch (e) { console.error('Scheduled backup failed:', e.message); }
   }
   return null;
 }

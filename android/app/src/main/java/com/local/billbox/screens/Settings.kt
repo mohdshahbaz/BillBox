@@ -433,6 +433,94 @@ private fun istStatus(s: String): String {
 
 private data class RestoreTarget(val name: String? = null, val folder: String? = null, val file: String? = null, val label: String)
 
+/**
+ * Settings › Backup › Google Drive: every backup also goes into "BillBox Backups" in the user's Google Drive. Sign-in is
+ * Google's code sign-in (a short code entered at google.com/device); the engine does the rest (services/drive.js).
+ */
+@Composable
+private fun DriveSection() {
+    val app = LocalApp.current
+    var status by remember { mutableStateOf(J()) }
+    var clientId by remember { mutableStateOf("") }
+    var secret by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf(false) }
+    var code by remember { mutableStateOf("") }
+    var link by remember { mutableStateOf("https://www.google.com/device") }
+    var every by remember { mutableIntStateOf(5) }
+    var until by remember { mutableStateOf(0L) }
+    var busy by remember { mutableStateOf(false) }
+    suspend fun load() { try { status = Api.get("/backup/drive") } catch (_: Exception) {} }
+    LaunchedEffect(Unit) { load() }
+    LaunchedEffect(code) {
+        if (code.isEmpty()) return@LaunchedEffect
+        while (System.currentTimeMillis() < until) {
+            kotlinx.coroutines.delay(every * 1000L)
+            try {
+                if (Api.obj("POST", "/backup/drive/poll", body = emptyMap<String, Any>()).bool("connected")) {
+                    code = ""; load(); app.notify("Google Drive connected. Backups now also go to Drive › BillBox Backups."); return@LaunchedEffect
+                }
+            } catch (e: Exception) {
+                if ((e as? com.local.billbox.data.ApiError)?.code == "OFFLINE") continue
+                code = ""; app.notify(e.message ?: "Google did not connect.", true); load(); return@LaunchedEffect
+            }
+        }
+        code = ""; app.notify("The code ran out. Press Connect Google Drive again.", true)
+    }
+    val connected = status.bool("connected")
+    val hasKeys = status.str("client_id").isNotEmpty() && status.bool("has_secret")
+    SectionHeader("Google Drive")
+    Text(if (connected) "Connected: backups also go to Google Drive › BillBox Backups" else if (code.isEmpty()) "Not connected" else "Waiting for Google…", fontWeight = FontWeight.Medium,
+        color = if (connected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurface)
+    if (connected && status.str("last_upload").isNotEmpty()) Hint("Last upload: ${status.str("last_upload")} · ${if (status.str("last_status") == "ok") "done" else status.str("last_status")}")
+    else if (connected && status.str("last_status").startsWith("failed")) Hint(status.str("last_status"), color = MaterialTheme.colorScheme.error)
+    if (code.isNotEmpty()) {
+        Text("1. Open google.com/device on any phone or computer.\n2. Enter this code and allow BillBox:")
+        Text(code, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { com.local.billbox.system.Platform.openUrl(link) }) { Text("Open google.com/device") }
+            OutlinedButton(onClick = { com.local.billbox.ui.copyText(code); app.notify("Code copied.") }) { Text("Copy code") }
+            TextButton(onClick = { code = "" }) { Text("Cancel") }
+        }
+    } else if (connected) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { app.launch {
+                busy = true
+                try { val r = Api.obj("POST", "/backup/drive/upload", body = emptyMap<String, Any>()); app.notify("Uploaded ${r.str("folder")} to Google Drive (${r.int("files")} files).") }
+                finally { busy = false; load() }
+            } }, enabled = !busy) { Text(if (busy) "Uploading…" else "Upload the newest backup now") }
+            OutlinedButton(onClick = { app.launch {
+                status = Api.obj("POST", "/backup/drive/disconnect", body = emptyMap<String, Any>())
+                app.notify("Google Drive disconnected. Backups stay on this phone; the copies already in Drive are not touched.")
+            } }, enabled = !busy) { Text("Disconnect") }
+        }
+    } else if (hasKeys && !editing) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { app.launch {
+                busy = true
+                try {
+                    val r = Api.obj("POST", "/backup/drive/connect", body = emptyMap<String, Any>())
+                    if (r.str("verification_url").isNotEmpty()) link = r.str("verification_url")
+                    every = maxOf(5, r.int("interval")); until = System.currentTimeMillis() + maxOf(60, r.int("expires_in")) * 1000L
+                    code = r.str("user_code")
+                } finally { busy = false }
+            } }, enabled = !busy) { Text(if (busy) "Connecting…" else "Connect Google Drive") }
+            TextButton(onClick = { editing = true; clientId = status.str("client_id") }) { Text("Change Google keys…") }
+        }
+    } else {
+        Field("Client ID (…apps.googleusercontent.com)", clientId, { clientId = it })
+        Field("Client secret", secret, { secret = it })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { app.launch {
+                status = Api.obj("PUT", "/backup/drive/client", body = mapOf("client_id" to clientId, "client_secret" to secret))
+                editing = false; secret = ""; app.notify("Google keys saved. Now press Connect Google Drive.")
+            } }, enabled = clientId.isNotBlank() && secret.isNotBlank()) { Text("Save keys") }
+            if (hasKeys) OutlinedButton(onClick = { editing = false }) { Text("Cancel") }
+        }
+    }
+    Hint(if (connected) "Every backup (Back up now, the daily backup and the backup on leaving) is also uploaded to your Google Drive, into a folder with the backup's name inside BillBox Backups. The copy on this phone stays as well. BillBox can see only the files it made itself in your Drive."
+        else "One-time setup (about 5 minutes, free): in console.cloud.google.com make a project, turn on the Google Drive API, set up the consent screen (External; add your Gmail as a test user), then Credentials › Create credentials › OAuth client ID › type “TVs and Limited Input devices”. Paste its Client ID and secret here, then Connect. The same keys work on the Mac, iPhone and Android.")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BackupPage() {
@@ -513,6 +601,8 @@ private fun BackupPage() {
             } }, enabled = !busy) { Text(if (busy) "Backing up…" else "Back up now") }
         }
         Hint("Every backup is kept for good; nothing is deleted automatically. While BillBox is open the daily backup runs at its time; when BillBox is closed Android runs it within about an hour of the time. Leaving the app counts as quitting. To keep a copy off the phone, select a backup below and use Save a copy (Drive, a USB drive, Downloads…).")
+
+        DriveSection()
 
         SectionHeader("Restore")
         val picked = backups.firstOrNull { it.str("name") in sel }
@@ -726,9 +816,16 @@ private fun PrintOptions() {
     if (app.setting("print_triplicate") == "1") SettingField("Third copy label", "print_copy3", "TRIPLICATE FOR ASSESSEE")
     SectionHeader("Your own lines")
     SettingField("Line under the company name", "print_tagline", "e.g. Distributor of Parle, Bikano", maxLength = 80)
-    SettingField("Bank details", "print_bank", "e.g. SBI A/c 1234… IFSC SBIN0001234 · UPI ak@upi", maxLength = 120)
+    SettingField("Payment line at the bottom", "print_bank", "e.g. UPI ak@upi", maxLength = 120)
     SettingField("Note at the bottom", "print_note", "e.g. Thank you for your business", maxLength = 60)
     Hint("Leave a line empty to leave it off the bill.")
+    SectionHeader("Bank details")
+    SwitchRow("Print the bank details", flag("print_bank_block", true), { setFlag("print_bank_block", it) })
+    listOf("bank_name" to "Bank name", "bank_ac_name" to "Account name", "bank_ac_no" to "Account number", "bank_ifsc" to "IFSC code",
+        "bank_branch" to "Branch name", "bank_branch_code" to "Branch code", "bank_address" to "Branch address").forEach { (k, title) ->
+        SettingField(title, k, "", maxLength = if (k == "bank_address") 200 else 60)
+    }
+    Hint("Printed above the amount in words, one per line (BANK NAME:, ACCOUNT NAME:, ACCOUNT NUMBER:, IFSC CODE:, BRANCH NAME:, BRANCH CODE:, ADDRESS:). Empty ones are left out; a bill with bank details has a few rows less room for items.")
 }
 
 /**

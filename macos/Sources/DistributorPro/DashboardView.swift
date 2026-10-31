@@ -248,7 +248,8 @@ import SwiftUI
                 }
                 Text(title).font(.subheadline).foregroundStyle(.secondary)
                 Text(value).font(.system(.title2, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.5)
-                Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                // two lines kept for every note, so all cards are the same height
+                Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(minHeight: 30, alignment: .topLeading)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)

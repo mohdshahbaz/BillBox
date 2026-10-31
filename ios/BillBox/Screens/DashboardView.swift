@@ -252,12 +252,13 @@ import SwiftUI
                     Spacer()
                     Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                 }
-                Text(title).font(.subheadline).foregroundStyle(.secondary)
+                Text(title).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                 Text(value).font(.system(.title2, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.5)
-                Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                // two lines kept for every note, so all cards are the same height and line up row by row
+                Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(2, reservesSpace: true)
             }
             .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             .card(14)
             .contentShape(Rectangle())
         }

@@ -46,6 +46,14 @@ async function createMissing(parsed, { online = true } = {}) {
       }
       sup.matched_party_id = p.id; sup.matched_name = p.name; sup.created = createdSupplier;
     }
+    // a supplier already in Parties (matched by GSTIN or a similar name): details missing there are filled in from the bill
+    if (sup && sup.matched_party_id && !createdSupplier) {
+      const fill = db.prepare(`UPDATE parties SET gstin=COALESCE(NULLIF(gstin,''),?), phone=COALESCE(NULLIF(phone,''),?), tel=COALESCE(NULLIF(tel,''),?),
+        mobiles=COALESCE(NULLIF(mobiles,''),?), address=COALESCE(NULLIF(address,''),?), fssai=COALESCE(NULLIF(fssai,''),?), pan=COALESCE(NULLIF(pan,''),?),
+        email=COALESCE(NULLIF(email,''),?) WHERE id=?`);
+      fill.run(sup.gstin || null, sup.phone || null, sup.tel || null, (sup.mobiles || []).join(', ') || null, sup.address || null,
+        sup.fssai || null, sup.pan || null, sup.email || null, sup.matched_party_id);
+    }
 
     // items
     const made = new Map();

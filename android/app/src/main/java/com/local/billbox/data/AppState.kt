@@ -180,6 +180,16 @@ class AppState(private val context: Context) {
         return out
     }
 
+    /** A party's ledger for one financial year; a year kept in its own file has its own copy of the party, found there by name. */
+    suspend fun ledger(party: J, year: String): J {
+        val choice = yearChoices.firstOrNull { it.label == year }
+        if (choice == null || choice.bookId == companyId) return Api.get("/parties/${party.id}/ledger", mapOf("fy" to year))
+        val name = party.str("name").lowercase()
+        val p = Api.list("/parties", mapOf("q" to party.str("name"), "fy" to year), company = choice.bookId).firstOrNull { it.str("name").lowercase() == name }
+            ?: throw Exception("${party.str("name")} is not in the FY $year books.")
+        return Api.get("/parties/${p.id}/ledger", mapOf("fy" to year), company = choice.bookId)
+    }
+
     suspend fun chooseYear(y: YearChoice) {
         if (y.bookId != companyId) switchCompany(y.bookId)
         if (y.label.isNotEmpty()) setYear(y.label)

@@ -70,10 +70,33 @@ struct Spec {
                              strip: strip * k, sellerBand: sellerBand * k, buyerBand: buyerBand, headNext: headNext * k, fs: fs * k, cw: cw)
     }
 
+    /// Room for the bank details under the GST table (Settings › Printing › Bank details), when the bill prints them.
+    func withBank(_ co: JSON) -> Spec {
+        let rows = bankRows(co)
+        guard !rows.isEmpty else { return self }
+        let extra = CGFloat(rows.count) * 8.4 * fs + (rows.contains { $0.0 == "ADDRESS" && $0.1.count > 70 } ? 8.4 * fs : 0) + 4
+        return Spec(w: w, h: h, m: m, rowH: rowH, tableHead: tableHead, foot: foot, totals: totals + extra,
+                    strip: strip, sellerBand: sellerBand, buyerBand: buyerBand, headNext: headNext, fs: fs, cw: cw)
+    }
+
     static let half = Spec(w: 595.276, h: 420.945, m: 20, rowH: 12, tableHead: 15, foot: 26, totals: 91,
                            strip: 15, sellerBand: 56, buyerBand: 0, headNext: 18, fs: 1, cw: 1)
     static let full = Spec(w: 595.276, h: 841.89, m: 34, rowH: 16, tableHead: 20, foot: 32, totals: 112,
                            strip: 19, sellerBand: 68, buyerBand: 0, headNext: 24, fs: 1.15, cw: 1.0)
+}
+
+/// The bank details printed above the amount in words, one per line, in this order; empty ones are left out.
+let bankFields: [(key: String, label: String, title: String)] = [
+    ("bank_name", "BANK NAME", "Bank name"), ("bank_ac_name", "ACCOUNT NAME", "Account name"), ("bank_ac_no", "ACCOUNT NUMBER", "Account number"),
+    ("bank_ifsc", "IFSC CODE", "IFSC code"), ("bank_branch", "BRANCH NAME", "Branch name"), ("bank_branch_code", "BRANCH CODE", "Branch code"),
+    ("bank_address", "ADDRESS", "Branch address"),
+]
+func bankRows(_ co: JSON) -> [(String, String)] {
+    if co.str("print_bank_block") == "0" { return [] }
+    return bankFields.compactMap { f in
+        let v = co.str(f.key).trimmingCharacters(in: .whitespacesAndNewlines)
+        return v.isEmpty ? nil : (f.label, v)
+    }
 }
 
 /// Splits n item rows into pages (row index ranges, always at least one page).
@@ -234,7 +257,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             VStack(alignment: .leading, spacing: 1) {
                 // the buyer stands out: "Bill to" and the party in bold, larger than the seller's details
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    t(hc(inv.str("doc_title") == "DEBIT NOTE" ? "Supplier" : "Bill to"), 7.5, bold: true)
+                    t(hc(inv.str("doc_title") == "DEBIT NOTE" ? "Supplier:" : "Bill to:"), 7.5, bold: true)
                     t(hc(inv.str("party_name").isEmpty ? "Cash customer" : inv.str("party_name")), 11.5, bold: true).lineLimit(1).minimumScaleFactor(0.6)
                 }
                 ForEach(Array(buyerLines.enumerated()), id: \.offset) { _, l in
@@ -359,6 +382,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             VStack(alignment: .leading, spacing: 1.5) {
                 if on("print_gst_table") { gstTable }
                 Spacer(minLength: 2)
+                bankBlock
                 if co.str("print_balance") == "1" && inv.has("party_prev_balance") {
                     t("Previous balance \(balanceText(inv.num("party_prev_balance")))   ·   This bill \(Fmt.money(inv.num("total") - inv.num("paid")))   ·   Now due \(balanceText(inv.num("party_balance_after")))", 6.5, weight: .semibold)
                         .lineLimit(1).minimumScaleFactor(0.6)
@@ -376,6 +400,22 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                 .overlay(alignment: .leading) { vRule(frameLine) }
         }
         .frame(height: g.totals, alignment: .top)
+    }
+
+    /// Bank details, one per line with the labels lined up (BANK NAME:, ACCOUNT NUMBER: …).
+    @ViewBuilder private var bankBlock: some View {
+        let rows = bankRows(co)
+        if !rows.isEmpty {
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        t(r.0 + ":", 6.5, bold: true).frame(width: 74 * g.cw, alignment: .leading)
+                        t(r.1, 7, weight: .semibold).lineLimit(r.0 == "ADDRESS" ? 2 : 1).minimumScaleFactor(0.75).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .padding(.bottom, 2)
+        }
     }
 
     /// Rate-wise GST: one row per GST rate on the bill.
@@ -506,7 +546,7 @@ func renderPDF(pages: [AnyView], size: CGSize) -> PDFDocument? {
 @MainActor
 func invoicePDF(_ inv: JSON, company: JSON, layout: PrintLayout) -> PDFDocument? {
     let n = inv.list("lines").count
-    let g: Spec = (layout.isFullPage ? Spec.full : Spec.half).scaled(printScale(company))
+    let g: Spec = (layout.isFullPage ? Spec.full : Spec.half).scaled(printScale(company)).withBank(company)
     if layout == .a4TwoUp && paginate(n, g).count == 1 {
         return renderPDF(pages: [AnyView(TwoUpView(inv: inv, co: company, g: g))], size: CGSize(width: g.w, height: g.h * 2))
     }

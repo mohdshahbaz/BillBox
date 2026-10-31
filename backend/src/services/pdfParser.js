@@ -210,11 +210,43 @@ function rowByNumbers(line) {
   return { description: desc, hsn: hsnTok ? hsnTok.raw : null, qty: best.q, unit, rate: best.r, amount: best.a, tax_hint: null };
 }
 
+// Words that say nothing about which item or supplier it is
+const NOISE = new Set(['pkt', 'pkts', 'pcs', 'pc', 'mrp', 'rs', 'new', 'pvt', 'ltd', 'private', 'limited', 'co', 'the', 'and', 'ms']);
+/** Spelling variants read alike: bhujiya / bhujia / bujia, papad / paapad, namkeen / namkin. Words with digits stay as they are. */
+const soft = (t) => (/^[a-z]+$/.test(t)
+  ? t.replace(/([bdgjkpt])h/g, '$1').replace(/iya$/, 'ia').replace(/ee/g, 'i').replace(/oo/g, 'u').replace(/(.)\1+/g, '$1') : t);
+/** Sizes written alike: "200 GM", "200gms", "200 g" -> 200g; kg and ml the same way. */
+const sizes = (s) => String(s || '').replace(/(\d+(?:\.\d+)?)\s*(?:grams|gram|gms|grm|gm|g)\b/gi, '$1g')
+  .replace(/(\d+(?:\.\d+)?)\s*(?:kgs|kg)\b/gi, '$1kg').replace(/(\d+(?:\.\d+)?)\s*(?:mls|ml)\b/gi, '$1ml');
+/** The weight or volume in a name ("200g", "1kg", "500ml"), or null. */
+const weightOf = (s) => { const m = /(?:^| )(\d+(?:\.\d+)?(?:g|kg|ml))(?= |$)/.exec(norm(sizes(s))); return m ? m[1] : null; };
+const wordsOf = (s) => [...new Set(norm(sizes(s)).split(' ').filter((t) => t.length > 1 && !NOISE.has(t)).map(soft))];
+/** At most one letter added, dropped or changed. */
+function oneEdit(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, d = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++d > 1) return false;
+    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+  }
+  return d + (a.length - i) + (b.length - j) <= 1;
+}
+function wordMatch(a, b) {
+  if (a === b) return 1;
+  const alpha = /^[a-z]+$/.test(a) && /^[a-z]+$/.test(b);
+  if (!alpha) return 0;
+  if (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a))) return 0.9;   // a shortened word
+  if (Math.min(a.length, b.length) >= 5 && oneEdit(a, b)) return 0.85;                          // one letter off
+  return 0;
+}
+/** How alike two names are (0-1): each word of one finds its best match in the other, spelling variants counting nearly as much. */
 const similarity = (a, b) => {
-  const A = tokensOf(a), B = tokensOf(b);
-  if (!A.size || !B.size) return 0;
-  let hit = 0; for (const t of A) if (B.has(t)) hit++;
-  return hit / Math.max(A.size, B.size);
+  const A = wordsOf(a), B = wordsOf(b);
+  if (!A.length || !B.length) return 0;
+  let hit = 0;
+  for (const t of A) { let m = 0; for (const u of B) { const v = wordMatch(t, u); if (v > m) m = v; } hit += m; }
+  return hit / Math.max(A.length, B.length);
 };
 function bestMatch(text, list, hsn) {
   let best = null, score = 0;
@@ -222,6 +254,8 @@ function bestMatch(text, list, hsn) {
   for (const x of list) {
     const have = sizeTokens(x.name);
     if ((want.pack && have.pack && want.pack !== have.pack) || (want.mrp && have.mrp && want.mrp !== have.mrp)) continue; // a different pack of the same brand
+    const wa = weightOf(text), wb = weightOf(x.name);
+    if (wa && wb && wa !== wb) continue;                                                                                 // 200g is not 400g
     let s = similarity(text, x.name);
     if (hsn && x.hsn && String(x.hsn) === String(hsn)) s += 0.25;
     if (s > score) { score = s; best = x; }

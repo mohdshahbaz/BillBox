@@ -15,8 +15,8 @@ android {
         minSdk = 31          // Android 12 and up
         targetSdk = 34
         // GitHub releases set these from the tag (v15.2.0 → 15.2.0, code 150200); ./build.sh keeps the defaults
-        versionCode = (project.findProperty("billboxVersionCode") as String?)?.toIntOrNull() ?: 1540
-        versionName = (project.findProperty("billboxVersionName") as String?) ?: "15.4"
+        versionCode = (project.findProperty("billboxVersionCode") as String?)?.toIntOrNull() ?: 1550
+        versionName = (project.findProperty("billboxVersionName") as String?) ?: "15.5"
     }
 
     signingConfigs {

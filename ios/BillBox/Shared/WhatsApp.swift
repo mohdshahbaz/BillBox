@@ -44,6 +44,18 @@ enum WhatsApp {
             .replacingOccurrences(of: "{invoice}", with: inv.str("invoice_no"))
             .replacingOccurrences(of: "{total}", with: Fmt.money(inv.num("total")))
             .replacingOccurrences(of: "{company}", with: app.companyName)
+        if !useWeb {
+            // through the WhatsApp app: the bill's PDF goes to the share sheet (WhatsApp › the customer › Send); the message is
+            // copied so it can be pasted as the caption
+            guard let data = invoicePDF(inv, company: company, layout: single)?.dataRepresentation(),
+                  let url = Files.temp(inv.str("invoice_no").replacingOccurrences(of: "/", with: "-") + ".pdf", data) else {
+                app.notify("Could not prepare the bill for WhatsApp.", error: true); return
+            }
+            UIPasteboard.general.string = text
+            app.notify("Choose WhatsApp, then \(who) (+\(phone)). The message is copied: paste it as the caption.")
+            Files.share(url)
+            return
+        }
         do {
             // the bill is drawn while WhatsApp Web opens the customer's chat
             try await WhatsAppWeb.shared.send(pdf: { invoicePDF(inv, company: company, layout: single)?.dataRepresentation() }, fileName: inv.str("invoice_no").replacingOccurrences(of: "/", with: "-"), phone: phone, caption: text)
@@ -76,6 +88,14 @@ enum WhatsApp {
         }
     }
 
+    /// How bills go out on this iPhone: "web" = WhatsApp Web inside BillBox (automatic, needs linking once), "app" = the
+    /// WhatsApp app through the share sheet (two taps, nothing to link). Until chosen: Web once it is linked, else the app.
+    static var method: String {
+        get { UserDefaults.standard.string(forKey: "wa_method") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "wa_method") }
+    }
+    static var useWeb: Bool { method == "web" || (method.isEmpty && WhatsAppWeb.shared.connected) }
+
     static let defaultMessage = "Hello {name}, thank you for your purchase. Your bill {invoice} for {total} is attached. - {company}"
 }
 
@@ -87,10 +107,20 @@ enum WhatsApp {
     @State private var message = ""
     @State private var testNumber = ""
     @State private var linkNumber = WhatsAppWeb.linkNumber
+    @State private var methodTick = 0
     @State private var loaded = false
 
     var body: some View {
         Form {
+            Section {
+                Picker("Send bills with", selection: Binding(get: { WhatsApp.useWeb ? "web" : "app" }, set: { WhatsApp.method = $0; methodTick += 1 })) {
+                    Text("The WhatsApp app (2 taps)").tag("app")
+                    Text("WhatsApp Web in BillBox (automatic)").tag("web")
+                }
+                .id(methodTick)
+            } footer: {
+                Text("The WhatsApp app: BillBox makes the bill's PDF and opens the share sheet; choose WhatsApp, the customer, Send. Nothing to link. WhatsApp Web: bills go by themselves while BillBox is open, after linking once below.")
+            }
             Section {
                 HStack(spacing: 8) {
                     Image(systemName: web.connected ? "checkmark.seal.fill" : "link.circle").foregroundColor(web.connected ? .green : .orange)

@@ -21,6 +21,9 @@ public final class Router {
     /// Reads the text of each page of a PDF (iOS: PDFKit, with Vision OCR for scans). Returns the pages and "text" or "ocr".
     public var pdfText: ((Data) async throws -> (pages: [String], method: String))?
 
+    /// Google Drive backups (Drive.swift). Its network work runs outside the queue; its settings take their turn in it.
+    public private(set) lazy var drive = Drive(backup) { [unowned self] work in try await self.exclusive(work) }
+
     public init(engine: Engine) {
         self.engine = engine
         self.backup = Backup(engine)
@@ -41,6 +44,14 @@ public final class Router {
 
     /// One request. `path` may start with "/api". Query values are strings, as Express gives them.
     public func handle(_ method: String, _ path: String, query: [String: String] = [:], body: Row = [:], companyId: Int? = nil) async -> Reply {
+        let seg = segments(path)
+        if seg.count >= 2 && seg[0] == "backup" && seg[1] == "drive" {
+            // Google Drive: not queued (an upload can take a while); Drive takes its turn for each settings read and write
+            return await answer {
+                guard let r = try await self.drive.route(method.uppercased(), seg, JSONNorm.row(body)) else { throw HttpError(404, "Not found") }
+                return r
+            }
+        }
         await gate.enter()
         let reply = await handleNow(method, path, query: query, body: body, companyId: companyId)
         gate.leave()
@@ -55,8 +66,13 @@ public final class Router {
     }
 
     private func handleNow(_ method: String, _ path: String, query: [String: String], body: Row, companyId: Int?) async -> Reply {
+        await answer { try await self.route(method.uppercased(), path, query, JSONNorm.row(body), companyId) }
+    }
+
+    /// A reply, or the error turned into one the way server.js does.
+    private func answer(_ work: () async throws -> Reply) async -> Reply {
         do {
-            return try await route(method.uppercased(), path, query, JSONNorm.row(body), companyId)
+            return try await work()
         } catch let e as HttpError {
             var o: Row = ["error": e.status == 500 ? "Server error" : e.message]
             if let c = e.code { o["code"] = c }
@@ -102,6 +118,8 @@ public final class Router {
             if n == 2 && s[1] == "config" && m == "PUT" { return ok(try backup.saveConfig(b)) }
             if n == 2 && s[1] == "run" && m == "POST" {
                 let r = try backup.backupNow(reason: "manual")
+                let folder = r.folder
+                Task { await self.drive.afterBackup(folder) }   // to Google Drive too, when connected
                 return ok(["folder": r.folder, "files": r.files.count, "config": try backup.config(), "backups": try backup.listBackups()] as Row)
             }
             if n == 2 && s[1] == "restore" && m == "POST" { return ok(try backup.restore(b)) }

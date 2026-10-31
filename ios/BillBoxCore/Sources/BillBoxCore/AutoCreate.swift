@@ -56,6 +56,16 @@ enum AutoCreate {
                 s["created"] = createdSupplier
                 sup = s
             }
+            // a supplier already in Parties (matched by GSTIN or a similar name): details missing there are filled in from the bill
+            if let s = sup, JS.truthy(s["matched_party_id"]), !createdSupplier {
+                let mobiles = ((s["mobiles"] as? [Any]) ?? []).map { JS.string($0) }.joined(separator: ", ")
+                func v(_ k: String) -> Any? { JS.truthy(s[k]) ? s.v(k) : nil }
+                try db.prepare("""
+                UPDATE parties SET gstin=COALESCE(NULLIF(gstin,''),?), phone=COALESCE(NULLIF(phone,''),?), tel=COALESCE(NULLIF(tel,''),?),
+                    mobiles=COALESCE(NULLIF(mobiles,''),?), address=COALESCE(NULLIF(address,''),?), fssai=COALESCE(NULLIF(fssai,''),?), pan=COALESCE(NULLIF(pan,''),?),
+                    email=COALESCE(NULLIF(email,''),?) WHERE id=?
+                """).run(v("gstin"), v("phone"), v("tel"), mobiles.isEmpty ? nil : mobiles, v("address"), v("fssai"), v("pan"), v("email"), s.v("matched_party_id"))
+            }
 
             // items
             var made: [String: Row] = [:]

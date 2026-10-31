@@ -49,12 +49,16 @@ actor EngineHost {
     /// Runs the daily backup if it is due (called every minute while the app is open, on launch and from the background task).
     func backupTick() async -> String? {
         guard let r = try? get() else { return nil }
-        return await r.exclusive { r.backup.tick()?.folder }
+        let folder = await r.exclusive { r.backup.tick()?.folder }
+        if let folder { await r.drive.afterBackup(folder) }   // to Google Drive too, when connected
+        return folder
     }
 
     func backupIfDue() async -> Bool {
         guard let r = try? get() else { return false }
-        return await r.exclusive { r.backup.isDue() ? r.backup.tick() != nil : false }
+        let folder = await r.exclusive { r.backup.isDue() ? r.backup.tick()?.folder : nil }
+        if let folder { await r.drive.afterBackup(folder) }
+        return folder != nil
     }
 }
 
@@ -79,11 +83,12 @@ enum API {
         if watched.contains(where: { path.hasPrefix($0) }) { onItemsChanged?() }
     }
 
-    static func send(_ method: String, _ path: String, query: [String: Any?] = [:], body: [String: Any]? = nil) async throws -> Reply {
+    /// `company`: another company's books for this one request (an earlier year kept in its own file); nil = the open one.
+    static func send(_ method: String, _ path: String, query: [String: Any?] = [:], body: [String: Any]? = nil, company: Int? = nil) async throws -> Reply {
         var q: [String: String] = [:]
         for (k, v) in query { if let v { q[k] = "\(v)" } }
         if q["fy"] == nil, let fy { q["fy"] = fy }
-        let reply = await EngineHost.shared.handle(method, path, query: q, body: body ?? [:], companyId: companyId)
+        let reply = await EngineHost.shared.handle(method, path, query: q, body: body ?? [:], companyId: company ?? companyId)
         if case .json(let status, let obj) = reply, status >= 400 {
             let o = obj as? [String: Any]
             throw APIError(message: (o?["detail"] as? String) ?? (o?["error"] as? String) ?? "Request failed (\(status))", status: status, code: o?["code"] as? String)
@@ -93,15 +98,15 @@ enum API {
     }
 
     /// A JSON object reply.
-    static func obj(_ method: String = "GET", _ path: String, query: [String: Any?] = [:], body: [String: Any?]? = nil) async throws -> JSON {
-        let r = try await send(method, path, query: query, body: body.map(clean))
+    static func obj(_ method: String = "GET", _ path: String, query: [String: Any?] = [:], body: [String: Any?]? = nil, company: Int? = nil) async throws -> JSON {
+        let r = try await send(method, path, query: query, body: body.map(clean), company: company)
         if case .json(_, let o) = r { return JSON((o as? [String: Any]) ?? [:]) }
         return JSON()
     }
 
     /// A JSON array reply.
-    static func list(_ path: String, query: [String: Any?] = [:]) async throws -> [JSON] {
-        let r = try await send("GET", path, query: query)
+    static func list(_ path: String, query: [String: Any?] = [:], company: Int? = nil) async throws -> [JSON] {
+        let r = try await send("GET", path, query: query, company: company)
         if case .json(_, let o) = r { return JSON.rows(o) }
         return []
     }

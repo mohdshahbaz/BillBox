@@ -266,11 +266,73 @@ public enum PDFParser {
         return ["description": desc, "hsn": hsnI.map { nums[$0].raw as Any } ?? NSNull(), "qty": b.q, "unit": unit, "rate": b.r, "amount": b.a, "tax_hint": NSNull()]
     }
 
+    /// Words that say nothing about which item or supplier it is (pdfParser.js NOISE).
+    static let noise: Set<String> = ["pkt", "pkts", "pcs", "pc", "mrp", "rs", "new", "pvt", "ltd", "private", "limited", "co", "the", "and", "ms"]
+    static func isAlpha(_ t: String) -> Bool { !t.isEmpty && t.unicodeScalars.allSatisfy { $0.value >= 97 && $0.value <= 122 } }
+    /// Spelling variants read alike: bhujiya / bhujia / bujia (pdfParser.js soft).
+    static func soft(_ t: String) -> String {
+        guard isAlpha(t) else { return t }
+        var c = Array(t)
+        var out: [Character] = []
+        var i = 0
+        while i < c.count {   // bh dh gh jh kh ph th -> b d g j k p t
+            if c[i] == "h", let last = out.last, "bdgjkpt".contains(last) { i += 1; continue }
+            out.append(c[i]); i += 1
+        }
+        var s = String(out)
+        if s.hasSuffix("iya") { s = String(s.dropLast(3)) + "ia" }
+        s = s.replacingOccurrences(of: "ee", with: "i").replacingOccurrences(of: "oo", with: "u")
+        c = Array(s); out = []
+        for ch in c where out.last != ch { out.append(ch) }   // doubled letters once
+        return String(out)
+    }
+    /// Sizes written alike: "200 GM", "200gms" -> 200g; kg and ml the same way (pdfParser.js sizes).
+    static func sizes(_ s: String?) -> String {
+        var x = s ?? ""
+        x = rx("(\\d+(?:\\.\\d+)?)\\s*(?:grams|gram|gms|grm|gm|g)\\b", "gi").replace(x) { m in m[1]! + "g" }
+        x = rx("(\\d+(?:\\.\\d+)?)\\s*(?:kgs|kg)\\b", "gi").replace(x) { m in m[1]! + "kg" }
+        x = rx("(\\d+(?:\\.\\d+)?)\\s*(?:mls|ml)\\b", "gi").replace(x) { m in m[1]! + "ml" }
+        return x
+    }
+    /// The weight or volume in a name ("200g", "1kg", "500ml"), or nil (pdfParser.js weightOf).
+    static func weightOf(_ s: String?) -> String? {
+        rx("(?:^| )(\\d+(?:\\.\\d+)?(?:g|kg|ml))(?= |$)").exec(norm(sizes(s)))?[1] ?? nil
+    }
+    static func wordsOf(_ s: String?) -> [String] {
+        var seen = Set<String>(), out: [String] = []
+        for t in norm(sizes(s)).components(separatedBy: " ") where t.jsLength > 1 && !noise.contains(t) {
+            let w = soft(t)
+            if !seen.contains(w) { seen.insert(w); out.append(w) }
+        }
+        return out
+    }
+    /// At most one letter added, dropped or changed.
+    static func oneEdit(_ x: String, _ y: String) -> Bool {
+        let a = Array(x), b = Array(y)
+        if abs(a.count - b.count) > 1 { return false }
+        var i = 0, j = 0, d = 0
+        while i < a.count && j < b.count {
+            if a[i] == b[j] { i += 1; j += 1; continue }
+            d += 1
+            if d > 1 { return false }
+            if a.count > b.count { i += 1 } else if b.count > a.count { j += 1 } else { i += 1; j += 1 }
+        }
+        return d + (a.count - i) + (b.count - j) <= 1
+    }
+    static func wordMatch(_ a: String, _ b: String) -> Double {
+        if a == b { return 1 }
+        guard isAlpha(a) && isAlpha(b) else { return 0 }
+        if min(a.count, b.count) >= 4 && (a.hasPrefix(b) || b.hasPrefix(a)) { return 0.9 }
+        if min(a.count, b.count) >= 5 && oneEdit(a, b) { return 0.85 }
+        return 0
+    }
+    /// How alike two names are (0-1): each word finds its best match in the other name (pdfParser.js similarity).
     public static func similarity(_ a: String?, _ b: String?) -> Double {
-        let A = tokensOf(a), B = tokensOf(b)
+        let A = wordsOf(a), B = wordsOf(b)
         if A.isEmpty || B.isEmpty { return 0 }
-        let hit = A.filter { B.contains($0) }.count
-        return Double(hit) / Double(max(A.count, B.count))
+        var hit = 0.0
+        for t in A { var m = 0.0; for u in B { let v = wordMatch(t, u); if v > m { m = v } }; hit += m }
+        return hit / Double(max(A.count, B.count))
     }
 
     static func bestMatch(_ text: String, _ list: [Row], _ hsn: Any?) -> (match: Row?, score: Double) {
@@ -280,6 +342,7 @@ public enum PDFParser {
         for x in list {
             let have = sizeTokens(x.str("name"))
             if (want.pack != nil && have.pack != nil && want.pack != have.pack) || (want.mrp != nil && have.mrp != nil && want.mrp != have.mrp) { continue }
+            if let wa = weightOf(text), let wb = weightOf(x.str("name")), wa != wb { continue }   // 200g is not 400g
             var s = similarity(text, x.s("name"))
             if JS.truthy(hsn) && JS.truthy(x["hsn"]) && JS.string(x.v("hsn")) == JS.string(unwrap(hsn)) { s += 0.25 }
             if s > score { score = s; best = x }

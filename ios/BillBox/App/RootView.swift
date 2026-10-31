@@ -26,7 +26,7 @@ import SwiftUI
             }
             ToastOverlay()
         }
-        .task { await app.start() }
+        .task { await app.start(); await SimSelfTest.runIfAsked(app) }
         // A print preview opens only once the bill / voucher sheet has closed (the Mac waits for the popup in the same way).
         .onChange(of: app.printJob?.id) { _ in
             guard let job = app.printJob else { return }

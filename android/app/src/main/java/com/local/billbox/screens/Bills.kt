@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.FindInPage
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.UploadFile
@@ -177,7 +178,14 @@ fun BillsScreen() {
             }
             SelectionBar(selection.size, rows.size, selecting, { selecting = it; if (!it) selection.clear() },
                 { if (selection.size == rows.size) selection.clear() else { selection.clear(); selection.addAll(rows.map { it.id }) } },
-                actionLabel = "Delete", busy = busy) { confirmBulk = true }
+                actionLabel = "Delete", busy = busy, extra = {
+                    // the ticked sale bills, oldest first
+                    val sales = rows.filter { it.id in selection && it.str("type") == "SALE" }.sortedWith(compareBy({ it.str("date") }, { it.int("bill_id") })).map { it.int("bill_id") }
+                    IconButton(onClick = { app.launch { Printing.invoices(sales, app) } }, enabled = sales.isNotEmpty() && !busy) { Icon(Icons.Default.Print, "Print ${sales.size} bills") }
+                    IconButton(onClick = { Printing.markPrinted(sales, app); app.notify("${sales.size} bills marked printed."); app.launch { kotlinx.coroutines.delay(400); load() } },
+                        enabled = sales.isNotEmpty() && !busy) { Icon(Icons.Default.Verified, "Mark printed") }
+                    if (sales.size == 1) IconButton(onClick = { app.launch { WhatsApp.send(sales[0], app) } }) { Icon(Icons.AutoMirrored.Filled.Send, "WhatsApp") }
+                }) { confirmBulk = true }
             Box(Modifier.weight(1f)) {
                 if (loading) Loading()
                 else if (rows.isEmpty()) EmptyState("No bills match these filters", "", Icons.Default.FindInPage)

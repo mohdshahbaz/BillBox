@@ -24,6 +24,20 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.5 — Google Drive backups, bank details on bills, ledger by year, many bills at once
+
+- **Google Drive backups** (Mac, iPhone, Android): Settings › Backup › Google Drive. Sign in once with a short code at
+  google.com/device; every backup then also goes to Drive › BillBox Backups. Setup: [docs/GOOGLE_DRIVE.md](docs/GOOGLE_DRIVE.md).
+- **Bank details on the bill**, above the amount in words, one per line (bank, account name, number, IFSC, branch,
+  branch code, address): Settings › Print › Bank details. "Bill to:" now has its colon.
+- **Ledger of an earlier year**: Parties › ledger › Year (also for years kept in their own file).
+- **All Bills: tick several bills** and Print them together, Mark printed, or send on WhatsApp.
+- **PDF purchase bills** match items with a slightly different spelling or size format (200 GM = 200g) and add the stock
+  to the existing item; an existing supplier gets missing GSTIN, phone and address filled in from the bill.
+- **Dashboard tiles** are all the same size.
+- **WhatsApp on iPhone**: choose "The WhatsApp app" (share sheet, nothing to link) or "WhatsApp Web in BillBox"; linking
+  WhatsApp Web now opens the desktop page, so both the QR and phone-number code work.
+
 ## v15.4 — Marg prices per piece, quantity first, bolder Bill to, Mac .dmg
 
 - **Marg prices**: an item without past sales got Marg's Rate A divided by the case size in its name ("Boondi Salted 38g

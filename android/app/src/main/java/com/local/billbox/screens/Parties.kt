@@ -290,10 +290,12 @@ fun PartyForm(party: J?, defaultType: String, routes: List<J>, salesmen: List<J>
 fun LedgerDialog(party: J, onDismiss: () -> Unit, onVoucher: () -> Unit) {
     val app = LocalApp.current
     var data by remember { mutableStateOf<J?>(null) }
-    LaunchedEffect(party.id) { app.guarded { data = Api.get("/parties/${party.id}/ledger") } }
+    // the financial year shown; earlier years too
+    var year by remember { mutableStateOf(app.fyLabel) }
+    LaunchedEffect(party.id, year) { data = null; app.guarded { data = try { app.ledger(party, year) } catch (e: Exception) { app.notify(e.message ?: "", true); J() } } }
     val entries = data?.list("entries") ?: emptyList()
     val bal = data?.num("balance") ?: 0.0
-    InfoDialog("${party.str("name")} · ledger · FY ${app.fyLabel}", onDismiss, scroll = false, actions = {
+    InfoDialog("${party.str("name")} · ledger · FY $year", onDismiss, scroll = false, actions = {
         androidx.compose.material3.IconButton(onClick = {
             copyText(tsv(listOf("Date", "Type", "Reference", "Narration", "Debit", "Credit", "Balance"),
                 entries.map { listOf(Fmt.dmy(it.str("date")), it.str("type"), it.str("ref_no"), it.str("narration"), it.str("debit"), it.str("credit"), it.str("balance")) }))
@@ -302,7 +304,8 @@ fun LedgerDialog(party: J, onDismiss: () -> Unit, onVoucher: () -> Unit) {
     }) {
         Text(balanceText(bal) + if (bal > 0.005) "  (they owe you)" else if (bal < -0.005) "  (you owe them)" else "", style = MaterialTheme.typography.titleMedium,
             color = if (bal > 0.5) Warn else if (bal < -0.5) Bad else Good)
-        data?.let { d -> if (kotlin.math.abs(d.num("opening_balance")) > 0.005) Hint("Opening balance for FY ${app.fyLabel}, brought forward from earlier years: ${balanceText(d.num("opening_balance"))}") }
+        Choice("Year", app.yearChoices.filter { it.label.isNotEmpty() }.map { it.label to "FY ${it.label}" }, year, { year = it })
+        data?.let { d -> if (kotlin.math.abs(d.num("opening_balance")) > 0.005) Hint("Opening balance for FY $year, brought forward from earlier years: ${balanceText(d.num("opening_balance"))}") }
         OutlinedButton(onClick = onVoucher) { Icon(Icons.Default.CurrencyRupee, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Record receipt / payment") }
         Box(Modifier.weight(1f)) {
             if (data == null) Loading() else DataTable(entries, "ledger", columns = listOf(

@@ -271,12 +271,18 @@ import SwiftUI
     let party: JSON
     let onVoucher: () -> Void
     @State private var data: JSON?
+    /// The financial year shown; earlier years too (Year menu).
+    @State private var year = ""
 
     var body: some View {
         let entries = data?.list("entries") ?? []
         let bal = data?.num("balance") ?? 0
-        InfoSheet(title: "\(party.str("name")) · ledger · FY \(app.fyLabel)", width: 900, height: 560, trailing: AnyView(
+        InfoSheet(title: "\(party.str("name")) · ledger · FY \(shownYear)", width: 900, height: 560, trailing: AnyView(
             HStack {
+                Picker("Year", selection: $year) {
+                    ForEach(app.yearChoices.filter { !$0.label.isEmpty }) { y in Text("FY \(y.label)").tag(y.label) }
+                }
+                .pickerStyle(.menu).fixedSize()
                 Button("Record receipt / payment…") { dismiss(); Task { await pause(ms: 600); onVoucher() } }
                 Spacer()
                 Button("Copy") {
@@ -291,7 +297,7 @@ import SwiftUI
                     .font(.headline)
                     .foregroundStyle(bal > 0.5 ? Color.orange : (bal < -0.5 ? Color.red : Color.green))
                 if let d = data, abs(d.num("opening_balance")) > 0.005 {
-                    Text("Opening balance for FY \(app.fyLabel), brought forward from earlier years: \(balanceText(d.num("opening_balance")))")
+                    Text("Opening balance for FY \(shownYear), brought forward from earlier years: \(balanceText(d.num("opening_balance")))")
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 DataGrid(entries, layoutKey: "ledger") {
@@ -306,7 +312,14 @@ import SwiftUI
                 Text("Dr = they owe you. Cr = you owe them.").font(.caption).foregroundStyle(.secondary)
             }
         }
-        .task { await app.guarded { data = try await API.obj("GET", "/parties/\(party.id)/ledger") } }
+        .task { if year.isEmpty { year = app.fyLabel }; await load() }
+        .onChange(of: year) { _ in Task { await load() } }
+    }
+
+    private var shownYear: String { year.isEmpty ? app.fyLabel : year }
+
+    private func load() async {
+        do { data = try await app.ledger(for: party, year: shownYear) } catch { data = JSON(); app.notify(error.localizedDescription, error: true) }
     }
 }
 

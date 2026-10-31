@@ -63,6 +63,13 @@ data class Spec(val w: Float, val h: Float, val m: Float, val rowH: Float, val t
     /** The same page with text (and the rows holding it) made larger or smaller. */
     fun scaled(k: Float): Spec = if (k == 1f) this else copy(rowH = rowH * k, tableHead = tableHead * k, foot = foot * k, totals = totals * k,
         strip = strip * k, sellerBand = sellerBand * k, headNext = headNext * k, fs = fs * k)
+    /** Room for the bank details under the GST table, when the bill prints them. */
+    fun withBank(co: J): Spec {
+        val rows = bankRows(co)
+        if (rows.isEmpty()) return this
+        val extra = rows.size * 8.4f * fs + (if (rows.any { it.first == "ADDRESS" && it.second.length > 70 }) 8.4f * fs else 0f) + 4f
+        return copy(totals = totals + extra)
+    }
     fun cap(first: Boolean, last: Boolean): Int = floor((inner - (if (first) headFirst else headNext) - tableHead - foot - (if (last) totals else 0f)) / rowH).toInt()
 
     companion object {
@@ -70,6 +77,12 @@ data class Spec(val w: Float, val h: Float, val m: Float, val rowH: Float, val t
         val full = Spec(595.276f, 841.89f, 34f, 16f, 20f, 32f, 112f, 19f, 68f, 0f, 24f, 1.15f, 1.0f)
     }
 }
+
+/** The bank details printed above the amount in words (Settings › Printing › Bank details), in this order; empty ones left out. */
+val bankFields = listOf("bank_name" to "BANK NAME", "bank_ac_name" to "ACCOUNT NAME", "bank_ac_no" to "ACCOUNT NUMBER", "bank_ifsc" to "IFSC CODE",
+    "bank_branch" to "BRANCH NAME", "bank_branch_code" to "BRANCH CODE", "bank_address" to "ADDRESS")
+fun bankRows(co: J): List<Pair<String, String>> =
+    if (co.str("print_bank_block") == "0") emptyList() else bankFields.mapNotNull { (k, label) -> co.str(k).trim().takeIf { it.isNotEmpty() }?.let { label to it } }
 
 /** Splits n item rows into pages (always at least one page). */
 fun paginate(n: Int, g: Spec): List<IntRange> {
@@ -206,7 +219,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         pen.vLine(x + half, y, y + g.sellerBand)
         val bx = x + half + 5; val bw = half - 10
         var by = y + 3
-        val lbl = hc(if (inv.str("doc_title") == "DEBIT NOTE") "Supplier" else "Bill to")
+        val lbl = hc(if (inv.str("doc_title") == "DEBIT NOTE") "Supplier:" else "Bill to:")
         // the buyer stands out: "Bill to" and the party in bold, larger than the seller's details
         val lw = pen.width(lbl, 7.5f * fs, 700)
         val rowH = 15f * fs
@@ -321,6 +334,17 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
                 ly += rowH
             }
         }
+        // bank details, one per line with the labels lined up, under the GST table
+        val bank = bankRows(co)
+        if (bank.isNotEmpty()) {
+            ly += 3
+            val bh = 8.4f * fs; val lab = 76f * g.cw; val vw = w - rightW - 12 - lab - 4
+            for ((label, value) in bank) {
+                pen.text("$label:", lx, ly, lab, bh, 6.5f * fs, 700, minScale = 0.8f)
+                if (label == "ADDRESS" && value.length > 70) { pen.para(value, lx + lab + 4, ly + 1, vw, 7f * fs, 2, 600); ly += 2 * bh }
+                else { pen.text(value, lx + lab + 4, ly, vw, bh, 7f * fs, 600, minScale = 0.75f); ly += bh }
+            }
+        }
         val wordsTop = y + g.totals - 4 - 8f * fs - 18f * fs
         if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) {
             val by = if (on("print_words")) wordsTop - 10f * fs else y + g.totals - 14f * fs
@@ -377,7 +401,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
 /** A bill as PDF in the chosen layout (A4 two-up falls back to half sheets when the bill is longer than one page). */
 fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder()): PdfBuilder {
     val n = inv.list("lines").size
-    val g = (if (layout.isFullPage) Spec.full else Spec.half).scaled(printScale(co))
+    val g = (if (layout.isFullPage) Spec.full else Spec.half).scaled(printScale(co)).withBank(co)
     val labels = copyLabelsFor(co)
     if (layout == PrintLayout.A4TwoUp && paginate(n, g).size == 1) {
         into.page(g.w, g.h * 2) { pen ->

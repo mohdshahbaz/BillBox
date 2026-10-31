@@ -318,7 +318,19 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
             HStack(spacing: 0) {
                 ForEach(Array(cols.enumerated()), id: \.element.id) { i, c in
                     Group {
-                        if c.isIndex { Text("\(idx + 1)").mono().foregroundStyle(.secondary) } else { c.cell(row) }
+                        if c.isIndex {
+                            HStack(spacing: 6) {
+                                // a tick box per row: tick several rows, then act on them (print, delete…)
+                                if let selection {
+                                    Button { if selected { selection.wrappedValue.remove(row.id) } else { selection.wrappedValue.insert(row.id) } } label: {
+                                        Image(systemName: selected ? "checkmark.square.fill" : "square").foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help(selected ? "Untick" : "Tick this row")
+                                }
+                                Text("\(idx + 1)").mono().foregroundStyle(.secondary)
+                            }
+                        } else { c.cell(row) }
                     }
                         .padding(.horizontal, 10)
                         .frame(width: w[i], height: rh, alignment: c.align)

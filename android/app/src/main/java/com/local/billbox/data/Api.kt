@@ -15,13 +15,14 @@ object Api {
 
     private val watched = listOf("/items", "/batches", "/purchases", "/schemes", "/debit-notes", "/import", "/backup", "/categories", "/parties", "/companies")
 
-    suspend fun send(method: String, path: String, query: Map<String, Any?> = emptyMap(), body: Any? = null): JSONObject {
+    /** `company`: another company's books for this one request (an earlier year kept in its own file); null = the open one. */
+    suspend fun send(method: String, path: String, query: Map<String, Any?> = emptyMap(), body: Any? = null, company: Int? = null): JSONObject {
         val q = JSONObject()
         for ((k, v) in query) if (v != null) q.put(k, v.toString())
         if (!q.has("fy")) fy?.let { q.put("fy", it) }
         val req = JSONObject().put("method", method).put("path", path.substringBefore('?')).put("query", q)
             .put("body", if (body == null) JSONObject() else J.wrap(body))
-        companyId?.let { req.put("company", it) }
+        (company ?: companyId)?.let { req.put("company", it) }
         val r = Engine.call(req)
         val status = r.optInt("status", 200)
         if (status >= 400) {
@@ -34,13 +35,13 @@ object Api {
     }
 
     /** A JSON object reply. */
-    suspend fun obj(method: String, path: String, query: Map<String, Any?> = emptyMap(), body: Any? = null): J =
-        J(send(method, path, query, body).optJSONObject("body") ?: JSONObject())
+    suspend fun obj(method: String, path: String, query: Map<String, Any?> = emptyMap(), body: Any? = null, company: Int? = null): J =
+        J(send(method, path, query, body, company).optJSONObject("body") ?: JSONObject())
 
-    suspend fun get(path: String, query: Map<String, Any?> = emptyMap()): J = obj("GET", path, query)
+    suspend fun get(path: String, query: Map<String, Any?> = emptyMap(), company: Int? = null): J = obj("GET", path, query, company = company)
 
     /** A JSON array reply. */
-    suspend fun list(path: String, query: Map<String, Any?> = emptyMap()): List<J> = J.rows(send("GET", path, query).opt("body"))
+    suspend fun list(path: String, query: Map<String, Any?> = emptyMap(), company: Int? = null): List<J> = J.rows(send("GET", path, query, company = company).opt("body"))
 
     /** A file reply (Excel): name and bytes. */
     suspend fun file(path: String, query: Map<String, Any?> = emptyMap()): Pair<String, ByteArray> {

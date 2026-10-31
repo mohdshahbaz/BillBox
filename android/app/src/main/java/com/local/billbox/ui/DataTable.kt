@@ -263,12 +263,13 @@ fun <R> DataTable(
 /** Select mode for a table: "Select" turns taps into selection; then "N of M selected · Select all" and the bulk action. */
 @Composable
 fun SelectionBar(count: Int, total: Int, selecting: Boolean, onSelecting: (Boolean) -> Unit, onAll: () -> Unit,
-                 actionLabel: String = "Delete selected", busy: Boolean = false, action: () -> Unit) {
+                 actionLabel: String = "Delete selected", busy: Boolean = false, extra: @Composable () -> Unit = {}, action: () -> Unit) {
     Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = { onSelecting(!selecting) }) { Text(if (selecting) "Done" else "Select") }
         if (selecting) {
             Text("$count of $total selected", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             TextButton(onClick = onAll) { Text(if (count == total) "Clear" else "Select all") }
+            extra()   // more actions for the ticked rows (print, mark printed…)
             TextButton(onClick = action, enabled = !busy && count > 0) { Text(actionLabel, color = MaterialTheme.colorScheme.error) }
         } else Box(Modifier.weight(1f))
     }

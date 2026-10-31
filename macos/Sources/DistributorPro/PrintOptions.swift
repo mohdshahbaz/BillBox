@@ -43,9 +43,17 @@ import SwiftUI
         }
         Section {
             SettingTextField(title: "Line under the company name", key: "print_tagline", placeholder: "e.g. Distributor of Parle, Bikano", maxLength: 80)
-            SettingTextField(title: "Bank details", key: "print_bank", placeholder: "e.g. SBI A/c 1234… IFSC SBIN0001234 · UPI ak@upi", maxLength: 120)
+            SettingTextField(title: "Payment line at the bottom", key: "print_bank", placeholder: "e.g. UPI ak@upi", maxLength: 120)
             SettingTextField(title: "Note at the bottom", key: "print_note", placeholder: "e.g. Thank you for your business", maxLength: 60)
         } header: { Text("Your own lines") } footer: { Text("Leave a line empty to leave it off the bill. These are saved as you press Save beside each.") }
+        Section {
+            Toggle("Print the bank details", isOn: flag("print_bank_block", true))
+            ForEach(bankFields, id: \.key) { f in
+                SettingTextField(title: f.title, key: f.key, placeholder: f.key == "bank_address" ? "Branch address" : "", maxLength: f.key == "bank_address" ? 200 : 60)
+            }
+        } header: { Text("Bank details") } footer: {
+            Text("Printed above the amount in words, one per line (BANK NAME:, ACCOUNT NAME:, ACCOUNT NUMBER:, IFSC CODE:, BRANCH NAME:, BRANCH CODE:, ADDRESS:). Empty ones are left out; a bill with bank details has a few rows less room for items.")
+        }
     }
 }
 

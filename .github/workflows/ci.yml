@@ -37,6 +37,10 @@ jobs:
         working-directory: backend
         run: node --disable-warning=ExperimentalWarning test/smoke.js
 
+      - name: Google Drive backups against a fake Google (backend/test/drive.js)
+        working-directory: backend
+        run: node --disable-warning=ExperimentalWarning test/drive.js
+
       - name: Swift toolchain
         run: |
           if ! command -v swift >/dev/null; then

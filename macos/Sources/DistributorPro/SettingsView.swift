@@ -227,9 +227,10 @@ import AppKit
                     Button { Task { await runNow() } } label: { Text(busy ? "Backing up…" : "Back up now") }
                         .buttonStyle(.borderedProminent).disabled(busy)
                 }
+                DriveBackupSection()
             }
             .groupedForm()
-            .frame(maxHeight: 340)
+            .frame(maxHeight: 620)
             HStack {
                 Text("Restore").font(.headline)
                 Spacer()

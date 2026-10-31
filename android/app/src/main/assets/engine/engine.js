@@ -192,7 +192,13 @@
             try {
               const net = globalThis.AndroidNet;
               if (!net) return no(new TypeError("fetch failed"));
-              const r = JSON.parse(net.request(String(url), JSON.stringify({ method: opts.method || "GET", headers: opts.headers || {}, timeoutMs: 2e4 })));
+              const b = opts.body == null ? null : Buffer2.isBuffer(opts.body) || opts.body instanceof Uint8Array ? Buffer2.from(opts.body) : Buffer2.from(String(opts.body), "utf8");
+              const r = JSON.parse(net.request(String(url), JSON.stringify({
+                method: opts.method || "GET",
+                headers: opts.headers || {},
+                timeoutMs: b ? 12e4 : 2e4,
+                ...b ? { b64: b.toString("base64") } : {}
+              })));
               if (r.error) return no(new TypeError(r.error));
               const body = Buffer2.from(r.b64 || "", "base64");
               const headers = new Map(Object.entries(r.headers || {}).map(([k, v]) => [k.toLowerCase(), v]));
@@ -917,7 +923,6 @@ CREATE INDEX IF NOT EXISTS idx_dns_line ON debit_note_stock(line_id);
       var toNum = (s) => Number(String(s).replace(/[,\s]/g, ""));
       var r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
       var norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
-      var tokensOf = (s) => new Set(norm(s).split(" ").filter((t) => t.length > 1));
       var cleanLines = (t) => String(t || "").split(/\r?\n/).map((l) => l.replace(/[\u00a0\t]+/g, " ").replace(/\s+/g, " ").replace(/(\d)\s+%/g, "$1%").trim()).filter(Boolean);
       var KIND_RES = [
         ["original", /\boriginal\b(?!\s+(?:invoice\s+)?(?:no|number|date|ref))/i],
@@ -1104,12 +1109,54 @@ CREATE INDEX IF NOT EXISTS idx_dns_line ON debit_note_stock(line_id);
         const unit = after && /^[A-Za-z]{2,6}\.?$/.test(after) && UNITS.has(after.replace(/\.$/, "").toUpperCase()) ? after.replace(/\.$/, "").toUpperCase() : null;
         return { description: desc, hsn: hsnTok ? hsnTok.raw : null, qty: best.q, unit, rate: best.r, amount: best.a, tax_hint: null };
       }
+      var NOISE = /* @__PURE__ */ new Set(["pkt", "pkts", "pcs", "pc", "mrp", "rs", "new", "pvt", "ltd", "private", "limited", "co", "the", "and", "ms"]);
+      var soft = (t) => /^[a-z]+$/.test(t) ? t.replace(/([bdgjkpt])h/g, "$1").replace(/iya$/, "ia").replace(/ee/g, "i").replace(/oo/g, "u").replace(/(.)\1+/g, "$1") : t;
+      var sizes = (s) => String(s || "").replace(/(\d+(?:\.\d+)?)\s*(?:grams|gram|gms|grm|gm|g)\b/gi, "$1g").replace(/(\d+(?:\.\d+)?)\s*(?:kgs|kg)\b/gi, "$1kg").replace(/(\d+(?:\.\d+)?)\s*(?:mls|ml)\b/gi, "$1ml");
+      var weightOf = (s) => {
+        const m = /(?:^| )(\d+(?:\.\d+)?(?:g|kg|ml))(?= |$)/.exec(norm(sizes(s)));
+        return m ? m[1] : null;
+      };
+      var wordsOf = (s) => [...new Set(norm(sizes(s)).split(" ").filter((t) => t.length > 1 && !NOISE.has(t)).map(soft))];
+      function oneEdit(a, b) {
+        if (Math.abs(a.length - b.length) > 1) return false;
+        let i = 0, j = 0, d = 0;
+        while (i < a.length && j < b.length) {
+          if (a[i] === b[j]) {
+            i++;
+            j++;
+            continue;
+          }
+          if (++d > 1) return false;
+          if (a.length > b.length) i++;
+          else if (b.length > a.length) j++;
+          else {
+            i++;
+            j++;
+          }
+        }
+        return d + (a.length - i) + (b.length - j) <= 1;
+      }
+      function wordMatch(a, b) {
+        if (a === b) return 1;
+        const alpha = /^[a-z]+$/.test(a) && /^[a-z]+$/.test(b);
+        if (!alpha) return 0;
+        if (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a))) return 0.9;
+        if (Math.min(a.length, b.length) >= 5 && oneEdit(a, b)) return 0.85;
+        return 0;
+      }
       var similarity = (a, b) => {
-        const A = tokensOf(a), B3 = tokensOf(b);
-        if (!A.size || !B3.size) return 0;
+        const A = wordsOf(a), B3 = wordsOf(b);
+        if (!A.length || !B3.length) return 0;
         let hit = 0;
-        for (const t of A) if (B3.has(t)) hit++;
-        return hit / Math.max(A.size, B3.size);
+        for (const t of A) {
+          let m = 0;
+          for (const u of B3) {
+            const v = wordMatch(t, u);
+            if (v > m) m = v;
+          }
+          hit += m;
+        }
+        return hit / Math.max(A.length, B3.length);
       };
       function bestMatch(text, list, hsn) {
         let best = null, score = 0;
@@ -1117,6 +1164,8 @@ CREATE INDEX IF NOT EXISTS idx_dns_line ON debit_note_stock(line_id);
         for (const x of list) {
           const have = sizeTokens(x.name);
           if (want.pack && have.pack && want.pack !== have.pack || want.mrp && have.mrp && want.mrp !== have.mrp) continue;
+          const wa = weightOf(text), wb = weightOf(x.name);
+          if (wa && wb && wa !== wb) continue;
           let s = similarity(text, x.name);
           if (hsn && x.hsn && String(x.hsn) === String(hsn)) s += 0.25;
           if (s > score) {
@@ -1889,6 +1938,190 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
     }
   });
 
+  // ../../backend/src/services/drive.js
+  var require_drive = __commonJS({
+    "../../backend/src/services/drive.js"(exports, module) {
+      init_globals();
+      var fs = require_fs();
+      var path = require_path();
+      var db2 = require_db();
+      var { HttpError: HttpError2 } = require_misc();
+      var B3 = require_backup();
+      var reg = db2.registry;
+      var get = (k) => {
+        const r = reg.prepare("SELECT value FROM app_settings WHERE key=?").get(k);
+        return r && r.value ? String(r.value) : "";
+      };
+      var set = (k, v) => reg.prepare("INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
+      var del = (k) => reg.prepare("DELETE FROM app_settings WHERE key=?").run(k);
+      var SCOPE = "https://www.googleapis.com/auth/drive.file";
+      var FOLDER = "BillBox Backups";
+      var FOLDER_TYPE = "application/vnd.google-apps.folder";
+      var offline = () => new HttpError2(503, "Could not reach Google. Check the internet connection and try again.", "OFFLINE");
+      var form = (o) => Object.entries(o).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+      var FORM = { "content-type": "application/x-www-form-urlencoded" };
+      async function call(url, opts) {
+        let r;
+        try {
+          r = await fetch(url, opts);
+        } catch (_) {
+          throw offline();
+        }
+        const text = await r.text();
+        let json = {};
+        try {
+          json = JSON.parse(text);
+        } catch (_) {
+        }
+        return { status: r.status, json: json && typeof json === "object" ? json : {} };
+      }
+      function status() {
+        return {
+          client_id: get("drive_client_id"),
+          has_secret: get("drive_client_secret") !== "",
+          connected: get("drive_refresh") !== "",
+          waiting: get("drive_device") !== "",
+          folder: get("drive_folder_id") ? FOLDER : "",
+          last_upload: get("drive_last_upload"),
+          last_status: get("drive_last_status")
+        };
+      }
+      function saveClient(b = {}) {
+        const id = String(b.client_id || "").trim(), secret = String(b.client_secret || "").trim();
+        if (!/\.apps\.googleusercontent\.com$/.test(id)) throw new HttpError2(400, "Paste the Client ID from Google Cloud (it ends in .apps.googleusercontent.com).");
+        if (!secret) throw new HttpError2(400, "Paste the client secret too.");
+        if (id !== get("drive_client_id")) for (const k of ["drive_refresh", "drive_folder_id", "drive_device"]) del(k);
+        set("drive_client_id", id);
+        set("drive_client_secret", secret);
+        return status();
+      }
+      async function connect() {
+        const id = get("drive_client_id");
+        if (!id) throw new HttpError2(400, "Add the Google Client ID and secret first.");
+        const r = await call("https://oauth2.googleapis.com/device/code", { method: "POST", headers: FORM, body: form({ client_id: id, scope: SCOPE }) });
+        if (r.status !== 200) throw new HttpError2(502, `Google did not give a code (${r.json.error_description || r.json.error || r.status}).`);
+        set("drive_device", r.json.device_code);
+        return {
+          user_code: r.json.user_code,
+          verification_url: r.json.verification_url || r.json.verification_uri || "https://www.google.com/device",
+          interval: r.json.interval || 5,
+          expires_in: r.json.expires_in || 1800
+        };
+      }
+      async function poll() {
+        const dev = get("drive_device");
+        if (!dev) throw new HttpError2(400, "Press Connect first.");
+        const r = await call("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: FORM,
+          body: form({ client_id: get("drive_client_id"), client_secret: get("drive_client_secret"), device_code: dev, grant_type: "urn:ietf:params:oauth:grant-type:device_code" })
+        });
+        if (r.json.error === "authorization_pending" || r.json.error === "slow_down") return { connected: false, waiting: true };
+        del("drive_device");
+        if (r.status !== 200 || !r.json.refresh_token) {
+          throw new HttpError2(400, r.json.error === "access_denied" ? "Google sign-in was declined." : r.json.error === "expired_token" ? "The code ran out. Press Connect again." : `Google did not connect (${r.json.error_description || r.json.error || r.status}).`);
+        }
+        set("drive_refresh", r.json.refresh_token);
+        await folder(r.json.access_token);
+        return { connected: true, waiting: false, folder: FOLDER };
+      }
+      function disconnect() {
+        for (const k of ["drive_refresh", "drive_folder_id", "drive_device", "drive_last_upload", "drive_last_status"]) del(k);
+        return status();
+      }
+      async function token() {
+        if (!get("drive_refresh")) throw new HttpError2(400, "Google Drive is not connected.");
+        const r = await call("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: FORM,
+          body: form({ client_id: get("drive_client_id"), client_secret: get("drive_client_secret"), refresh_token: get("drive_refresh"), grant_type: "refresh_token" })
+        });
+        if (r.status !== 200 || !r.json.access_token) {
+          if (r.json.error === "invalid_grant") {
+            del("drive_refresh");
+            del("drive_folder_id");
+            throw new HttpError2(401, "Google Drive was disconnected (the permission was removed or ran out). Connect again.");
+          }
+          throw new HttpError2(502, `Google did not answer (${r.json.error_description || r.json.error || r.status}).`);
+        }
+        return r.json.access_token;
+      }
+      async function makeFolder(tok, name, parent) {
+        const r = await call("https://www.googleapis.com/drive/v3/files?fields=id", {
+          method: "POST",
+          headers: { authorization: `Bearer ${tok}`, "content-type": "application/json" },
+          body: JSON.stringify(parent ? { name, mimeType: FOLDER_TYPE, parents: [parent] } : { name, mimeType: FOLDER_TYPE })
+        });
+        if (r.status !== 200 || !r.json.id) throw new HttpError2(502, `Google Drive did not make the folder "${name}" (${r.json.error && r.json.error.message || r.status}).`);
+        return r.json.id;
+      }
+      async function folder(tok) {
+        const id = get("drive_folder_id");
+        if (id) {
+          const r = await call(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,trashed`, { headers: { authorization: `Bearer ${tok}` } });
+          if (r.status === 200 && !r.json.trashed) return id;
+        }
+        const made = await makeFolder(tok, FOLDER, null);
+        set("drive_folder_id", made);
+        return made;
+      }
+      async function upload(b = {}) {
+        const list = B3.listBackups();
+        const name = b.folder ? String(b.folder) : list[0] && list[0].name;
+        if (!name) throw new HttpError2(400, "There is no backup to upload yet. Press Back up now first.");
+        const dir = path.join(B3.config().dir, path.basename(name));
+        if (!fs.existsSync(dir)) throw new HttpError2(404, `Backup ${name} not found.`);
+        const tok = await token();
+        const parent = await folder(tok);
+        const sub = await makeFolder(tok, path.basename(name), parent);
+        const files = fs.readdirSync(dir).filter((f) => fs.statSync(path.join(dir, f)).isFile()).sort();
+        let bytes = 0;
+        for (const f of files) {
+          const data = fs.readFileSync(path.join(dir, f));
+          const boundary = "billbox" + Date.now().toString(36);
+          const meta = JSON.stringify({ name: f, parents: [sub] });
+          const body = Buffer2.concat([
+            Buffer2.from(`--${boundary}\r
+content-type: application/json; charset=UTF-8\r
+\r
+${meta}\r
+--${boundary}\r
+content-type: application/octet-stream\r
+\r
+`),
+            data,
+            Buffer2.from(`\r
+--${boundary}--\r
+`)
+          ]);
+          const r = await call("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+            method: "POST",
+            headers: { authorization: `Bearer ${tok}`, "content-type": `multipart/related; boundary=${boundary}` },
+            body
+          });
+          if (r.status !== 200) {
+            set("drive_last_status", `failed: ${f}`);
+            throw new HttpError2(502, `Google Drive did not take ${f} (${r.json.error && r.json.error.message || r.status}).`);
+          }
+          bytes += data.length;
+        }
+        set("drive_last_upload", `${name}`);
+        set("drive_last_status", "ok");
+        return { folder: name, files: files.length, bytes, drive_folder: FOLDER };
+      }
+      async function afterBackup(folderName) {
+        if (!get("drive_refresh")) return null;
+        try {
+          return await upload({ folder: folderName });
+        } catch (e) {
+          set("drive_last_status", `failed: ${e.message}`);
+          return null;
+        }
+      }
+      module.exports = { status, saveClient, connect, poll, disconnect, upload, afterBackup };
+    }
+  });
+
   // ../../backend/src/services/backup.js
   var require_backup = __commonJS({
     "../../backend/src/services/backup.js"(exports, module) {
@@ -2018,7 +2251,9 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
         const lastDay = c.last_run ? new Date(c.last_run).toLocaleDateString("en-CA") : "";
         if (hhmm >= c.time && lastDay !== today) {
           try {
-            return backupNow({ reason: "scheduled" });
+            const r = backupNow({ reason: "scheduled" });
+            require_drive().afterBackup(r.folder);
+            return r;
           } catch (e) {
             console.error("Scheduled backup failed:", e.message);
           }
@@ -2487,6 +2722,22 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
             sup.matched_party_id = p.id;
             sup.matched_name = p.name;
             sup.created = createdSupplier;
+          }
+          if (sup && sup.matched_party_id && !createdSupplier) {
+            const fill = db2.prepare(`UPDATE parties SET gstin=COALESCE(NULLIF(gstin,''),?), phone=COALESCE(NULLIF(phone,''),?), tel=COALESCE(NULLIF(tel,''),?),
+        mobiles=COALESCE(NULLIF(mobiles,''),?), address=COALESCE(NULLIF(address,''),?), fssai=COALESCE(NULLIF(fssai,''),?), pan=COALESCE(NULLIF(pan,''),?),
+        email=COALESCE(NULLIF(email,''),?) WHERE id=?`);
+            fill.run(
+              sup.gstin || null,
+              sup.phone || null,
+              sup.tel || null,
+              (sup.mobiles || []).join(", ") || null,
+              sup.address || null,
+              sup.fssai || null,
+              sup.pan || null,
+              sup.email || null,
+              sup.matched_party_id
+            );
           }
           const made = /* @__PURE__ */ new Map();
           for (const l of lines) {
@@ -3263,14 +3514,22 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
     "../../backend/src/routes/backup.js"(exports, module) {
       init_globals();
       var router = require_express_shim().Router();
-      var { h } = require_misc();
+      var { h, ha } = require_misc();
       var B3 = require_backup();
+      var D = require_drive();
       router.get("/backup", h((req, res) => res.json({ config: B3.config(), backups: B3.listBackups() })));
       router.put("/backup/config", h((req, res) => res.json(B3.saveConfig(req.body))));
       router.post("/backup/run", h((req, res) => {
         const r = B3.backupNow({ reason: "manual" });
+        D.afterBackup(r.folder);
         res.json({ folder: r.folder, files: r.files.length, config: B3.config(), backups: B3.listBackups() });
       }));
+      router.get("/backup/drive", h((req, res) => res.json(D.status())));
+      router.put("/backup/drive/client", h((req, res) => res.json(D.saveClient(req.body || {}))));
+      router.post("/backup/drive/connect", ha(async (req, res) => res.json(await D.connect())));
+      router.post("/backup/drive/poll", ha(async (req, res) => res.json(await D.poll())));
+      router.post("/backup/drive/disconnect", h((req, res) => res.json(D.disconnect())));
+      router.post("/backup/drive/upload", ha(async (req, res) => res.json(await D.upload(req.body || {}))));
       router.delete("/backup/:name", h((req, res) => {
         const r = B3.deleteBackup(req.params.name);
         res.json({ ...r, backups: B3.listBackups() });
