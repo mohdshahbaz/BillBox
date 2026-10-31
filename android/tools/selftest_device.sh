@@ -52,6 +52,7 @@ adb shell input keyevent KEYCODE_ESCAPE; sleep 1
 tap "Billing" --last; shot billing 1
 tap "Type an item name" && typetext "bikano" && shot search
 tap "Bikano" --skip=1 && shot line_added
+adb shell input keyevent 111; sleep 1   # the keyboard away first
 tap "Save & print" && shot after_save 4
 back; back
 tap "Parties" --last && shot parties

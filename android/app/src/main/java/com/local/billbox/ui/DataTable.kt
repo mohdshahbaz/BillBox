@@ -176,13 +176,17 @@ fun <R> DataTable(
                         Text(c.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
                             textAlign = if (c.end) TextAlign.End else TextAlign.Start,
                             modifier = Modifier.fillMaxWidth().align(Alignment.CenterStart).padding(horizontal = 8.dp, vertical = 6.dp))
-                        Box(Modifier.align(Alignment.CenterEnd).width(14.dp).fillMaxHeight().pointerInput(c.id) {
-                            detectHorizontalDragGestures(onDragEnd = { layout.save() }) { _, dx ->
-                                layout.materialise(cols)
-                                val cur = layout.widths[c.id] ?: c.width.toFloat()
-                                layout.widths[c.id] = maxOf(c.minWidth.toFloat(), cur + with(density) { dx.toDp().value })
-                            }
-                        }) { Box(Modifier.align(Alignment.Center).width(1.dp).size(1.dp, 20.dp).background(MaterialTheme.colorScheme.outlineVariant)) }
+                        // the resize grip takes the heading's own height (matchParentSize), never the space left on screen: with
+                        // fillMaxHeight the heading of a non-lazy table (the bill being typed) grew to fill the screen and hid every row
+                        Box(Modifier.matchParentSize()) {
+                            Box(Modifier.align(Alignment.CenterEnd).width(14.dp).fillMaxHeight().pointerInput(c.id) {
+                                detectHorizontalDragGestures(onDragEnd = { layout.save() }) { _, dx ->
+                                    layout.materialise(cols)
+                                    val cur = layout.widths[c.id] ?: c.width.toFloat()
+                                    layout.widths[c.id] = maxOf(c.minWidth.toFloat(), cur + with(density) { dx.toDp().value })
+                                }
+                            }) { Box(Modifier.align(Alignment.Center).width(1.dp).size(1.dp, 20.dp).background(MaterialTheme.colorScheme.outlineVariant)) }
+                        }
                     }
                 }
             }

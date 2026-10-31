@@ -19,6 +19,9 @@ import com.local.billbox.engine.Engine
 import com.local.billbox.print.PrintLayout
 import com.local.billbox.print.invoicePdf
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONArray
 import org.json.JSONObject
@@ -39,10 +42,29 @@ object SelfTest {
     fun wanted(a: Activity): Boolean =
         a.intent?.getBooleanExtra("selftest", false) == true && (a.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
-    fun dir(a: Activity): File = File(a.filesDir, "selftest").apply { mkdirs() }
+    fun dir(a: android.content.Context): File = File(a.filesDir, "selftest").apply { mkdirs() }
+
+    /** True while the session is being replayed (the screen shows a short note instead of the app). */
+    var replaying by androidx.compose.runtime.mutableStateOf(false)
+    private var started = false
+    private var current: java.lang.ref.WeakReference<Activity>? = null
+
+    /** Runs once per app launch, on the app's own scope: Android may recreate the screen while it runs (the first run was
+     *  cancelled half-way by that and raced a second one). Screenshots use whichever screen is showing. */
+    fun begin(a: Activity, app: AppState) {
+        current = java.lang.ref.WeakReference(a)
+        if (started) return
+        started = true
+        replaying = true
+        val ctx = a.applicationContext
+        app.scope.launch {
+            try { replay(ctx) } finally { replaying = false }
+            tour(app)
+        }
+    }
 
     /** Phase 1: before the app's own start, so the books are exactly the session's. */
-    suspend fun replay(a: Activity) {
+    suspend fun replay(a: android.content.Context) {
         val d = dir(a)
         val f = File(d, "scenario.json")
         if (!f.exists()) { Log.w(TAG, "no scenario.json, replay skipped"); return }
@@ -79,8 +101,9 @@ object SelfTest {
     }
 
     /** Phase 2: once the app is up. */
-    suspend fun tour(a: Activity, app: AppState) {
-        val shots = File(dir(a), "shots").apply { mkdirs() }
+    suspend fun tour(app: AppState) {
+        val ctx = current?.get()?.applicationContext ?: return
+        val shots = File(dir(ctx), "shots").apply { mkdirs() }
         for (k in 0 until 120) { if (app.ready) break; delay(500) }
         Log.i(TAG, "app ready=${app.ready} error=${app.startError} company=${app.companyName} fy=${app.fy}")
         delay(1500)
@@ -88,7 +111,7 @@ object SelfTest {
         suspend fun shot(name: String) {
             delay(2200)
             val file = File(shots, "%02d_%s.png".format(n++, name))
-            runCatching { capture(a, file) }.onFailure { Log.e(TAG, "screenshot $name", it) }
+            runCatching { current?.get()?.let { capture(it, file) } }.onFailure { Log.e(TAG, "screenshot $name", it) }
         }
         for (p in listOf(Page.Billing, Page.Bills, Page.Stock, Page.Parties, Page.Purchases, Page.DebitNotes, Page.Salesmen, Page.Dashboard, Page.Reports, Page.Settings)) {
             app.section = p
@@ -101,13 +124,13 @@ object SelfTest {
             if (inv != null) {
                 for ((tag, layout) in listOf("half" to PrintLayout.Single, "a4" to PrintLayout.A4FullOriginal)) {
                     val bytes = invoicePdf(inv, app.settings, layout).bytes()
-                    val pdf = File(dir(a), "bill_$tag.pdf").apply { writeBytes(bytes) }
+                    val pdf = File(dir(ctx), "bill_$tag.pdf").apply { writeBytes(bytes) }
                     renderFirstPage(pdf, File(shots, "%02d_print_%s.png".format(n++, tag)))
                 }
             }
         }.onFailure { Log.e(TAG, "print", it) }
         app.section = Page.Billing
-        File(dir(a), "done").writeText("ok")
+        File(dir(ctx), "done").writeText("ok")
         Log.i(TAG, "tour done")
     }
 
