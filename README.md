@@ -24,6 +24,21 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.7 — Google keys from the downloaded file, tick boxes, compact bank details, more themes, Android icon
+
+- **Google Drive**: import the `client_secret_….json` downloaded from Google Cloud instead of pasting the keys; Google's
+  errors ("The OAuth client was not found", wrong client type, Drive API off, not a test user) are explained in plain words.
+  The Drive section is beside the backup settings on the Mac and has cleaner buttons on iPhone, Mac and Android.
+- **Tick boxes** in tables stay lined up, and a row is ticked only with its box (a click on the row no longer ticks it).
+- **Price and party changes show at once** on the Mac (its connection to the books no longer keeps old answers).
+- **Bank details** print in three short lines where the bill has room anyway (the footer, or under the GST classes in the
+  Marg style): no item rows are lost. **ORIGINAL / DUPLICATE** on each copy can be switched off. Marg style: E-Mail,
+  GSTIN and State code lined up.
+- **Appearance**: seven more themes (Midnight, Mint, Lavender, Saffron, Crimson, Coffee, Graphite) and a choice of
+  letters (System, Rounded, Serif, Mono) and weight. Changing the theme or saving a setting keeps you on the same page.
+- Android: the dashboard tiles are all the same size; the app icon is the same as on iPhone and Mac.
+- Mac: clicks in tables respond at once (no double-click wait).
+
 ## v15.6 — Marg style bill design
 
 - **Settings › Printing › Bill design**: "BillBox (clean, modern)" or **"Marg style"**, laid out like a Marg ERP bill: firm and

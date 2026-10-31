@@ -813,6 +813,7 @@ extension View {
     public func environment<V>(_ kp: WritableKeyPath<EnvironmentValues, V>, _ v: V) -> _MV { _MV() }
     public func environmentObject<O: ObservableObject>(_ o: O) -> _MV { _MV() }
     public func dynamicTypeSize(_ s: DynamicTypeSize) -> _MV { _MV() }
+    public func fontDesign(_ d: Font.Design?) -> _MV { _MV() }
     public func dynamicTypeSize<T: RangeExpression>(_ r: T) -> _MV where T.Bound == DynamicTypeSize { _MV() }
     public func ignoresSafeArea(_ regions: SafeAreaRegions = .all, edges: Edge.Set = .all) -> _MV { _MV() }
     public func safeAreaInset<V: View>(edge: VerticalEdge, alignment: HorizontalAlignment = .center, spacing: CGFloat? = nil, @ViewBuilder content: () -> V) -> _MV { _MV() }

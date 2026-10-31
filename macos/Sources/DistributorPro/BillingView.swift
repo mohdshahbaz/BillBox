@@ -151,7 +151,7 @@ struct BillLine: Identifiable {
             if app.settings.str("wa_auto") == "1" { WhatsAppWeb.shared.warmUp() }
             searchFocus = true
         }
-        .background(KeyCatcher(active: searchFocus) { key in
+        .background(KeyCatcher(active: searchFocus && app.section == .billing) { key in
             switch key {
             case 125: highlight = min(highlight + 1, max(0, suggestions.count - 1)); return true
             case 126: highlight = max(0, highlight - 1); return true

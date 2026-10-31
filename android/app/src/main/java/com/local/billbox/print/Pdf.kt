@@ -64,7 +64,8 @@ data class Spec(val w: Float, val h: Float, val m: Float, val rowH: Float, val t
     fun scaled(k: Float): Spec = if (k == 1f) this else copy(rowH = rowH * k, tableHead = tableHead * k, foot = foot * k, totals = totals * k,
         strip = strip * k, sellerBand = sellerBand * k, headNext = headNext * k, fs = fs * k)
     /** Room for the bank details under the GST table, when the bill prints them. */
-    fun withBank(co: J): Spec {
+    fun withBank(co: J): Spec = this   // the bank details now sit in the footer, in the room it already has
+    fun withBankBlock(co: J): Spec {
         val rows = bankRows(co)
         if (rows.isEmpty()) return this
         val extra = rows.size * 8.4f * fs + (if (rows.any { it.first == "ADDRESS" && it.second.length > 70 }) 8.4f * fs else 0f) + 4f
@@ -83,6 +84,26 @@ val bankFields = listOf("bank_name" to "BANK NAME", "bank_ac_name" to "ACCOUNT N
     "bank_branch" to "BRANCH NAME", "bank_branch_code" to "BRANCH CODE", "bank_address" to "ADDRESS")
 fun bankRows(co: J): List<Pair<String, String>> =
     if (co.str("print_bank_block") == "0") emptyList() else bankFields.mapNotNull { (k, label) -> co.str(k).trim().takeIf { it.isNotEmpty() }?.let { label to it } }
+
+/** The bank details in at most three short lines of (label, value) pairs (Bank · A/c name / A/c no. · IFSC / Branch · address). */
+fun bankLines(co: J): List<List<Pair<String, String>>> {
+    if (co.str("print_bank_block") == "0") return emptyList()
+    fun v(k: String) = co.str(k).trim()
+    val code = v("bank_branch_code")
+    val branch = v("bank_branch") + if (code.isEmpty()) "" else if (v("bank_branch").isEmpty()) "Code $code" else " ($code)"
+    return listOf(listOf("Bank" to v("bank_name"), "A/c name" to v("bank_ac_name")), listOf("A/c no." to v("bank_ac_no"), "IFSC" to v("bank_ifsc")),
+        listOf("Branch" to branch, "" to v("bank_address"))).map { l -> l.filter { it.second.isNotEmpty() } }.filter { it.isNotEmpty() }
+}
+
+/** Draws one line of bank details (bold labels) from x within width w; shrinks to fit. */
+fun bankLine(pen: Pen, pairs: List<Pair<String, String>>, x: Float, top: Float, w: Float, h: Float, size: Float) {
+    val parts = mutableListOf<Pair<String, Int>>()
+    pairs.forEachIndexed { i, (k, v) -> if (i > 0) parts.add("  ·  " to 400); if (k.isNotEmpty()) parts.add("$k: " to 700); parts.add(v to 500) }
+    val total = parts.sumOf { pen.width(it.first, size, it.second).toDouble() }.toFloat()
+    val k = if (total > w) maxOf(0.6f, w / total) else 1f
+    var cx = x
+    for ((t, wt) in parts) { if (cx >= x + w) break; cx += pen.text(t, cx, top, x + w - cx, h, size * k, wt, minScale = 1f) }
+}
 
 /** Splits n item rows into pages (always at least one page). */
 fun paginate(n: Int, g: Spec): List<IntRange> {
@@ -337,17 +358,6 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
                 ly += rowH
             }
         }
-        // bank details, one per line with the labels lined up, under the GST table
-        val bank = bankRows(co)
-        if (bank.isNotEmpty()) {
-            ly += 3
-            val bh = 8.4f * fs; val lab = 86f * g.cw; val vw = w - rightW - 12 - lab - 4
-            for ((label, value) in bank) {
-                pen.text("$label:", lx, ly, lab, bh, 6.5f * fs, 700, minScale = 0.8f)
-                if (label == "ADDRESS" && value.length > 70) { pen.para(value, lx + lab + 4, ly + 1, vw, 7f * fs, 2, 600); ly += 2 * bh }
-                else { pen.text(value, lx + lab + 4, ly, vw, bh, 7f * fs, 600, minScale = 0.75f); ly += bh }
-            }
-        }
         val wordsTop = y + g.totals - 4 - 8f * fs - 18f * fs
         if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) {
             val by = if (on("print_words")) wordsTop - 10f * fs else y + g.totals - 14f * fs
@@ -382,21 +392,34 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
     }
 
     private fun footer(pen: Pen, x: Float, y: Float, w: Float) {
-        val top = y + 4
-        val third = w / 3
-        val bank = co.str("print_bank")
+        val top = y + 3
+        val bankL = bankLines(co)
+        val sigW = if (bankL.isEmpty()) w / 3 else 130 * g.cw
+        val leftW = if (bankL.isEmpty()) w / 3 * 1.3f else (w - sigW) * 0.42f
+        val pay = co.str("print_bank")
         var ty = top
         if (on("print_terms") && co.str("invoice_terms").isNotEmpty()) {
-            pen.text("Terms", x + 2, ty, third * 1.3f, 7f * fs, 6 * fs, 700, color = MUTED)
-            ty += 7f * fs + pen.para(co.str("invoice_terms"), x + 2, ty + 7f * fs, third * 1.3f, 6.5f * fs, if (bank.isEmpty()) 2 else 1)
+            pen.text("Terms", x + 2, ty, leftW, 7f * fs, 6 * fs, 700, color = MUTED)
+            ty += 7f * fs + pen.para(co.str("invoice_terms"), x + 2, ty + 7f * fs, leftW, 6.5f * fs, if (pay.isEmpty()) 2 else 1)
         }
-        if (bank.isNotEmpty()) pen.text(bank, x + 2, ty, third * 1.3f, 8f * fs, 6.5f * fs, 600, minScale = 0.7f)
-        var my = top
-        if (co.str("print_note").isNotEmpty()) { pen.text(co.str("print_note"), x + third, my, third, 9f * fs, 7f * fs, 700, align = 1, minScale = 0.7f); my += 9f * fs }
-        if (pages > 1) pen.text("Page ${page + 1} of $pages", x + third, my, third, 8f * fs, 6.5f * fs, align = 1, color = MUTED)
+        if (pay.isNotEmpty()) { pen.text(pay, x + 2, ty, leftW, 8f * fs, 6.5f * fs, 600, minScale = 0.7f); ty += 8f * fs }
+        if (bankL.isEmpty()) {
+            val third = w / 3
+            var my = top
+            if (co.str("print_note").isNotEmpty()) { pen.text(co.str("print_note"), x + third, my, third, 9f * fs, 7f * fs, 700, align = 1, minScale = 0.7f); my += 9f * fs }
+            if (pages > 1) pen.text("Page ${page + 1} of $pages", x + third, my, third, 8f * fs, 6.5f * fs, align = 1, color = MUTED)
+        } else {
+            if (co.str("print_note").isNotEmpty() && ty + 8f * fs <= y + g.foot) pen.text(co.str("print_note"), x + 2, ty, leftW, 8f * fs, 6.5f * fs, 700, minScale = 0.7f)
+            // the bank details, three short lines in the middle of the footer: no room is taken from the items
+            val bx = x + leftW + 8; val bw = w - sigW - leftW - 14
+            var by = top
+            val lh = 7.4f * fs
+            for (l in bankL) { bankLine(pen, l, bx, by, bw, lh, 6.3f * fs); by += lh }
+            if (pages > 1) pen.text("Page ${page + 1} of $pages", bx, by, bw, 7f * fs, 6 * fs, color = MUTED)
+        }
         if (on("print_signature")) {
-            pen.text(hc("For $companyName"), x + 2 * third - 2, top, third, 9f * fs, 7 * fs, 700, 2, minScale = 0.7f)
-            pen.text("Authorised Signatory", x + 2 * third - 2, y + g.foot - 9f * fs, third, 8f * fs, 6.5f * fs, align = 2, color = MUTED)
+            pen.text(hc("For $companyName"), x + w - sigW, top, sigW - 2, 9f * fs, 7 * fs, 700, 2, minScale = 0.7f)
+            pen.text("Authorised Signatory", x + w - sigW, y + g.foot - 9f * fs, sigW - 2, 8f * fs, 6.5f * fs, align = 2, color = MUTED)
         }
     }
 }
@@ -408,8 +431,10 @@ fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder
     val marg = printStyle(co) == "marg"
     val g = if (marg) margSpec(base, inv, co) else base.withBank(co)
     // one copy of one page, in the company's bill design (Settings › Printing › Bill design)
-    fun sheet(pen: Pen, r: IntRange, i: Int, n2: Int, c: String, oy: Float = 0f) =
+    fun sheet(pen: Pen, r: IntRange, i: Int, n2: Int, label: String, oy: Float = 0f) {
+        val c = if (co.str("print_copy_label") == "0") "" else label   // Settings › Printing › ORIGINAL / DUPLICATE on each copy
         if (marg) MargSheet(inv, co, r, i, n2, c, g).draw(pen, 0f, oy) else InvoiceSheet(inv, co, r, i, n2, c, g).draw(pen, 0f, oy)
+    }
     val labels = copyLabelsFor(co)
     if (layout == PrintLayout.A4TwoUp && paginate(n, g).size == 1) {
         into.page(g.w, g.h * 2) { pen ->

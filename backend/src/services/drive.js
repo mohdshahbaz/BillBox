@@ -41,7 +41,28 @@ function status() {
   };
 }
 
+/** The keys from the file Google Cloud downloads (client_secret_….json): {"installed": {client_id, client_secret, …}}. */
+function keysFromJson(text) {
+  let j;
+  try { j = JSON.parse(String(text)); } catch (_) { throw new HttpError(400, 'That file is not the JSON file downloaded from Google Cloud (client_secret_….json).'); }
+  if (j && j.web && !j.installed) throw new HttpError(400, 'That file is for a “Web application” client. In Google Cloud make an OAuth client of type “TVs and Limited Input devices” and download its JSON.');
+  const k = (j && (j.installed || j.web)) || j || {};
+  if (!k.client_id || !k.client_secret) throw new HttpError(400, 'That file has no client ID and secret in it. Download the JSON of the OAuth client (Credentials › your client › Download JSON).');
+  return { client_id: k.client_id, client_secret: k.client_secret };
+}
+
+/** What Google's error means, in plain words. */
+function explain(j, status) {
+  const e = j.error || '';
+  if (e === 'invalid_client') return 'Google does not know this Client ID. Check it was copied in full (or import the downloaded JSON file), that the client is of type “TVs and Limited Input devices”, and if you made it just now wait a few minutes and try again';
+  if (e === 'unauthorized_client') return 'this client cannot use code sign-in: make an OAuth client of type “TVs and Limited Input devices”';
+  if (e === 'invalid_scope') return 'the Google Drive API is not allowed for this client: turn on the Google Drive API in your Google Cloud project';
+  if (e === 'access_denied' || e === 'org_internal') return 'Google refused: add your Gmail as a test user on the consent screen (Audience › Test users)';
+  return j.error_description || e || String(status);
+}
+
 function saveClient(b = {}) {
+  if (b.json) b = keysFromJson(b.json);
   const id = String(b.client_id || '').trim(), secret = String(b.client_secret || '').trim();
   if (!/\.apps\.googleusercontent\.com$/.test(id)) throw new HttpError(400, 'Paste the Client ID from Google Cloud (it ends in .apps.googleusercontent.com).');
   if (!secret) throw new HttpError(400, 'Paste the client secret too.');
@@ -56,7 +77,7 @@ async function connect() {
   const id = get('drive_client_id');
   if (!id) throw new HttpError(400, 'Add the Google Client ID and secret first.');
   const r = await call('https://oauth2.googleapis.com/device/code', { method: 'POST', headers: FORM, body: form({ client_id: id, scope: SCOPE }) });
-  if (r.status !== 200) throw new HttpError(502, `Google did not give a code (${r.json.error_description || r.json.error || r.status}).`);
+  if (r.status !== 200) throw new HttpError(r.json.error ? 400 : 502, `Google did not give a code: ${explain(r.json, r.status)}.`);
   set('drive_device', r.json.device_code);
   return { user_code: r.json.user_code, verification_url: r.json.verification_url || r.json.verification_uri || 'https://www.google.com/device',
     interval: r.json.interval || 5, expires_in: r.json.expires_in || 1800 };
@@ -72,7 +93,7 @@ async function poll() {
   del('drive_device');
   if (r.status !== 200 || !r.json.refresh_token) {
     throw new HttpError(400, r.json.error === 'access_denied' ? 'Google sign-in was declined.' : r.json.error === 'expired_token' ? 'The code ran out. Press Connect again.'
-      : `Google did not connect (${r.json.error_description || r.json.error || r.status}).`);
+      : `Google did not connect: ${explain(r.json, r.status)}.`);
   }
   set('drive_refresh', r.json.refresh_token);
   await folder(r.json.access_token);

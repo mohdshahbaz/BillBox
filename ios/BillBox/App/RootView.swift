@@ -46,8 +46,8 @@ import SwiftUI
 
 @MainActor struct MainTabs: View {
     @EnvironmentObject private var app: AppModel
-    @State private var tab: Page = .billing
-    @State private var morePath: [Page] = []
+    private var tab: Page { app.tab }
+    private var morePath: [MoreRoute] { app.morePath }
 
     static let tabs: [Page] = [.billing, .bills, .stock, .parties]
     static let more: [Page] = [.purchases, .debitNotes, .salesmen, .dashboard, .reports, .settings]
@@ -62,15 +62,20 @@ import SwiftUI
                 .tabItem { Label(Page.stock.title, systemImage: Page.stock.symbol) }.tag(Page.stock)
             NavigationStack { PartiesView().companyYearToolbar() }
                 .tabItem { Label(Page.parties.title, systemImage: Page.parties.symbol) }.tag(Page.parties)
-            NavigationStack(path: $morePath) {
+            NavigationStack(path: $app.morePath) {
                 List {
                     ForEach(MainTabs.more) { p in
-                        NavigationLink(value: p) { Label(p.title, systemImage: p.symbol) }
+                        NavigationLink(value: MoreRoute.page(p)) { Label(p.title, systemImage: p.symbol) }
                     }
                 }
                 .navigationTitle("More")
                 .companyYearToolbar()
-                .navigationDestination(for: Page.self) { p in screen(p).companyYearToolbar() }
+                .navigationDestination(for: MoreRoute.self) { r in
+                    switch r {
+                    case .page(let p): screen(p).companyYearToolbar()
+                    case .settings(let k): SettingsView.page(k)
+                    }
+                }
             }
             .tabItem { Label("More", systemImage: "ellipsis.circle") }.tag(Page.dashboard)
         }
@@ -84,17 +89,25 @@ import SwiftUI
     private var tabBinding: Binding<Page> {
         Binding(get: { MainTabs.tabs.contains(tab) ? tab : .dashboard },
                 set: { t in
-                    tab = t
-                    if MainTabs.tabs.contains(t) { app.section = t } else { app.section = morePath.last ?? .dashboard }
+                    app.tab = t
+                    if MainTabs.tabs.contains(t) { app.section = t } else { app.section = lastPage ?? .dashboard }
                 })
+    }
+
+    /// The screen open in More (the Settings pages count as Settings).
+    private var lastPage: Page? {
+        for r in morePath.reversed() {
+            switch r { case .page(let p): return p; case .settings: return .settings }
+        }
+        return nil
     }
 
     private func show(_ s: Page) {
         if MainTabs.tabs.contains(s) {
-            tab = s
+            app.tab = s
         } else {
-            tab = .dashboard
-            if morePath.last != s { morePath = [s] }
+            app.tab = .dashboard
+            if lastPage != s { app.morePath = [.page(s)] }
         }
     }
 

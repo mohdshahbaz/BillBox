@@ -194,9 +194,11 @@ db.withCompany(id1, () => {
     fs.writeFileSync(path.join(process.env.DATA_DIR, 'test.xlsx'), buf);
   });
   ok('sales book + purchase book + all-bills', () => {
-    const sb = R.book('sales'), pb = R.book('purchase');
+    // the same dates for both (on the 1st of a month the books' month-to-date default would leave out yesterday's bills)
+    const from = '2000-01-01', to = '2100-12-31';
+    const sb = R.book('sales', from, to), pb = R.book('purchase', from, to);
     assert.ok(sb.totals.count >= 2 && pb.totals.count >= 2);
-    const all = R.bills({ type: 'ALL' });
+    const all = R.bills({ type: 'ALL', from, to });
     assert.strictEqual(all.rows.length, sb.totals.count + pb.totals.count);
     assert.ok(R.bills({ q: 'HB/1001' }).rows.some((r) => r.type === 'PURCHASE'));
   });

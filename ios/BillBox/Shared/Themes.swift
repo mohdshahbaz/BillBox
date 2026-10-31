@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Colour themes (same eight as the Mac). Each has an accent colour plus page and card backgrounds for light and dark mode.
+/// Colour themes (the same on the Mac). Each has an accent colour plus page and card backgrounds for light and dark mode.
 struct AppTheme: Identifiable, Equatable {
     let id: String
     let name: String
@@ -30,10 +30,25 @@ struct AppTheme: Identifiable, Equatable {
         AppTheme(id: "rose", name: "Rose", accent: dyn(0xC9285F, 0xF0608F), card: dyn(0xFFFFFF, 0x2B1821), page: dyn(0xFBEEF3, 0x22141A), swatch: [hex(0xC9285F), hex(0xF6C9D8)]),
         AppTheme(id: "gold", name: "Marigold", accent: dyn(0xB7791F, 0xF2B544), card: dyn(0xFFFFFF, 0x2A2316), page: dyn(0xFBF5E6, 0x1E190F), swatch: [hex(0xB7791F), hex(0xF5E2B4)]),
         AppTheme(id: "slate", name: "Slate", accent: dyn(0x4A5C70, 0x93A8BD), card: dyn(0xFFFFFF, 0x25282C), page: dyn(0xEEF0F3, 0x1B1D20), swatch: [hex(0x4A5C70), hex(0xCDD5DE)]),
+        AppTheme(id: "midnight", name: "Midnight", accent: dyn(0x2563EB, 0x60A5FA), card: dyn(0xFFFFFF, 0x111827), page: dyn(0xEEF2F7, 0x0B1220), swatch: [hex(0x2563EB), hex(0x1E293B)]),
+        AppTheme(id: "mint", name: "Mint", accent: dyn(0x0F9D7A, 0x34D3A6), card: dyn(0xFFFFFF, 0x16241F), page: dyn(0xEAF7F2, 0x0F1A16), swatch: [hex(0x0F9D7A), hex(0xC6F0E2)]),
+        AppTheme(id: "lavender", name: "Lavender", accent: dyn(0x7C5CC4, 0xB49CFF), card: dyn(0xFFFFFF, 0x221D2E), page: dyn(0xF4F0FB, 0x17131F), swatch: [hex(0x7C5CC4), hex(0xE4DBF7)]),
+        AppTheme(id: "saffron", name: "Saffron", accent: dyn(0xE07000, 0xFFA733), card: dyn(0xFFFFFF, 0x2B2112), page: dyn(0xFFF5E6, 0x1F170C), swatch: [hex(0xE07000), hex(0xFFE2B8)]),
+        AppTheme(id: "crimson", name: "Crimson", accent: dyn(0xB91C1C, 0xF87171), card: dyn(0xFFFFFF, 0x2A1616), page: dyn(0xFBEFEF, 0x1E1010), swatch: [hex(0xB91C1C), hex(0xF5CFCF)]),
+        AppTheme(id: "coffee", name: "Coffee", accent: dyn(0x7A4E2D, 0xC9925E), card: dyn(0xFFFFFF, 0x2A211B), page: dyn(0xF6EFE8, 0x1C1612), swatch: [hex(0x7A4E2D), hex(0xE9D8C6)]),
+        AppTheme(id: "graphite", name: "Graphite", accent: dyn(0x1F2937, 0xE5E7EB), card: dyn(0xFFFFFF, 0x1C1C1E), page: dyn(0xF2F2F3, 0x000000), swatch: [hex(0x1F2937), hex(0xD1D5DB)]),
     ]
 
     static func named(_ id: String) -> AppTheme { all.first { $0.id == id } ?? all[0] }
-    static var current: AppTheme { named(UserDefaults.standard.string(forKey: "theme") ?? "clean") }
+    /// The chosen theme. Asked for by every table row and panel, so it is looked up once per theme change, not each time.
+    private static var cached: (id: String, theme: AppTheme)?
+    static var current: AppTheme {
+        let id = UserDefaults.standard.string(forKey: "theme") ?? "clean"
+        if let c = cached, c.id == id { return c.theme }
+        let t = named(id)
+        cached = (id, t)
+        return t
+    }
 }
 
 /// Settings > Appearance: pick a colour theme and light / dark / automatic.
@@ -44,6 +59,8 @@ struct AppTheme: Identifiable, Equatable {
     @AppStorage("corners") private var corners = "normal"
     @AppStorage("density") private var density = "regular"
     @AppStorage("textSize") private var textSize = "default"
+    @AppStorage("fontStyle") private var fontStyle = "system"
+    @AppStorage("fontWeight") private var fontWeight = "regular"
 
     var body: some View {
         ScrollView {
@@ -79,6 +96,19 @@ struct AppTheme: Identifiable, Equatable {
                 }
                 .pickerStyle(.segmented).labelsHidden()
                 Group {
+                    Text("Letters").font(.headline)
+                    Picker("Letters", selection: $fontStyle) {
+                        Text("System").tag("system"); Text("Rounded").tag("rounded"); Text("Serif").tag("serif"); Text("Mono").tag("mono")
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                    Picker("Weight", selection: $fontWeight) {
+                        Text("Light").tag("light"); Text("Regular").tag("regular"); Text("Medium").tag("medium"); Text("Bold").tag("bold")
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                    Text("Letters change at once in the whole app: System is San Francisco (Apple's own), Serif is New York.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Group {
                     Text("Panels").font(.headline)
                     Picker("Panels", selection: $cardStyle) {
                         Text("Soft shadow").tag("soft"); Text("Outlined").tag("outline"); Text("Flat").tag("flat")
@@ -109,5 +139,20 @@ struct AppTheme: Identifiable, Equatable {
         }
         .background(Theme.page)
         .navigationTitle("Appearance")
+    }
+}
+
+/// Settings › Appearance › Letters: the app's typeface (San Francisco, its rounded form, New York serif or monospaced) and weight.
+struct FontChoice: ViewModifier {
+    @AppStorage("fontStyle") private var style = "system"
+    @AppStorage("fontWeight") private var weight = "regular"
+    func body(content: Content) -> some View {
+        if #available(iOS 16.1, *) {
+            content
+                .fontDesign(style == "rounded" ? .rounded : style == "serif" ? .serif : style == "mono" ? .monospaced : .default)
+                .fontWeight(weight == "light" ? .light : weight == "medium" ? .medium : weight == "bold" ? .semibold : nil)
+        } else {
+            content
+        }
     }
 }

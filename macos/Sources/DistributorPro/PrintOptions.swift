@@ -77,6 +77,7 @@ import SwiftUI
             Picker("Text size", selection: choice("print_font", "normal")) {
                 Text("Smaller (more rows on a page)").tag("small"); Text("Normal").tag("normal"); Text("Larger (easier to read)").tag("large")
             }
+            Toggle("Print ORIGINAL / DUPLICATE on each copy", isOn: flag("print_copy_label", true))
             Toggle("Print a third copy", isOn: flag("print_triplicate", false))
             if app.settings.str("print_triplicate") == "1" {
                 SettingTextField(title: "Third copy label", key: "print_copy3", placeholder: "TRIPLICATE FOR ASSESSEE", maxLength: 40)
@@ -95,7 +96,7 @@ import SwiftUI
                 SettingTextField(title: f.title, key: f.key, placeholder: f.key == "bank_address" ? "Branch address" : "", maxLength: f.key == "bank_address" ? 200 : 60)
             }
         } header: { Text("Bank details") } footer: {
-            Text("Printed above the amount in words, one per line (BANK NAME:, ACCOUNT NAME:, ACCOUNT NUMBER:, IFSC CODE:, BRANCH NAME:, BRANCH CODE:, ADDRESS:). Empty ones are left out; a bill with bank details has a few rows less room for items.")
+            Text("Printed in three short lines (Bank · A/c name / A/c no. · IFSC / Branch · address) where the bill has room anyway: in the footer of the BillBox design, under the GST classes of the Marg style. Item rows are not reduced. Empty ones are left out.")
         }
     }
 }

@@ -4,21 +4,38 @@ import UniformTypeIdentifiers
 
 /// The Mac's six settings tabs become a list of sections, each opening its own page.
 @MainActor struct SettingsView: View {
+    /// (key, title, symbol, colour) of each Settings page
+    static let pages: [(key: String, title: String, symbol: String, color: Color)] = [
+        ("appearance", "Appearance", "paintpalette", .pink), ("companies", "Companies", "building.2", .blue), ("printing", "Printing", "printer", .gray),
+        ("whatsapp", "WhatsApp", "message", .green), ("billing", "Billing & Dashboard", "gauge.with.dots.needle.33percent", .orange),
+        ("parties", "Parties & Payments", "person.2.fill", .purple), ("stock", "Stock", "archivebox", .brown), ("backup", "Backup", "externaldrive", .teal),
+        ("marg", "Import from Marg ERP", "square.and.arrow.down.on.square", .indigo),
+    ]
+
     var body: some View {
         List {
             BackupSafetyRow()
-            NavigationLink { AppearanceSettings().navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline) } label: { SettingsRow(title: "Appearance", symbol: "paintpalette", color: .pink) }
-            NavigationLink { CompanySettings() } label: { SettingsRow(title: "Companies", symbol: "building.2", color: .blue) }
-            NavigationLink { PrintSettings() } label: { SettingsRow(title: "Printing", symbol: "printer", color: .gray) }
-            NavigationLink { WhatsAppSettings().navigationTitle("WhatsApp").navigationBarTitleDisplayMode(.inline) } label: { SettingsRow(title: "WhatsApp", symbol: "message", color: .green) }
-            NavigationLink { BillingDashboardSettings().navigationTitle("Billing & Dashboard").navigationBarTitleDisplayMode(.inline) } label: { SettingsRow(title: "Billing & Dashboard", symbol: "gauge.with.dots.needle.33percent", color: .orange) }
-            NavigationLink { PartiesPaymentsSettings().navigationTitle("Parties & Payments").navigationBarTitleDisplayMode(.inline) } label: { SettingsRow(title: "Parties & Payments", symbol: "person.2.fill", color: .purple) }
-            NavigationLink { StockSettings() } label: { SettingsRow(title: "Stock", symbol: "archivebox", color: .brown) }
-            NavigationLink { BackupSettings() } label: { SettingsRow(title: "Backup", symbol: "externaldrive", color: .teal) }
-            NavigationLink { MargImportView().navigationTitle("Import from Marg ERP").navigationBarTitleDisplayMode(.inline) } label: { SettingsRow(title: "Import from Marg ERP", symbol: "square.and.arrow.down.on.square", color: .indigo) }
+            // value links: the open page is part of the More tab's path, so redrawing (a theme change, Save) keeps it open
+            ForEach(SettingsView.pages, id: \.key) { p in
+                NavigationLink(value: MoreRoute.settings(p.key)) { SettingsRow(title: p.title, symbol: p.symbol, color: p.color) }
+            }
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder static func page(_ key: String) -> some View {
+        switch key {
+        case "appearance": AppearanceSettings().navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline)
+        case "companies": CompanySettings()
+        case "printing": PrintSettings()
+        case "whatsapp": WhatsAppSettings().navigationTitle("WhatsApp").navigationBarTitleDisplayMode(.inline)
+        case "billing": BillingDashboardSettings().navigationTitle("Billing & Dashboard").navigationBarTitleDisplayMode(.inline)
+        case "parties": PartiesPaymentsSettings().navigationTitle("Parties & Payments").navigationBarTitleDisplayMode(.inline)
+        case "stock": StockSettings()
+        case "backup": BackupSettings()
+        default: MargImportView().navigationTitle("Import from Marg ERP").navigationBarTitleDisplayMode(.inline)
+        }
     }
 }
 

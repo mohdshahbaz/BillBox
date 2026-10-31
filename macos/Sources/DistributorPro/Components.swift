@@ -359,6 +359,13 @@ enum Files {
         return p.runModal() == .OK ? p.url : nil
     }
 
+    /// A JSON file chosen in Finder, as text (nil when cancelled or unreadable).
+    @MainActor
+    static func pickJSON() async -> String? {
+        guard let u = open(types: ["json"]) else { return nil }
+        return try? String(contentsOf: u, encoding: .utf8)
+    }
+
     @MainActor
     static func chooseFolder() -> String? {
         let p = NSOpenPanel()

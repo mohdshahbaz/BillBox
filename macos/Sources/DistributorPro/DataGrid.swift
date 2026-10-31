@@ -77,6 +77,9 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
     var selection: Binding<Set<Row.ID>>?
     var rowHeight: CGFloat = 32
     var numbered = true
+    /// true: a plain click selects the row (a list with a detail beside it, e.g. Salesmen). false: rows are ticked only with
+    /// their tick box (or ⌘/⇧-click); a plain click just highlights the row.
+    var clickSelects = false
     var onOpen: ((Row) -> Void)?
     var menu: ((Row) -> AnyView)?
     let columns: [GridColumn<Row>]
@@ -89,20 +92,23 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
     @State private var dragDX: CGFloat = 0
     @State private var resizing: (id: String, start: Double)?
     @State private var anchor: Int?   // row last clicked plain, for Shift-click range selection
+    @State private var highlighted: Row.ID?   // the row clicked last (ticks are separate)
 
     init(_ rows: [Row], layoutKey: String, selection: Binding<Set<Row.ID>>? = nil, rowHeight: CGFloat = 32,
-         numbered: Bool = true, onOpen: ((Row) -> Void)? = nil, menu: ((Row) -> AnyView)? = nil,
+         numbered: Bool = true, clickSelects: Bool = false, onOpen: ((Row) -> Void)? = nil, menu: ((Row) -> AnyView)? = nil,
          @ColumnBuilder<Row> columns: () -> [GridColumn<Row>]) {
         self.rows = rows
         self.layoutKey = layoutKey
         self.selection = selection
         self.rowHeight = rowHeight
+        self.clickSelects = clickSelects
         self.onOpen = onOpen
         self.menu = menu
         var cols = columns()
         // every table gets a serial number column first, unless the screen already has its own
         if numbered && !cols.contains(where: { $0.id == "sno" }) {
-            var n = GridColumn<Row>("S.No", id: "sno", min: 44, ideal: 48, align: .trailing) { _ in EmptyView() }
+            let ticks = selection != nil && !clickSelects
+            var n = GridColumn<Row>("S.No", id: "sno", min: ticks ? 66 : 44, ideal: ticks ? 70 : 48, align: .trailing) { _ in EmptyView() }
             n.isIndex = true
             cols.insert(n, at: 0)
         }
@@ -191,8 +197,10 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
     /// Plain click: select only this row (and remember it as the anchor for a later Shift-click).
     /// ⌘-click: add/remove just this row. ⇧-click: select every row between the anchor and here.
     private func click(_ row: Row, _ idx: Int) {
+        highlighted = row.id
         guard let selection else { return }
         let mods = NSEvent.modifierFlags
+        if !clickSelects && !mods.contains(.shift) && !mods.contains(.command) { anchor = idx; return }   // only the tick box ticks
         if mods.contains(.shift), let a = anchor {
             let lo = Swift.min(a, idx), hi = Swift.max(a, idx)
             guard lo >= 0, hi < rows.count else { selection.wrappedValue = [row.id]; anchor = idx; return }
@@ -320,18 +328,22 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                     Group {
                         if c.isIndex {
                             HStack(spacing: 6) {
-                                // a tick box per row: tick several rows, then act on them (print, delete…)
-                                if let selection {
+                                // a tick box per row, always in the same place: tick several rows, then act on them (print, delete…)
+                                if let selection, !clickSelects {
                                     Button { if selected { selection.wrappedValue.remove(row.id) } else { selection.wrappedValue.insert(row.id) } } label: {
                                         Image(systemName: selected ? "checkmark.square.fill" : "square").foregroundStyle(selected ? Color.accentColor : Color.secondary)
                                     }
                                     .buttonStyle(.plain)
+                                    .frame(width: 18, height: rh)
+                                    .contentShape(Rectangle())
                                     .help(selected ? "Untick" : "Tick this row")
                                 }
-                                Text("\(idx + 1)").mono().foregroundStyle(.secondary)
+                                Spacer(minLength: 0)
+                                Text("\(idx + 1)").mono().foregroundStyle(.secondary).lineLimit(1).fixedSize()
                             }
                         } else { c.cell(row) }
                     }
+                        .lineLimit(1)   // a long value is cut, never wrapped onto a second line
                         .padding(.horizontal, 10)
                         .frame(width: w[i], height: rh, alignment: c.align)
                         .clipped()
@@ -341,9 +353,9 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
             }
             Rectangle().fill(Theme.line.opacity(0.7)).frame(height: 0.5)
         }
-        .background(selected ? Color.accentColor.opacity(0.14) : Theme.card)
+        .background(selected ? Color.accentColor.opacity(0.14) : (highlighted == row.id && !clickSelects ? Color.primary.opacity(0.06) : Theme.card))
         .contentShape(Rectangle())
-        .modifier(RowTaps(enabled: selection != nil, single: { click(row, idx) }, double: { onOpen?(row) }))
+        .modifier(RowTaps(enabled: selection != nil || onOpen != nil, single: { click(row, idx) }, double: { onOpen?(row) }))
         .contextMenu { if let menu { menu(row) } }
     }
 }
@@ -354,9 +366,12 @@ private struct RowTaps: ViewModifier {
     let double: () -> Void
     func body(content: Content) -> some View {
         if enabled {
-            content
-                .onTapGesture(count: 2) { single(); double() }
-                .onTapGesture { single() }
+            // one tap gesture: a second gesture for double-clicks made every single click wait for the double-click time
+            // first, which made the tables feel slow
+            content.onTapGesture {
+                single()
+                if (NSApp.currentEvent?.clickCount ?? 1) >= 2 { double() }
+            }
         } else {
             content
         }

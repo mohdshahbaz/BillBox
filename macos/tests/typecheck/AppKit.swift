@@ -114,6 +114,7 @@ extension NSWindowDelegate { public func windowShouldClose(_ sender: NSWindow) -
 open class NSScreen { public static var main: NSScreen? { nil }; public static var screens: [NSScreen] { [] }; public var frame: NSRect { .zero }; public var visibleFrame: NSRect { .zero }; public var backingScaleFactor: CGFloat { 2 } }
 
 open class NSEvent: NSObject {
+    open var clickCount: Int { 1 }
     public enum EventType { case keyDown, keyUp, leftMouseDown, leftMouseUp, flagsChanged }
     public struct EventTypeMask: OptionSet { public let rawValue: UInt64; public init(rawValue: UInt64) { self.rawValue = rawValue }; public static let keyDown = EventTypeMask(rawValue: 1), flagsChanged = EventTypeMask(rawValue: 2) }
     public struct ModifierFlags: OptionSet { public let rawValue: UInt; public init(rawValue: UInt) { self.rawValue = rawValue }
@@ -224,6 +225,7 @@ open class NSApplication: NSResponder {
     public struct ModalResponse: Equatable { public init(_ v: Int) {}; public static let OK = ModalResponse(1), cancel = ModalResponse(0),
         alertFirstButtonReturn = ModalResponse(1000), alertSecondButtonReturn = ModalResponse(1001), alertThirdButtonReturn = ModalResponse(1002) }
     public static var shared: NSApplication { NSApplication() }
+    open var currentEvent: NSEvent? { nil }
     @discardableResult open func setActivationPolicy(_ p: ActivationPolicy) -> Bool { true }
     open func activate(ignoringOtherApps: Bool) {}
     open func terminate(_ s: Any?) {}

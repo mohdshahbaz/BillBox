@@ -2,17 +2,20 @@ import SwiftUI
 import AppKit
 
 @MainActor struct SettingsView: View {
+    /// the tab stays chosen when the window is redrawn (a theme change) and when Settings is opened again
+    @AppStorage("settingsTab") private var tab = "appearance"
+
     var body: some View {
-        TabView {
-            AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }
-            CompanySettings().tabItem { Label("Companies", systemImage: "building.2") }
-            PrintSettings().tabItem { Label("Printing", systemImage: "printer") }
-            WhatsAppSettings().tabItem { Label("WhatsApp", systemImage: "message") }
-            BillingDashboardSettings().tabItem { Label("Billing & Dashboard", systemImage: "gauge") }
-            PartiesPaymentsSettings().tabItem { Label("Parties & Payments", systemImage: "person.2") }
-            StockSettings().tabItem { Label("Stock", systemImage: "archivebox") }
-            BackupSettings().tabItem { Label("Backup", systemImage: "externaldrive") }
-            MargImportView().tabItem { Label("Import from Marg", systemImage: "square.and.arrow.down.on.square") }
+        TabView(selection: $tab) {
+            AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }.tag("appearance")
+            CompanySettings().tabItem { Label("Companies", systemImage: "building.2") }.tag("companies")
+            PrintSettings().tabItem { Label("Printing", systemImage: "printer") }.tag("printing")
+            WhatsAppSettings().tabItem { Label("WhatsApp", systemImage: "message") }.tag("whatsapp")
+            BillingDashboardSettings().tabItem { Label("Billing & Dashboard", systemImage: "gauge") }.tag("billing")
+            PartiesPaymentsSettings().tabItem { Label("Parties & Payments", systemImage: "person.2") }.tag("parties")
+            StockSettings().tabItem { Label("Stock", systemImage: "archivebox") }.tag("stock")
+            BackupSettings().tabItem { Label("Backup", systemImage: "externaldrive") }.tag("backup")
+            MargImportView().tabItem { Label("Import from Marg", systemImage: "square.and.arrow.down.on.square") }.tag("marg")
         }
         .padding(16)
         .navigationTitle("Settings")
@@ -211,6 +214,8 @@ import AppKit
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+          // this Mac's backups on the left, Google Drive on the right: both always in view
+          HStack(alignment: .top, spacing: 12) {
             Form {
                 HStack {
                     TextField("Backup folder", text: $dir)
@@ -220,17 +225,21 @@ import AppKit
                 Toggle("Also back up whenever I quit the app", isOn: $onExit)
                 DatePicker("Time", selection: timeDate, displayedComponents: .hourAndMinute)
                 Text("Every backup is kept for good; nothing is deleted automatically.").font(.caption).foregroundStyle(.secondary)
+                if !lastRun.isEmpty { Text("Last backup: \(Fmt.ist(lastRun)) · \(istStatus(lastStatus))").font(.caption).foregroundStyle(.secondary) }
                 HStack {
-                    if !lastRun.isEmpty { Text("Last backup: \(Fmt.ist(lastRun)) · \(istStatus(lastStatus))").font(.caption).foregroundStyle(.secondary) }
                     Spacer()
                     Button("Save settings") { Task { await saveConfig() } }
                     Button { Task { await runNow() } } label: { Text(busy ? "Backing up…" : "Back up now") }
                         .buttonStyle(.borderedProminent).disabled(busy)
                 }
-                DriveBackupSection()
             }
             .groupedForm()
-            .frame(maxHeight: 620)
+            .frame(minWidth: 380, maxWidth: .infinity)
+            Form { DriveBackupSection() }
+                .groupedForm()
+                .frame(minWidth: 340, maxWidth: .infinity)
+          }
+          .frame(height: 330)
             HStack {
                 Text("Restore").font(.headline)
                 Spacer()

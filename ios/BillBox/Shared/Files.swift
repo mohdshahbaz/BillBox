@@ -36,6 +36,18 @@ enum Files {
 
     static func copy(_ text: String) { UIPasteboard.general.string = text }
 
+    /// A JSON file picked in Files, as text (nil when cancelled or unreadable).
+    @MainActor
+    static func pickJSON() async -> String? {
+        guard let url = await pick([.json]) else { return nil }
+        let ok = url.startAccessingSecurityScopedResource()
+        defer { if ok { url.stopAccessingSecurityScopedResource() } }
+        var text: String?
+        var err: NSError?
+        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &err) { u in text = try? String(contentsOf: u, encoding: .utf8) }
+        return text
+    }
+
     @MainActor
     static func topController() -> UIViewController? {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }

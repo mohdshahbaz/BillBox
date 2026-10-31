@@ -61,7 +61,34 @@ public final class Drive {
         ]
     }
 
-    func saveClient(_ b: Row) async throws -> Row {
+    /// The keys from the file Google Cloud downloads (client_secret_….json): {"installed": {client_id, client_secret, …}}.
+    static func keysFromJson(_ text: String) throws -> Row {
+        guard let j = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any] else {
+            throw HttpError(400, "That file is not the JSON file downloaded from Google Cloud (client_secret_….json).")
+        }
+        if j["web"] != nil && j["installed"] == nil {
+            throw HttpError(400, "That file is for a “Web application” client. In Google Cloud make an OAuth client of type “TVs and Limited Input devices” and download its JSON.")
+        }
+        let k = (j["installed"] as? [String: Any]) ?? (j["web"] as? [String: Any]) ?? j
+        guard JS.truthy(k["client_id"]), JS.truthy(k["client_secret"]) else {
+            throw HttpError(400, "That file has no client ID and secret in it. Download the JSON of the OAuth client (Credentials › your client › Download JSON).")
+        }
+        return ["client_id": k["client_id"]!, "client_secret": k["client_secret"]!]
+    }
+
+    /// What Google's error means, in plain words.
+    static func explain(_ j: [String: Any], _ status: Int) -> String {
+        switch j["error"] as? String ?? "" {
+        case "invalid_client": return "Google does not know this Client ID. Check it was copied in full (or import the downloaded JSON file), that the client is of type “TVs and Limited Input devices”, and if you made it just now wait a few minutes and try again"
+        case "unauthorized_client": return "this client cannot use code sign-in: make an OAuth client of type “TVs and Limited Input devices”"
+        case "invalid_scope": return "the Google Drive API is not allowed for this client: turn on the Google Drive API in your Google Cloud project"
+        case "access_denied", "org_internal": return "Google refused: add your Gmail as a test user on the consent screen (Audience › Test users)"
+        default: return why(j, status)
+        }
+    }
+
+    func saveClient(_ b0: Row) async throws -> Row {
+        let b = JS.truthy(b0["json"] ?? nil) ? try Drive.keysFromJson(JS.string(b0.v("json"))) : b0
         let text = { (k: String) in JS.truthy(b[k] ?? nil) ? JS.trim(JS.string(b.v(k))) : "" }
         let id = text("client_id"), secret = text("client_secret")
         if !id.hasSuffix(".apps.googleusercontent.com") || id == ".apps.googleusercontent.com" {
@@ -78,7 +105,7 @@ public final class Drive {
         let id = try await get("drive_client_id")
         if id.isEmpty { throw HttpError(400, "Add the Google Client ID and secret first.") }
         let r = try await call("https://oauth2.googleapis.com/device/code", method: "POST", headers: Drive.FORM, body: Drive.form([("client_id", id), ("scope", Drive.SCOPE)]))
-        if r.status != 200 { throw HttpError(502, "Google did not give a code (\(Drive.why(r.json, r.status))).") }
+        if r.status != 200 { throw HttpError(r.json["error"] != nil ? 400 : 502, "Google did not give a code: \(Drive.explain(r.json, r.status)).") }
         try await set("drive_device", JS.string(r.json["device_code"]))
         return ["user_code": JS.string(r.json["user_code"]),
                 "verification_url": (r.json["verification_url"] as? String) ?? (r.json["verification_uri"] as? String) ?? "https://www.google.com/device",
@@ -96,7 +123,7 @@ public final class Drive {
         try await del(["drive_device"])
         guard r.status == 200, let refresh = r.json["refresh_token"] as? String, !refresh.isEmpty else {
             throw HttpError(400, err == "access_denied" ? "Google sign-in was declined." : err == "expired_token" ? "The code ran out. Press Connect again."
-                : "Google did not connect (\(Drive.why(r.json, r.status))).")
+                : "Google did not connect: \(Drive.explain(r.json, r.status)).")
         }
         try await set("drive_refresh", refresh)
         _ = try await folder(JS.string(r.json["access_token"]))

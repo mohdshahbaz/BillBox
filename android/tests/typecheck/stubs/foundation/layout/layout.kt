@@ -47,3 +47,7 @@ fun Modifier.windowInsetsPadding(insets: WindowInsets): Modifier = this
 class WindowInsets { companion object { val statusBars: WindowInsets get() = WindowInsets() } }
 fun WindowInsets(all: Int): WindowInsets = WindowInsets()
 @ExperimentalLayoutApi val WindowInsets.Companion.isImeVisible: Boolean @Composable get() = false
+interface BoxWithConstraintsScope : BoxScope { val maxWidth: Dp; val maxHeight: Dp }
+@Composable fun BoxWithConstraints(modifier: Modifier = Modifier, contentAlignment: Alignment = Alignment.TopStart, content: @Composable BoxWithConstraintsScope.() -> Unit) {}
+enum class IntrinsicSize { Min, Max }
+fun Modifier.height(intrinsicSize: IntrinsicSize): Modifier = this

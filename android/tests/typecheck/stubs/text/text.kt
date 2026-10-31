@@ -7,6 +7,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnit
 class TextStyle {
+    val fontWeight: FontWeight? = null
     fun copy(color: Color = Color.Unspecified, fontSize: TextUnit = TextUnit(0), fontWeight: FontWeight? = null, fontFamily: FontFamily? = null,
              textAlign: TextAlign = TextAlign.Start, textDecoration: TextDecoration? = null, lineHeight: TextUnit = TextUnit(0)): TextStyle = this
 }

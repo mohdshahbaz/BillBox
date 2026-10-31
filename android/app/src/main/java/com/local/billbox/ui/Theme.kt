@@ -28,6 +28,8 @@ class UiPrefs(private val p: SharedPreferences) {
     var corners by mutableStateOf(p.getString("corners", "normal") ?: "normal")
     var density by mutableStateOf(p.getString("density", "regular") ?: "regular")
     var textSize by mutableStateOf(p.getString("textSize", "default") ?: "default")
+    var fontStyle by mutableStateOf(p.getString("fontStyle", "system") ?: "system")
+    var fontWeight by mutableStateOf(p.getString("fontWeight", "regular") ?: "regular")
     var startPage by mutableStateOf(p.getString("startPage", "billing") ?: "billing")
     var showPhotoCard by mutableStateOf(p.getBoolean("showPhotoCard", true))
 
@@ -36,6 +38,7 @@ class UiPrefs(private val p: SharedPreferences) {
         when (key) {
             "theme" -> theme = v; "appearance" -> appearance = v; "cardStyle" -> cardStyle = v; "corners" -> corners = v
             "density" -> density = v; "textSize" -> textSize = v; "startPage" -> startPage = v
+            "fontStyle" -> fontStyle = v; "fontWeight" -> fontWeight = v
         }
     }
     fun setPhotoCard(v: Boolean) { p.edit().putBoolean("showPhotoCard", v).apply(); showPhotoCard = v }
@@ -59,6 +62,13 @@ val Themes = listOf(
     AppTheme("rose", "Rose", 0xFFC9285F, 0xFFF0608F, 0xFFFBEEF3, 0xFF22141A),
     AppTheme("gold", "Marigold", 0xFFB7791F, 0xFFF2B544, 0xFFFBF5E6, 0xFF1E190F),
     AppTheme("slate", "Slate", 0xFF4A5C70, 0xFF93A8BD, 0xFFEEF0F3, 0xFF1B1D20),
+    AppTheme("midnight", "Midnight", 0xFF2563EB, 0xFF60A5FA, 0xFFEEF2F7, 0xFF0B1220),
+    AppTheme("mint", "Mint", 0xFF0F9D7A, 0xFF34D3A6, 0xFFEAF7F2, 0xFF0F1A16),
+    AppTheme("lavender", "Lavender", 0xFF7C5CC4, 0xFFB49CFF, 0xFFF4F0FB, 0xFF17131F),
+    AppTheme("saffron", "Saffron", 0xFFE07000, 0xFFFFA733, 0xFFFFF5E6, 0xFF1F170C),
+    AppTheme("crimson", "Crimson", 0xFFB91C1C, 0xFFF87171, 0xFFFBEFEF, 0xFF1E1010),
+    AppTheme("coffee", "Coffee", 0xFF7A4E2D, 0xFFC9925E, 0xFFF6EFE8, 0xFF1C1612),
+    AppTheme("graphite", "Graphite", 0xFF1F2937, 0xFFE5E7EB, 0xFFF2F2F3, 0xFF000000),
 )
 
 private fun scheme(t: AppTheme, dark: Boolean): ColorScheme {
@@ -96,6 +106,26 @@ private val BillBoxType = Typography().let { b ->
     )
 }
 
+/** Settings › Appearance › Letters: the type scale in the chosen family (system, rounded, serif, mono) and weight. */
+private fun typeFor(style: String, weight: String): Typography {
+    val fam = when (style) {
+        "serif" -> androidx.compose.ui.text.font.FontFamily.Serif
+        "mono" -> androidx.compose.ui.text.font.FontFamily.Monospace
+        "rounded" -> androidx.compose.ui.text.font.FontFamily.SansSerif
+        else -> androidx.compose.ui.text.font.FontFamily.Default
+    }
+    val body = when (weight) {
+        "light" -> androidx.compose.ui.text.font.FontWeight.Light; "medium" -> androidx.compose.ui.text.font.FontWeight.Medium
+        "bold" -> androidx.compose.ui.text.font.FontWeight.SemiBold; else -> null
+    }
+    if (style == "system" && body == null) return BillBoxType
+    fun t(x: androidx.compose.ui.text.TextStyle, isBody: Boolean) = x.copy(fontFamily = fam, fontWeight = if (isBody && body != null) body else x.fontWeight)
+    val b = BillBoxType
+    return b.copy(headlineSmall = t(b.headlineSmall, false), titleLarge = t(b.titleLarge, false), titleMedium = t(b.titleMedium, false), titleSmall = t(b.titleSmall, false),
+        bodyLarge = t(b.bodyLarge, true), bodyMedium = t(b.bodyMedium, true), bodySmall = t(b.bodySmall, true),
+        labelLarge = t(b.labelLarge, false), labelMedium = t(b.labelMedium, false), labelSmall = t(b.labelSmall, false))
+}
+
 @Composable
 fun BillBoxTheme(prefs: UiPrefs, content: @Composable () -> Unit) {
     val dark = when (prefs.appearance) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
@@ -109,7 +139,7 @@ fun BillBoxTheme(prefs: UiPrefs, content: @Composable () -> Unit) {
         LocalDensity provides Density(base.density, base.fontScale * prefs.fontScale),
         LocalUi provides prefs,
     ) {
-        MaterialTheme(colorScheme = colors, typography = BillBoxType, content = content)
+        MaterialTheme(colorScheme = colors, typography = typeFor(prefs.fontStyle, prefs.fontWeight), content = content)
     }
 }
 

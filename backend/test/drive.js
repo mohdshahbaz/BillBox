@@ -41,6 +41,18 @@ const fails = async (fn, status) => { try { await fn(); } catch (e) { return e.s
     assert.ok(await fails(() => D.connect(), 400));
   });
   await ok('a wrong Client ID is refused', async () => { assert.ok(await fails(() => D.saveClient({ client_id: 'abc', client_secret: 'x' }), 400)); });
+  await ok('keys from the downloaded JSON; a Web client file is refused', async () => {
+    assert.ok(await fails(() => D.saveClient({ json: 'nope' }), 400));
+    assert.ok(await fails(() => D.saveClient({ json: JSON.stringify({ web: { client_id: '9-w.apps.googleusercontent.com', client_secret: 's' } }) }), 400));
+    const s = D.saveClient({ json: JSON.stringify({ installed: { client_id: '77-tv.apps.googleusercontent.com', client_secret: 'S2', project_id: 'x' } }) });
+    assert.strictEqual(s.client_id, '77-tv.apps.googleusercontent.com');
+  });
+  await ok('an unknown client is explained', async () => {
+    const f = globalThis.fetch;
+    globalThis.fetch = async () => ({ status: 401, text: async () => JSON.stringify({ error: 'invalid_client', error_description: 'The OAuth client was not found.' }) });
+    try { await D.connect(); assert.fail('no error'); } catch (e) { assert.strictEqual(e.status, 400); assert.match(e.message, /copied in full/); }
+    globalThis.fetch = f;
+  });
   await ok('keys saved; connect gives the code', async () => {
     D.saveClient({ client_id: '123-abc.apps.googleusercontent.com', client_secret: 'SECRET' });
     const r = await D.connect();

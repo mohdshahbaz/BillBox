@@ -72,6 +72,11 @@ struct Spec {
 
     /// Room for the bank details under the GST table (Settings › Printing › Bank details), when the bill prints them.
     func withBank(_ co: JSON) -> Spec {
+        // the bank details now sit in the footer, in the room it already has
+        return self
+    }
+
+    func withBankBlock(_ co: JSON) -> Spec {
         let rows = bankRows(co)
         guard !rows.isEmpty else { return self }
         let extra = CGFloat(rows.count) * 8.4 * fs + (rows.contains { $0.0 == "ADDRESS" && $0.1.count > 70 } ? 8.4 * fs : 0) + 4
@@ -91,6 +96,32 @@ let bankFields: [(key: String, label: String, title: String)] = [
     ("bank_ifsc", "IFSC CODE", "IFSC code"), ("bank_branch", "BRANCH NAME", "Branch name"), ("bank_branch_code", "BRANCH CODE", "Branch code"),
     ("bank_address", "ADDRESS", "Branch address"),
 ]
+/// The bank details in at most three short lines of (label, value) pairs, for the footer:
+///   Bank: … · A/c name: …  /  A/c no.: … · IFSC: …  /  Branch: … (code) · …address
+func bankLines(_ co: JSON) -> [[(String, String)]] {
+    if co.str("print_bank_block") == "0" { return [] }
+    func v(_ k: String) -> String { co.str(k).trimmingCharacters(in: .whitespacesAndNewlines) }
+    let branch = v("bank_branch") + (v("bank_branch_code").isEmpty ? "" : (v("bank_branch").isEmpty ? "Code " : " (") + v("bank_branch_code") + (v("bank_branch").isEmpty ? "" : ")"))
+    let lines: [[(String, String)]] = [
+        [("Bank", v("bank_name")), ("A/c name", v("bank_ac_name"))],
+        [("A/c no.", v("bank_ac_no")), ("IFSC", v("bank_ifsc"))],
+        [("Branch", branch), ("", v("bank_address"))],
+    ]
+    return lines.map { $0.filter { !$0.1.isEmpty } }.filter { !$0.isEmpty }
+}
+
+/// One line of bank details: bold labels, values after them, " · " between.
+func bankLineText(_ pairs: [(String, String)], size: CGFloat, serif: Bool = false) -> Text {
+    let design: Font.Design = serif ? .serif : .default
+    var t = Text("")
+    for (i, p) in pairs.enumerated() {
+        if i > 0 { t = t + Text("  ·  ").font(.system(size: size, design: design)) }
+        if !p.0.isEmpty { t = t + Text(p.0 + ": ").font(.system(size: size, weight: .bold, design: design)) }
+        t = t + Text(p.1).font(.system(size: size, weight: .medium, design: design))
+    }
+    return t
+}
+
 func bankRows(_ co: JSON) -> [(String, String)] {
     if co.str("print_bank_block") == "0" { return [] }
     return bankFields.compactMap { f in
@@ -382,7 +413,6 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             VStack(alignment: .leading, spacing: 1.5) {
                 if on("print_gst_table") { gstTable }
                 Spacer(minLength: 2)
-                bankBlock
                 if co.str("print_balance") == "1" && inv.has("party_prev_balance") {
                     t("Previous balance \(balanceText(inv.num("party_prev_balance")))   ·   This bill \(Fmt.money(inv.num("total") - inv.num("paid")))   ·   Now due \(balanceText(inv.num("party_balance_after")))", 6.5, weight: .semibold)
                         .lineLimit(1).minimumScaleFactor(0.6)
@@ -472,20 +502,34 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
         HStack { t(a, 7).foregroundStyle(muted); Spacer(); t(Fmt.amount(v), 7.5) }
     }
 
-    /// Terms on the left, the company's signature block on the right, page number in the middle.
+    /// Terms (and your own lines) on the left, the bank details in the middle, the company's signature block on the right.
     private var footer: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        let bank = bankLines(co)
+        return HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
                 if on("print_terms") && !co.str("invoice_terms").isEmpty {
                     t("Terms", 6, bold: true).foregroundStyle(muted)
                     t(co.str("invoice_terms"), 6.5).lineLimit(co.str("print_bank").isEmpty ? 2 : 1).fixedSize(horizontal: false, vertical: true)
                 }
                 if !co.str("print_bank").isEmpty { t(co.str("print_bank"), 6.5, weight: .semibold).lineLimit(1).minimumScaleFactor(0.7) }
+                if !bank.isEmpty && !co.str("print_note").isEmpty { t(co.str("print_note"), 6.5, bold: true).lineLimit(1).minimumScaleFactor(0.7) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(spacing: 1) {
-                if !co.str("print_note").isEmpty { t(co.str("print_note"), 7, bold: true).lineLimit(1).minimumScaleFactor(0.7) }
-                t(pages > 1 ? "Page \(page + 1) of \(pages)" : "", 6.5).foregroundStyle(muted)
+            if bank.isEmpty {
+                VStack(spacing: 1) {
+                    if !co.str("print_note").isEmpty { t(co.str("print_note"), 7, bold: true).lineLimit(1).minimumScaleFactor(0.7) }
+                    t(pages > 1 ? "Page \(page + 1) of \(pages)" : "", 6.5).foregroundStyle(muted)
+                }
+            } else {
+                // the bank details, in three short lines in the footer: no room is taken from the items
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(bank.enumerated()), id: \.offset) { _, l in
+                        bankLineText(l, size: 6.3 * g.fs).lineLimit(1).minimumScaleFactor(0.65)
+                    }
+                    if pages > 1 { t("Page \(page + 1) of \(pages)", 6).foregroundStyle(muted) }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
             }
             VStack(alignment: .trailing, spacing: 0) {
                 if on("print_signature") {
@@ -494,9 +538,9 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                     t("Authorised Signatory", 6.5).foregroundStyle(muted)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            .frame(maxWidth: bank.isEmpty ? .infinity : 130 * g.cw, alignment: .trailing)
         }
-        .padding(.horizontal, 2).padding(.top, 4)
+        .padding(.horizontal, 2).padding(.top, 3)
         .frame(height: g.foot, alignment: .top)
     }
 }
@@ -551,8 +595,10 @@ func billSpec(_ inv: JSON, _ co: JSON, full: Bool) -> Spec {
 
 /// One copy of one page of a bill, in the company's bill design.
 @MainActor
-func billSheet(_ inv: JSON, _ co: JSON, rows: Range<Int>, page: Int, pages: Int, copy: String, g: Spec) -> AnyView {
-    printStyle(co) == "marg"
+func billSheet(_ inv: JSON, _ co: JSON, rows: Range<Int>, page: Int, pages: Int, copy copyLabel: String, g: Spec) -> AnyView {
+    // Settings › Printing › "ORIGINAL / DUPLICATE on each copy": off prints the copies without the words
+    let copy = co.str("print_copy_label") == "0" ? "" : copyLabel
+    return printStyle(co) == "marg"
         ? AnyView(MargSheetView(inv: inv, co: co, rows: rows, page: page, pages: pages, copy: copy, g: g))
         : AnyView(InvoiceSheetView(inv: inv, co: co, rows: rows, page: page, pages: pages, copy: copy, g: g))
 }

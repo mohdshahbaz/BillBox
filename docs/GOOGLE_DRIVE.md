@@ -19,7 +19,7 @@ BillBox has no server of its own, so it signs in to Google with a key you make i
    Then under **Audience › Test users** press **Add users** and add your Gmail address.
 5. **APIs & Services › Credentials › Create credentials › OAuth client ID**.
    Application type: **TVs and Limited Input devices**. Name `BillBox`. **Create**.
-6. Copy the **Client ID** (ends in `.apps.googleusercontent.com`) and the **Client secret**.
+6. Press **Download JSON** (the file is called `client_secret_….json`). In BillBox use **Import the downloaded JSON file…**; or copy the **Client ID** (ends in `.apps.googleusercontent.com`) and the **Client secret** by hand. A client made a minute ago can take a few minutes before Google knows it ("The OAuth client was not found").
 
 While the app stays in "Testing", Google asks you to sign in again about once a week. To avoid that, on the
 **Audience** page press **Publish app** (for your own use no review is needed for the `drive.file` permission;
@@ -29,7 +29,7 @@ Google may show "unverified app" during sign-in: choose *Advanced › Go to Bill
 
 Settings › Backup › **Google Drive**:
 
-1. Paste the Client ID and secret, **Save keys**.
+1. **Import the downloaded JSON file…** (or paste the Client ID and secret and press **Save keys**).
 2. **Connect Google Drive**. BillBox shows a code like `ABCD-EFGH`.
 3. On any phone or computer open <https://www.google.com/device>, enter the code, choose your account and allow BillBox.
 4. BillBox notices by itself within a few seconds and makes **BillBox Backups** in your Drive.

@@ -7,6 +7,9 @@ const backup = require('./services/backup');
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '40mb' })); // scanned purchase-bill PDFs arrive base64-encoded
+// every answer is live data: never kept in a cache (the Mac app's web cache otherwise showed old prices and parties)
+app.set('etag', false);
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

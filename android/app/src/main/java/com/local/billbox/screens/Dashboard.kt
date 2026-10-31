@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -160,14 +161,25 @@ fun DashboardScreen() {
             val purchases = pick(todayPurchases, x.num("month_purchases"), x.num("fy_purchases"))
             val collected = pick(x.num("today_collections"), x.num("month_collections"), x.num("fy_collections"))
             val gst = if (period == "year") x.num("fy_gst_liability") else x.num("gst_liability")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), maxItemsInEachRow = 3) {
-                val m = Modifier.weight(1f).widthIn(min = 150.dp)
-                Kpi("Sales", Fmt.money(sales), "${bills.toInt()} bills $word", Icons.Default.CurrencyRupee, Teal, m) { go(Page.Bills) }
-                Kpi("Profit", Fmt.money(profit), if (period == "year") "Margin ${Fmt.qty(x.num("fy_margin_pct"))}%" else "Before expenses, $word", Icons.AutoMirrored.Filled.TrendingUp, if (profit >= 0) Good else Bad, m) { go(Page.Reports) }
-                Kpi("Collections", Fmt.money(collected), "Payments received $word", Icons.Default.Payments, Good, m) { go(Page.Parties) }
-                Kpi("Purchases", Fmt.money(purchases), "Supplier bills $word", Icons.Default.LocalShipping, Orange, m) { go(Page.Purchases) }
-                Kpi("To receive", Fmt.money(x.num("receivable")), "You owe suppliers ${Fmt.money(x.num("payable"))}", Icons.Default.PersonSearch, Orange, m) { go(Page.Parties) }
-                Kpi(if (period == "year") "GST for the year" else "GST this month", Fmt.money(abs(gst)), if (gst >= 0) "To pay (output less input)" else "Credit carried forward", Icons.Default.AccountBalance, if (gst >= 0) Bad else Good, m) { go(Page.Reports) }
+            // a fixed grid (2 across on a phone, 3 on a wide screen): every tile the same width, and the same height in a row
+            val tiles: List<@Composable (Modifier) -> Unit> = listOf(
+                { m -> Kpi("Sales", Fmt.money(sales), "${bills.toInt()} bills $word", Icons.Default.CurrencyRupee, Teal, m) { go(Page.Bills) } },
+                { m -> Kpi("Profit", Fmt.money(profit), if (period == "year") "Margin ${Fmt.qty(x.num("fy_margin_pct"))}%" else "Before expenses, $word", Icons.AutoMirrored.Filled.TrendingUp, if (profit >= 0) Good else Bad, m) { go(Page.Reports) } },
+                { m -> Kpi("Collections", Fmt.money(collected), "Payments received $word", Icons.Default.Payments, Good, m) { go(Page.Parties) } },
+                { m -> Kpi("Purchases", Fmt.money(purchases), "Supplier bills $word", Icons.Default.LocalShipping, Orange, m) { go(Page.Purchases) } },
+                { m -> Kpi("To receive", Fmt.money(x.num("receivable")), "You owe suppliers ${Fmt.money(x.num("payable"))}", Icons.Default.PersonSearch, Orange, m) { go(Page.Parties) } },
+                { m -> Kpi(if (period == "year") "GST for the year" else "GST this month", Fmt.money(abs(gst)), if (gst >= 0) "To pay (output less input)" else "Credit carried forward", Icons.Default.AccountBalance, if (gst >= 0) Bad else Good, m) { go(Page.Reports) } }
+            )
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val across = if (maxWidth >= 560.dp) 3 else 2
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    tiles.chunked(across).forEach { row ->
+                        Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            row.forEach { tile -> tile(Modifier.weight(1f).fillMaxHeight()) }
+                            repeat(across - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                }
             }
             if ("charts" !in hidden) {
                 val rows = x.list("monthly")

@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -200,16 +201,19 @@ fun <R> DataTable(
         Box {
             Row(Modifier.fillMaxWidth()
                 .background(if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
-                .combinedClickable(onClick = { if ((selecting || onOpen == null) && onToggle != null) onToggle(row) else onOpen?.invoke(row) },
+                // a row is ticked only while ticking (Select); otherwise a tap opens it and never ticks it
+                .combinedClickable(onClick = { if (selecting && onToggle != null) onToggle(row) else onOpen?.invoke(row) },
                     onLongClick = if (menu != null) ({ menuOpen = true }) else null)
                 .heightIn(min = rh), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.weight(1f).horizontalScroll(h), verticalAlignment = Alignment.CenterVertically) {
                     visible.forEach { c ->
                         Box(Modifier.width(w(c)).padding(horizontal = 8.dp, vertical = 4.dp), contentAlignment = if (c.end) Alignment.CenterEnd else Alignment.CenterStart) {
-                            if (c.isIndex) Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (c.isIndex) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                // the tick circle always in the same place, the number on the right
                                 if (selecting) Icon(if (isSel) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null, Modifier.size(16.dp),
                                     tint = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${idx + 1}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+                                Spacer(Modifier.weight(1f))
+                                Text("${idx + 1}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                             } else c.cell(row)
                         }
                     }

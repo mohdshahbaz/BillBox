@@ -352,6 +352,9 @@ put('/settings', {'bank_name': 'Example Bank', 'bank_ac_name': 'AK Enterprises',
 # ---------------- Google Drive backups (offline here: both engines answer the same)
 get('/backup/drive'); post('/backup/drive/connect'); post('/backup/drive/poll'); post('/backup/drive/upload')
 put('/backup/drive/client', {'client_id': 'abc', 'client_secret': 'x'}); put('/backup/drive/client', {'client_id': '1-a.apps.googleusercontent.com'})
+put('/backup/drive/client', {'json': 'not json'}); put('/backup/drive/client', {'json': '{"web": {"client_id": "9-w.apps.googleusercontent.com", "client_secret": "w"}}'})
+put('/backup/drive/client', {'json': '{"installed": {"client_id": "5-j.apps.googleusercontent.com"}}'})
+put('/backup/drive/client', {'json': '{"installed": {"client_id": "5-j.apps.googleusercontent.com", "client_secret": "j", "project_id": "p"}}'})
 put('/backup/drive/client', {'client_id': ' 1-a.apps.googleusercontent.com ', 'client_secret': ' s '})
 post('/backup/drive/connect'); post('/backup/drive/upload'); post('/backup/drive/disconnect'); get('/backup/drive'); post('/backup/drive/nope')
 

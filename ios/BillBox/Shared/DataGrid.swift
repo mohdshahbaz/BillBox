@@ -105,7 +105,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
         var cols = columns()
         // every table gets a serial number column first, unless the screen already has its own
         if numbered && !cols.contains(where: { $0.id == "sno" }) {
-            var n = GridColumn<Row>("S.No", id: "sno", min: 44, ideal: 48, align: .trailing) { _ in EmptyView() }
+            var n = GridColumn<Row>("S.No", id: "sno", min: selection != nil ? 60 : 44, ideal: selection != nil ? 64 : 48, align: .trailing) { _ in EmptyView() }
             n.isIndex = true
             cols.insert(n, at: 0)
         }
@@ -255,11 +255,14 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                     Group {
                         if c.isIndex {
                             HStack(spacing: 4) {
+                                // the tick circle always in the same place, the number on the right
                                 if isSelecting { Image(systemName: selected ? "checkmark.circle.fill" : "circle").foregroundStyle(selected ? Color.accentColor : Color.secondary) }
-                                Text("\(idx + 1)").monospacedDigit().foregroundStyle(.secondary)
+                                Spacer(minLength: 0)
+                                Text("\(idx + 1)").monospacedDigit().foregroundStyle(.secondary).lineLimit(1).fixedSize()
                             }
                         } else { c.cell(row) }
                     }
+                    .lineLimit(1)
                     .padding(.horizontal, 8)
                     .frame(width: w[i], alignment: c.align)
                     .frame(minHeight: rh)

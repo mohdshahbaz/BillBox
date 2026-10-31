@@ -194,6 +194,9 @@ private fun AppearancePage() {
         Segments(listOf("square" to "Square", "normal" to "Rounded", "round" to "Round"), ui.corners, { ui.set("corners", it) })
         SectionHeader("Table rows")
         Segments(listOf("compact" to "Compact", "regular" to "Regular", "roomy" to "Roomy"), ui.density, { ui.set("density", it) })
+        SectionHeader("Letters")
+        Segments(listOf("system" to "System", "serif" to "Serif", "mono" to "Mono"), ui.fontStyle, { ui.set("fontStyle", it) })
+        Segments(listOf("light" to "Light", "regular" to "Regular", "medium" to "Medium", "bold" to "Bold"), ui.fontWeight, { ui.set("fontWeight", it) })
         SectionHeader("Text size")
         Segments(listOf("small" to "Smaller", "default" to "System", "large" to "Larger", "xlarge" to "Largest"), ui.textSize, { ui.set("textSize", it) })
         Hint("Panels, corners, row height and text size apply at once on this phone and are remembered.")
@@ -506,7 +509,16 @@ private fun DriveSection() {
             } }, enabled = !busy) { Text(if (busy) "Connecting…" else "Connect Google Drive") }
             TextButton(onClick = { editing = true; clientId = status.str("client_id") }) { Text("Change Google keys…") }
         }
+        Hint("Client ID: " + status.str("client_id").substringBefore(".apps.googleusercontent.com").let { if (it.length > 22) it.take(10) + "…" + it.takeLast(8) else it })
     } else {
+        Button(onClick = { app.launch {
+            val (dir, name) = com.local.billbox.system.Platform.importPicked(false, "application/json", "*/*") ?: return@launch
+            val text = java.io.File(dir, name).takeIf { it.exists() }?.readText() ?: ""
+            status = Api.obj("PUT", "/backup/drive/client", body = mapOf("json" to text))
+            editing = false; secret = ""; clientId = ""
+            app.notify("Google keys imported. Now press Connect Google Drive.")
+        } }, enabled = !busy) { Text("Import the downloaded JSON file…") }
+        Hint("or paste the two keys:")
         Field("Client ID (…apps.googleusercontent.com)", clientId, { clientId = it })
         Field("Client secret", secret, { secret = it })
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -518,7 +530,7 @@ private fun DriveSection() {
         }
     }
     Hint(if (connected) "Every backup (Back up now, the daily backup and the backup on leaving) is also uploaded to your Google Drive, into a folder with the backup's name inside BillBox Backups. The copy on this phone stays as well. BillBox can see only the files it made itself in your Drive."
-        else "One-time setup (about 5 minutes, free): in console.cloud.google.com make a project, turn on the Google Drive API, set up the consent screen (External; add your Gmail as a test user), then Credentials › Create credentials › OAuth client ID › type “TVs and Limited Input devices”. Paste its Client ID and secret here, then Connect. The same keys work on the Mac, iPhone and Android.")
+        else "One-time setup (about 5 minutes, free): in console.cloud.google.com make a project, turn on the Google Drive API, set up the consent screen (External; add your Gmail as a test user), then Credentials › Create credentials › OAuth client ID › type “TVs and Limited Input devices”. Download its JSON and import it here (or paste the Client ID and secret), then Connect. A client made a minute ago can take a few minutes before Google knows it. The same keys work on the Mac, iPhone and Android.")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -847,6 +859,7 @@ private fun PrintOptions() {
     SectionHeader("Size and copies")
     val (font, setFont) = settingChoice("print_font", "normal")
     Choice("Text size", listOf("small" to "Smaller (more rows on a page)", "normal" to "Normal", "large" to "Larger (easier to read)"), font, setFont)
+    SwitchRow("Print ORIGINAL / DUPLICATE on each copy", flag("print_copy_label", true), { setFlag("print_copy_label", it) })
     SwitchRow("Print a third copy", flag("print_triplicate", false), { setFlag("print_triplicate", it) }, "Half-sheet and full-A4 layouts; two-on-A4 keeps its two copies.")
     if (app.setting("print_triplicate") == "1") SettingField("Third copy label", "print_copy3", "TRIPLICATE FOR ASSESSEE")
     SectionHeader("Your own lines")
@@ -860,7 +873,7 @@ private fun PrintOptions() {
         "bank_branch" to "Branch name", "bank_branch_code" to "Branch code", "bank_address" to "Branch address").forEach { (k, title) ->
         SettingField(title, k, "", maxLength = if (k == "bank_address") 200 else 60)
     }
-    Hint("Printed above the amount in words, one per line (BANK NAME:, ACCOUNT NAME:, ACCOUNT NUMBER:, IFSC CODE:, BRANCH NAME:, BRANCH CODE:, ADDRESS:). Empty ones are left out; a bill with bank details has a few rows less room for items.")
+    Hint("Printed in three short lines (Bank · A/c name / A/c no. · IFSC / Branch · address) where the bill has room anyway: in the footer of the BillBox design, under the GST classes of the Marg style. Item rows are not reduced. Empty ones are left out.")
 }
 
 /**

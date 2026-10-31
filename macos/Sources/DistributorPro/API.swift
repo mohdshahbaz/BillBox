@@ -21,6 +21,15 @@ enum API {
         return out
     }
 
+    /// No web cache at all: every list is read fresh from the books (a cached /items or /parties showed old prices and parties).
+    static let session: URLSession = {
+        let c = URLSessionConfiguration.ephemeral
+        c.urlCache = nil
+        c.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        c.httpMaximumConnectionsPerHost = 8
+        return URLSession(configuration: c)
+    }()
+
     /// Called after a successful change that can alter items, prices or stock, so the billing screen reloads its item list.
     static var onItemsChanged: (() -> Void)?
     static func noteChange(_ method: String, _ path: String) {
@@ -40,7 +49,7 @@ enum API {
         }
         if !items.isEmpty { comps.queryItems = items }
         guard let url = comps.url else { throw APIError(message: "Bad address \(path)", status: 0, code: nil) }
-        var req = URLRequest(url: url)
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
         req.httpMethod = method
         req.timeoutInterval = 180
         req.setValue("application/json", forHTTPHeaderField: "content-type")
@@ -49,7 +58,7 @@ enum API {
         let data: Data
         let resp: URLResponse
         do {
-            (data, resp) = try await URLSession.shared.data(for: req)
+            (data, resp) = try await session.data(for: req)
         } catch {
             throw APIError(message: "Cannot reach the server. Start it from the screen that appears at launch, or run \"npm start\" in the backend folder.", status: 0, code: nil)
         }

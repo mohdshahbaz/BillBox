@@ -70,12 +70,12 @@ func margClasses(_ inv: JSON, _ co: JSON) -> [Double] {
 /// The page for the Marg design: heights follow the text size, the GST classes and the bank details.
 func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
     let f = base.fs
-    let bank = bankRows(co)
-    let bankH: CGFloat = bank.isEmpty ? 0 : CGFloat((bank.count + 1) / 2) * 8.2 * f + 5
+    // the bank details go under the GST classes, in room the totals beside them need anyway
+    let bankH: CGFloat = bankLines(co).isEmpty ? 0 : CGFloat(bankLines(co).count) * 8 * f + 4
     let classH = CGFloat(margClasses(inv, co).count + 2) * 8.6 * f + 4
-    let totals = max(classH, 9 * 8.6 * f) + 13 * f + bankH + 1.2
+    let totals = max(classH + bankH, 9 * 8.6 * f) + 13 * f + 1.2
     return Spec(w: base.w, h: base.h, m: base.m, rowH: base.rowH, tableHead: 15 * f, foot: 36 * f, totals: totals,
-                strip: 24 * f, sellerBand: 52 * f, buyerBand: 0, headNext: 18 * f, fs: f, cw: base.cw)
+                strip: 26 * f, sellerBand: 52 * f, buyerBand: 0, headNext: 18 * f, fs: f, cw: base.cw)
 }
 
 @MainActor struct MargSheetView: View {
@@ -168,11 +168,8 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
             .clipped()
             hLine()
             HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 1) {
-                    if on("print_marg_email", false) && !co.str("company_email").isEmpty { t("E-Mail : \(co.str("company_email"))", 6.5).foregroundStyle(accent).lineLimit(1).minimumScaleFactor(0.6) }
-                    if !co.str("company_gstin").isEmpty { t("GSTIN : \(co.str("company_gstin"))", 7.5, bold: true).foregroundStyle(accent).lineLimit(1).minimumScaleFactor(0.7) }
-                    if !co.str("state_code").isEmpty { t("State code : \(co.str("state_code"))", 6.5).foregroundStyle(accent).lineLimit(1) }
-                }
+                // E-Mail, GSTIN and State code with their labels and colons lined up, all the same size
+                detailGroup(firmIds, bold: ["GSTIN"]).foregroundStyle(accent)
                 .padding(.horizontal, 6)
                 .frame(width: W * 0.34, alignment: .leading)
                 .frame(maxHeight: .infinity)
@@ -248,13 +245,22 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
         return out
     }
 
-    private func detailGroup(_ kv: [(String, String)]) -> some View {
+    private var firmIds: [(String, String)] {
+        var out: [(String, String)] = []
+        if on("print_marg_email", false) && !co.str("company_email").isEmpty { out.append(("E-Mail", co.str("company_email"))) }
+        if !co.str("company_gstin").isEmpty { out.append(("GSTIN", co.str("company_gstin"))) }
+        if !co.str("state_code").isEmpty { out.append(("State code", co.str("state_code"))) }
+        return out
+    }
+
+    /// label : value lines with the labels and colons lined up. `bold`: labels whose value is bold (nil = every value).
+    private func detailGroup(_ kv: [(String, String)], bold: Set<String>? = nil, size: CGFloat = 7.5) -> some View {
         HStack(alignment: .top, spacing: 3) {
-            VStack(alignment: .leading, spacing: 1.5) { ForEach(Array(kv.enumerated()), id: \.offset) { _, p in t(p.0, 7.5).lineLimit(1) } }
+            VStack(alignment: .leading, spacing: 1) { ForEach(Array(kv.enumerated()), id: \.offset) { _, p in t(p.0, size).lineLimit(1) } }
                 .fixedSize()
-            VStack(spacing: 1.5) { ForEach(Array(kv.enumerated()), id: \.offset) { _, p in t(p.0.isEmpty ? "" : ":", 7.5) } }
+            VStack(spacing: 1) { ForEach(Array(kv.enumerated()), id: \.offset) { _, p in t(p.0.isEmpty ? "" : ":", size) } }
                 .fixedSize()
-            VStack(alignment: .leading, spacing: 1.5) { ForEach(Array(kv.enumerated()), id: \.offset) { _, p in t(p.1, 7.5, bold: true).lineLimit(1).minimumScaleFactor(0.6) } }
+            VStack(alignment: .leading, spacing: 1) { ForEach(Array(kv.enumerated()), id: \.offset) { _, p in t(p.1, size, bold: bold.map { $0.contains(p.0) } ?? true).lineLimit(1).minimumScaleFactor(0.6) } }
         }
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -363,19 +369,32 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
                   : [r.label, Fmt.amount(r.taxable), Fmt.amount(r.disc), Fmt.amount(r.sgst), Fmt.amount(r.cgst), Fmt.amount(r.gst), Fmt.amount(r.total)]
         }
         let rh = 8.6 * g.fs
-        let bank = bankRows(co)
+        let bank = bankLines(co)
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
                 // the GST class table
                 VStack(spacing: 0) {
-                    classLine(heads, bold: true, size: 7.5).frame(height: rh + 1).frame(maxWidth: .infinity).background(band)
-                    ForEach(Array(rows.enumerated()), id: \.offset) { _, r in classLine(vals(r)).frame(height: rh) }
-                    hLine(0.6)
-                    classLine(vals(tot), bold: true).frame(height: rh)
+                    VStack(spacing: 0) {
+                        classLine(heads, bold: true, size: 7.5).frame(height: rh + 1).frame(maxWidth: .infinity).background(band)
+                        ForEach(Array(rows.enumerated()), id: \.offset) { _, r in classLine(vals(r)).frame(height: rh) }
+                        hLine(0.6)
+                        classLine(vals(tot), bold: true).frame(height: rh)
+                    }
+                    .overlay(classGrid(count: heads.count))
+                    if !bank.isEmpty {
+                        // the bank details in the room under the GST classes
+                        hLine(0.6)
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(bank.enumerated()), id: \.offset) { _, l in
+                                bankLineText(l, size: 6.8 * g.fs, serif: serif).lineLimit(1).minimumScaleFactor(0.6).frame(height: 8 * g.fs)
+                            }
+                        }
+                        .padding(.horizontal, 4).padding(.top, 1.5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     Spacer(minLength: 0)
                 }
                 .frame(width: W - 172 * g.cw - 0.8)
-                .overlay(classGrid(count: heads.count))
                 vLine()
                 summary.frame(width: 172 * g.cw)
             }
@@ -390,10 +409,6 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
             }
             .padding(.horizontal, 6)
             .frame(height: 13 * g.fs)
-            if !bank.isEmpty {
-                hLine(0.6)
-                bankBand(bank)
-            }
         }
         .frame(height: g.totals, alignment: .top)
     }
@@ -448,30 +463,7 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
     }
 
     /// height of the totals area above the amount in words, less the GRAND TOTAL band
-    private var summaryRoom: CGFloat {
-        let bank = bankRows(co)
-        let bankH: CGFloat = bank.isEmpty ? 0 : CGFloat((bank.count + 1) / 2) * 8.2 * g.fs + 5 + 0.6
-        return g.totals - 13 * g.fs - 0.6 - bankH - 17 * g.fs - 0.6
-    }
-
-    private func bankBand(_ rows: [(String, String)]) -> some View {
-        let half = (rows.count + 1) / 2
-        return HStack(alignment: .top, spacing: 10) {
-            ForEach(0..<2, id: \.self) { side in
-                VStack(alignment: .leading, spacing: 1) {
-                    ForEach(Array(rows[(side == 0 ? 0 : half)..<(side == 0 ? half : rows.count)].enumerated()), id: \.offset) { _, r in
-                        HStack(spacing: 4) {
-                            t(r.0 + " :", 6.5, bold: true).lineLimit(1).minimumScaleFactor(0.8).frame(width: 84 * g.cw, alignment: .leading)
-                            t(r.1, 7, weight: .semibold).lineLimit(1).minimumScaleFactor(0.6)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-        }
-        .padding(.horizontal, 6).padding(.vertical, 2)
-        .frame(height: CGFloat(half) * 8.2 * g.fs + 5, alignment: .top)
-    }
+    private var summaryRoom: CGFloat { g.totals - 13 * g.fs - 0.6 - 17 * g.fs - 0.6 }
 
     // MARK: footer
 

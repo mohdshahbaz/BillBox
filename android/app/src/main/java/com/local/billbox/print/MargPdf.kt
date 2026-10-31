@@ -61,11 +61,11 @@ fun margClasses(inv: J, co: J): List<Double> {
 }
 fun margSpec(base: Spec, inv: J, co: J): Spec {
     val f = base.fs
-    val bank = bankRows(co)
-    val bankH = if (bank.isEmpty()) 0f else ((bank.size + 1) / 2) * 8.2f * f + 5
+    // the bank details go under the GST classes, in room the totals beside them need anyway
+    val bankH = if (bankLines(co).isEmpty()) 0f else bankLines(co).size * 8f * f + 4
     val classH = (margClasses(inv, co).size + 2) * 8.6f * f + 4
-    val totals = max(classH, 9 * 8.6f * f) + 13 * f + bankH + 1.2f
-    return base.copy(tableHead = 15 * f, foot = 36 * f, totals = totals, strip = 24 * f, sellerBand = 52 * f, buyerBand = 0f, headNext = 18 * f)
+    val totals = max(classH + bankH, 9 * 8.6f * f) + 13 * f + 1.2f
+    return base.copy(tableHead = 15 * f, foot = 36 * f, totals = totals, strip = 26 * f, sellerBand = 52 * f, buyerBand = 0f, headNext = 18 * f)
 }
 fun expText(d: String): String { val p = d.split('-'); return if (p.size >= 2 && p[0].length == 4) "${p[1]}/${p[0].takeLast(2)}" else "" }
 fun addDays(d: String, n: Int): String = try { java.time.LocalDate.parse(d).plusDays(n.toLong()).toString() } catch (_: Exception) { d }
@@ -136,8 +136,17 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         if (on("print_marg_email", false) && co.str("company_email").isNotEmpty()) ids.add("E-Mail : ${co.str("company_email")}" to false)
         if (co.str("company_gstin").isNotEmpty()) ids.add("GSTIN : ${co.str("company_gstin")}" to true)
         if (co.str("state_code").isNotEmpty()) ids.add("State code : ${co.str("state_code")}" to false)
-        val ih = (bh - 4) / max(1, ids.size)
-        for ((t, b) in ids) { pen.text(t, x + 6, gy, leftW - 12, ih, (if (b) 7.5f else 6.5f) * fs, if (b) 700 else 400, color = accent, minScale = 0.6f); gy += ih }
+        // labels and colons lined up, all the same size; only the GSTIN in bold
+        val ih = minOf(8.6f * fs, (bh - 3) / max(1, ids.size))
+        gy = by + (bh - ih * ids.size) / 2
+        val labs = ids.map { it.first.substringBefore(" : ") to it.first.substringAfter(" : ") }
+        val labW = labs.maxOfOrNull { pen.width(it.first, 7.5f * fs) } ?: 0f
+        labs.forEachIndexed { i, (k, v) ->
+            pen.text(k, x + 6, gy, labW + 1, ih, 7.5f * fs, color = accent, minScale = 1f)
+            pen.text(":", x + 6 + labW + 3, gy, 4f, ih, 7.5f * fs, color = accent, minScale = 1f)
+            pen.text(v, x + 6 + labW + 9, gy, leftW - labW - 21, ih, 7.5f * fs, if (ids[i].second) 700 else 400, color = accent, minScale = 0.6f)
+            gy += ih
+        }
         pen.vLine(x + leftW, by, by + bh, L)
         pen.shade(RectF(x + leftW, by, x + leftW + tw, by + bh), band)
         pen.text(docTitle, x + leftW, by + 1, tw, bh * 0.66f, 12.5f * fs, 700, 1, minScale = 0.6f)
@@ -267,10 +276,9 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         fun vals(r: ClassRow) = if (inter) listOf(r.label, Fmt.amount(r.taxable), Fmt.amount(r.disc), Fmt.amount(r.igst), Fmt.amount(r.gst), Fmt.amount(r.total))
             else listOf(r.label, Fmt.amount(r.taxable), Fmt.amount(r.disc), Fmt.amount(r.sgst), Fmt.amount(r.cgst), Fmt.amount(r.gst), Fmt.amount(r.total))
         val rh = 8.6f * fs
-        val bank = bankRows(co)
-        val bankH = if (bank.isEmpty()) 0f else ((bank.size + 1) / 2) * 8.2f * fs + 5
+        val bank = bankLines(co)
         val wordsH = 13 * fs
-        val upperH = g.totals - wordsH - bankH - 1.2f
+        val upperH = g.totals - wordsH - 1.2f
         val sumW = 172 * g.cw
         val tw = w - sumW
         val cw = tw / heads.size
@@ -283,7 +291,14 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         for (r in rows) { line(vals(r), ty, rh, false); ty += rh }
         pen.hLine(x, x + tw, ty, 0.6f)
         line(vals(tot), ty, rh, true)
-        for (k in 1 until heads.size) pen.vLine(x + k * cw, y, y + upperH, 0.5f, Color.argb(178, 0, 0, 0))
+        val tableEnd = ty + rh
+        for (k in 1 until heads.size) pen.vLine(x + k * cw, y, tableEnd, 0.5f, Color.argb(178, 0, 0, 0))
+        if (bank.isNotEmpty()) {
+            // the bank details in the room under the GST classes
+            pen.hLine(x, x + tw, tableEnd, 0.6f)
+            var by = tableEnd + 1.5f
+            for (l in bank) { bankLine(pen, l, x + 4, by, tw - 8, 8f * fs, 6.8f * fs); by += 8f * fs }
+        }
         pen.vLine(x + tw, y, y + upperH, L)
         // the totals beside it, ending in the grand total
         val sx = x + tw
@@ -309,20 +324,6 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         if (co.str("print_words") != "0") pen.text("Rs. " + inv.str("amount_words").replace("Rupees ", ""), x + 6, wy, w * 0.6f, wordsH, 7.5f * fs, 600, minScale = 0.6f)
         if (co.str("print_balance") == "1" && inv.has("party_prev_balance"))
             pen.text("Old balance ${balanceText(inv.num("party_prev_balance"))}  ·  Now due ${balanceText(inv.num("party_balance_after"))}", x + w * 0.6f, wy, w * 0.4f - 6, wordsH, 7 * fs, 700, 2, minScale = 0.6f)
-        if (bank.isNotEmpty()) {
-            val bY = wy + wordsH
-            pen.hLine(x, x + w, bY, 0.6f)
-            val half = (bank.size + 1) / 2
-            val colW = (w - 12) / 2
-            bank.forEachIndexed { i, (k, v) ->
-                val col = if (i < half) 0 else 1
-                val row = if (i < half) i else i - half
-                val bx = x + 6 + col * (colW + 6)
-                val yy = bY + 2 + row * 8.2f * fs
-                pen.text("$k :", bx, yy, 84 * g.cw, 8.2f * fs, 6.5f * fs, 700, minScale = 0.8f)
-                pen.text(v, bx + 88 * g.cw, yy, colW - 88 * g.cw, 8.2f * fs, 7 * fs, 600, minScale = 0.6f)
-            }
-        }
     }
 
     // MARK: footer

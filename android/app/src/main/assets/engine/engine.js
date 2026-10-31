@@ -1986,7 +1986,28 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
           last_status: get("drive_last_status")
         };
       }
+      function keysFromJson(text) {
+        let j;
+        try {
+          j = JSON.parse(String(text));
+        } catch (_) {
+          throw new HttpError2(400, "That file is not the JSON file downloaded from Google Cloud (client_secret_\u2026.json).");
+        }
+        if (j && j.web && !j.installed) throw new HttpError2(400, "That file is for a \u201CWeb application\u201D client. In Google Cloud make an OAuth client of type \u201CTVs and Limited Input devices\u201D and download its JSON.");
+        const k = j && (j.installed || j.web) || j || {};
+        if (!k.client_id || !k.client_secret) throw new HttpError2(400, "That file has no client ID and secret in it. Download the JSON of the OAuth client (Credentials \u203A your client \u203A Download JSON).");
+        return { client_id: k.client_id, client_secret: k.client_secret };
+      }
+      function explain(j, status2) {
+        const e = j.error || "";
+        if (e === "invalid_client") return "Google does not know this Client ID. Check it was copied in full (or import the downloaded JSON file), that the client is of type \u201CTVs and Limited Input devices\u201D, and if you made it just now wait a few minutes and try again";
+        if (e === "unauthorized_client") return "this client cannot use code sign-in: make an OAuth client of type \u201CTVs and Limited Input devices\u201D";
+        if (e === "invalid_scope") return "the Google Drive API is not allowed for this client: turn on the Google Drive API in your Google Cloud project";
+        if (e === "access_denied" || e === "org_internal") return "Google refused: add your Gmail as a test user on the consent screen (Audience \u203A Test users)";
+        return j.error_description || e || String(status2);
+      }
       function saveClient(b = {}) {
+        if (b.json) b = keysFromJson(b.json);
         const id = String(b.client_id || "").trim(), secret = String(b.client_secret || "").trim();
         if (!/\.apps\.googleusercontent\.com$/.test(id)) throw new HttpError2(400, "Paste the Client ID from Google Cloud (it ends in .apps.googleusercontent.com).");
         if (!secret) throw new HttpError2(400, "Paste the client secret too.");
@@ -1999,7 +2020,7 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
         const id = get("drive_client_id");
         if (!id) throw new HttpError2(400, "Add the Google Client ID and secret first.");
         const r = await call("https://oauth2.googleapis.com/device/code", { method: "POST", headers: FORM, body: form({ client_id: id, scope: SCOPE }) });
-        if (r.status !== 200) throw new HttpError2(502, `Google did not give a code (${r.json.error_description || r.json.error || r.status}).`);
+        if (r.status !== 200) throw new HttpError2(r.json.error ? 400 : 502, `Google did not give a code: ${explain(r.json, r.status)}.`);
         set("drive_device", r.json.device_code);
         return {
           user_code: r.json.user_code,
@@ -2019,7 +2040,7 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
         if (r.json.error === "authorization_pending" || r.json.error === "slow_down") return { connected: false, waiting: true };
         del("drive_device");
         if (r.status !== 200 || !r.json.refresh_token) {
-          throw new HttpError2(400, r.json.error === "access_denied" ? "Google sign-in was declined." : r.json.error === "expired_token" ? "The code ran out. Press Connect again." : `Google did not connect (${r.json.error_description || r.json.error || r.status}).`);
+          throw new HttpError2(400, r.json.error === "access_denied" ? "Google sign-in was declined." : r.json.error === "expired_token" ? "The code ran out. Press Connect again." : `Google did not connect: ${explain(r.json, r.status)}.`);
         }
         set("drive_refresh", r.json.refresh_token);
         await folder(r.json.access_token);

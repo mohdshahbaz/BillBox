@@ -33,6 +33,13 @@ enum Page: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// A page inside the More tab: a screen, or one of the Settings pages (kept in AppModel, so a theme change or a save that
+/// redraws the screens leaves you where you were).
+enum MoreRoute: Hashable {
+    case page(Page)
+    case settings(String)
+}
+
 struct Toast: Identifiable, Equatable {
     let id = UUID()
     let text: String
@@ -48,6 +55,9 @@ final class AppModel: ObservableObject {
     @Published var ready = false
     @Published var startError: String?
     @Published var section: Page = .billing
+    /// The tab bar and the pages open inside More (iPhone).
+    @Published var tab: Page = .billing
+    @Published var morePath: [MoreRoute] = []
     @Published var toast: Toast?
     /// Set by "Edit" in All Bills: the target screen opens that bill.
     @Published var pendingEdit: (type: String, id: Int)?

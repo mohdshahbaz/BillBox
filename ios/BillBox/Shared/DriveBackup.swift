@@ -47,21 +47,30 @@ import SwiftUI
                 .padding(.vertical, 4)
             }
             if connected {
-                Button { Task { await upload() } } label: { Text(busy ? "Uploading…" : "Upload the newest backup now") }.disabled(busy)
-                Button("Disconnect Google Drive", role: .destructive) { Task { await disconnect() } }.disabled(busy)
+                Button { Task { await upload() } } label: { Label(busy ? "Uploading…" : "Upload the newest backup now", systemImage: "icloud.and.arrow.up") }
+                    .disabled(busy)
+                Button(role: .destructive) { Task { await disconnect() } } label: { Label("Disconnect Google Drive", systemImage: "xmark.icloud") }
+                    .disabled(busy)
             } else if code.isEmpty {
                 if hasKeys && !editingKeys {
-                    Button { Task { await connect() } } label: { Label(busy ? "Connecting…" : "Connect Google Drive", systemImage: "link") }
-                        .buttonStyle(.borderedProminent).disabled(busy)
-                    Button("Change Google keys…") { editingKeys = true; clientId = status.str("client_id") }.buttonStyle(.borderless)
-                } else {
-                    TextField("Client ID (…apps.googleusercontent.com)", text: $clientId).textFieldStyle(.roundedBorder).autocorrectionDisabled()
-                    SecureField("Client secret", text: $secret).textFieldStyle(.roundedBorder)
-                    HStack {
-                        Button("Save keys") { Task { await saveKeys() } }.buttonStyle(.borderedProminent)
-                            .disabled(busy || clientId.trimmingCharacters(in: .whitespaces).isEmpty || secret.trimmingCharacters(in: .whitespaces).isEmpty)
-                        if hasKeys { Button("Cancel") { editingKeys = false }.buttonStyle(.bordered) }
+                    Button { Task { await connect() } } label: {
+                        Label(busy ? "Connecting…" : "Connect Google Drive", systemImage: "link.icloud").font(.body.weight(.semibold))
                     }
+                    .disabled(busy)
+                    HStack {
+                        Text("Client ID").foregroundStyle(.secondary)
+                        Spacer()
+                        Text(shortId(status.str("client_id"))).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    }
+                    Button { editingKeys = true; clientId = status.str("client_id") } label: { Label("Change Google keys…", systemImage: "key") }
+                } else {
+                    Button { Task { await importJSON() } } label: { Label("Import the downloaded JSON file…", systemImage: "doc.badge.plus") }
+                        .disabled(busy)
+                    TextField("Client ID (…apps.googleusercontent.com)", text: $clientId).autocorrectionDisabled()
+                    SecureField("Client secret", text: $secret)
+                    Button { Task { await saveKeys() } } label: { Label("Save keys", systemImage: "checkmark.circle") }
+                        .disabled(busy || clientId.trimmingCharacters(in: .whitespaces).isEmpty || secret.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if hasKeys { Button("Cancel") { editingKeys = false } }
                 }
             }
         } header: {
@@ -69,10 +78,26 @@ import SwiftUI
         } footer: {
             Text(connected
                  ? "Every backup (Back up now, the daily backup and the backup on quitting) is also uploaded to your Google Drive, into a folder with the backup's name inside BillBox Backups. The copy on this device stays as well. BillBox can see only the files it made itself in your Drive."
-                 : "One-time setup (about 5 minutes, free): in console.cloud.google.com make a project, turn on the Google Drive API, set up the consent screen (External; add your Gmail as a test user), then Credentials › Create credentials › OAuth client ID › type “TVs and Limited Input devices”. Paste its Client ID and secret here, then Connect. The same keys work on the Mac, iPhone and Android.")
+                 : "One-time setup (about 5 minutes, free): in console.cloud.google.com make a project, turn on the Google Drive API, set up the consent screen (External; add your Gmail as a test user), then Credentials › Create credentials › OAuth client ID › type “TVs and Limited Input devices”. Download its JSON and import it here (or paste the Client ID and secret), then Connect. A client made a minute ago can take a few minutes before Google knows it. The same keys work on the Mac, iPhone and Android.")
         }
         .task { await load() }
         .onDisappear { polling?.cancel() }
+    }
+
+    private func shortId(_ id: String) -> String {
+        let head = id.components(separatedBy: ".apps.googleusercontent.com").first ?? id
+        return head.count > 22 ? String(head.prefix(10)) + "…" + String(head.suffix(8)) : head
+    }
+
+    /// Settings › Google Drive › Import: the client_secret_….json downloaded from Google Cloud holds both keys.
+    private func importJSON() async {
+        guard let text = await Files.pickJSON() else { return }
+        busy = true; defer { busy = false }
+        await app.guarded {
+            status = try await API.obj("PUT", "/backup/drive/client", body: ["json": text])
+            editingKeys = false; secret = ""; clientId = ""
+            app.notify("Google keys imported. Now press Connect Google Drive.")
+        }
     }
 
     private func copy(_ text: String) {
