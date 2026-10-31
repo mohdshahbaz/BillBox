@@ -1,0 +1,17 @@
+10-31 12:48:11.949 E/BillBoxEngine( 2618): Error: UNIQUE constraint failed: categories.name
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at fail (file:///android_asset/engine/engine.js:259:19)
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at reply (file:///android_asset/engine/engine.js:267:33)
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at StatementSync.run (file:///android_asset/engine/engine.js:430:18)
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at Object.run (file:///android_asset/engine/engine.js:486:38)
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at file:///android_asset/engine/engine.js:4123:76
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at Array.<anonymous> (file:///android_asset/engine/engine.js:1873:11)
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at run (file:///android_asset/engine/engine.js:11377:38)
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at file:///android_asset/engine/engine.js:11394:27
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at AsyncLocalStorage.run (file:///android_asset/engine/engine.js:521:20)
+10-31 12:48:11.949 E/BillBoxEngine( 2618):     at Object.withCompany (file:///android_asset/engine/engine.js:1602:20) (file:///android_asset/engine/engine.js:11371)
+10-31 12:48:11.950 E/SELFTEST( 2618): step 18 POST /categories: {"error":"Server error","code":"ERR_SQLITE_ERROR"}
+10-31 12:48:13.702 E/SELFTEST( 2618): step 302 POST /items/online/search: {"error":"Could not reach the internet. Check the connection and try again.","code":"OFFLINE"}
+10-31 12:48:13.706 E/SELFTEST( 2618): step 304 POST /items/online/fetch: {"error":"Could not reach the internet. Check the connection and try again.","code":"OFFLINE"}
+10-31 12:48:15.933 I/SELFTEST( 2618): replay done: 470 steps, 3 server errors
+10-31 12:48:17.633 I/SELFTEST( 2618): app ready=true error=null company=AK  Enterprises fy=2026-27
+10-31 12:48:45.267 I/SELFTEST( 2618): tour done
