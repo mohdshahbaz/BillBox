@@ -41,7 +41,7 @@ shot() { sleep "${2:-2}"; adb exec-out screencap -p > "$UI/${N}_$1.png"; N=$((N 
 tap() {   # tap <text> [--edit] [--skip=n]
   local xy=""
   for try in 1 2 3; do calm; xy=$(dump | python3 "$HERE/ui_find.py" "$@") && break; xy=""; sleep 2; done
-  [ -n "$xy" ] || { echo "::warning::UI step: nothing called '$1' on screen"; echo "missing: $1" >> "$UI/steps.txt"; cp "$UI/last.xml" "$UI/missing_${N}.xml" 2>/dev/null; return 1; }
+  [ -n "$xy" ] || { echo "::warning::UI step: nothing called '$1' on screen"; echo "missing: $1" >> "$UI/steps.txt"; cp "$UI/last.xml" "$UI/missing_${N}.xml" 2>/dev/null; adb exec-out screencap -p > "$UI/missing_${N}.png"; return 1; }
   adb shell input tap $xy; echo "tapped: $1 at $xy" >> "$UI/steps.txt"; sleep 1.5
 }
 typetext() { adb shell input text "$(echo "$1" | sed 's/ /%s/g')"; sleep 2; }

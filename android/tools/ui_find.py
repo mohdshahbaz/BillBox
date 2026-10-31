@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reads a uiautomator dump (stdin) and prints the centre "x y" of the first node whose text or description contains the
 pattern (case-insensitive); --last takes the last one on screen (the bottom bar). With --edit, only text boxes. Exit 1 when nothing matches."""
-import sys, re
+import sys, re, html
 pat = sys.argv[1].lower()
 edit = '--edit' in sys.argv
 last = '--last' in sys.argv
@@ -10,8 +10,8 @@ xml = sys.stdin.read()
 found = None
 for m in re.finditer(r'<node [^>]*>', xml):
     n = m.group(0)
-    t = (re.search(r' text="([^"]*)"', n) or [None, ''])[1]
-    d = (re.search(r' content-desc="([^"]*)"', n) or [None, ''])[1]
+    t = html.unescape((re.search(r' text="([^"]*)"', n) or [None, ''])[1])
+    d = html.unescape((re.search(r' content-desc="([^"]*)"', n) or [None, ''])[1])
     cls = (re.search(r' class="([^"]*)"', n) or [None, ''])[1]
     if edit and 'EditText' not in cls: continue
     if pat in t.lower() or pat in d.lower():
