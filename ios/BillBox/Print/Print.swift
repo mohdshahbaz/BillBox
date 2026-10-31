@@ -409,7 +409,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             VStack(alignment: .leading, spacing: 1) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        t(r.0 + ":", 6.5, bold: true).frame(width: 74 * g.cw, alignment: .leading)
+                        t(r.0 + ":", 6.5, bold: true).lineLimit(1).minimumScaleFactor(0.8).frame(width: 86 * g.cw, alignment: .leading)
                         t(r.1, 7, weight: .semibold).lineLimit(r.0 == "ADDRESS" ? 2 : 1).minimumScaleFactor(0.75).fixedSize(horizontal: false, vertical: true)
                     }
                 }

@@ -338,7 +338,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         val bank = bankRows(co)
         if (bank.isNotEmpty()) {
             ly += 3
-            val bh = 8.4f * fs; val lab = 76f * g.cw; val vw = w - rightW - 12 - lab - 4
+            val bh = 8.4f * fs; val lab = 86f * g.cw; val vw = w - rightW - 12 - lab - 4
             for ((label, value) in bank) {
                 pen.text("$label:", lx, ly, lab, bh, 6.5f * fs, 700, minScale = 0.8f)
                 if (label == "ADDRESS" && value.length > 70) { pen.para(value, lx + lab + 4, ly + 1, vw, 7f * fs, 2, 600); ly += 2 * bh }
