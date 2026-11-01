@@ -17,7 +17,7 @@ public final class License {
     /// "public" (the App Store / website app), "admin" (the owner's test build) or "" (tests: nothing is limited).
     public static var edition = ""
 
-    static let SITE = "https://billbox.pages.dev"
+    static let SITE = "https://billbox-app.pages.dev"
     static let KEYS = ["live": "n5iJULtiUQmzWASMw96LVf9kQ6y5z77934tbchjqhpE", "test": "pL2sd4UksOSqnzAlNDcYtgcquKYTxZYu9fR0c0vbHVY"]
     static let TRIAL_DAYS = 15
     static let DAY = 86_400_000.0

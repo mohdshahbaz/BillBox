@@ -1,4 +1,4 @@
-# The website and licence server on Cloudflare Pages (billbox.pages.dev): built, checked and deployed on every push to
+# The website and licence server on Cloudflare Pages (billbox-app.pages.dev): built, checked and deployed on every push to
 # main that touches website/ (other branches get a preview address). Needs the repository secrets
 # CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID; the licence and Razorpay secrets are copied to Cloudflare when present.
 name: Website
@@ -51,6 +51,6 @@ jobs:
         run: |
           sleep 20
           for p in / /mac/ /windows/ /pricing/ /buy.html /sitemap.xml /videos/mac.mp4; do
-            c=$(curl -s -o /dev/null -w '%{http_code}' "https://billbox.pages.dev$p"); echo "$c $p"
+            c=$(curl -s -o /dev/null -w '%{http_code}' "https://billbox-app.pages.dev$p"); echo "$c $p"
           done
           curl -s https://billbox-app.pages.dev/api/test/config | head -c 300; echo

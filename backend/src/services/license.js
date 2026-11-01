@@ -20,7 +20,7 @@ const db = require('../db');
 const { HttpError } = require('../utils/misc');
 const ed = require('./ed25519');
 
-const SITE = 'https://billbox.pages.dev';
+const SITE = 'https://billbox-app.pages.dev';
 const KEYS = {
   live: 'n5iJULtiUQmzWASMw96LVf9kQ6y5z77934tbchjqhpE',
   test: 'pL2sd4UksOSqnzAlNDcYtgcquKYTxZYu9fR0c0vbHVY',

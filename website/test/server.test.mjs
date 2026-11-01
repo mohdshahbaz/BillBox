@@ -30,14 +30,14 @@ globalThis.fetch = async (url, opts = {}) => {
     if (opts.method === 'POST') { const b = JSON.parse(opts.body); const id = 'order_' + Object.keys(orders).length; orders[id] = { id, ...b, status: 'created' }; return new Response(JSON.stringify(orders[id])); }
     const id = decodeURIComponent(u.split('/').pop()); return orders[id] ? new Response(JSON.stringify(orders[id])) : new Response('{}', { status: 404 });
   }
-  if (u.startsWith('https://billbox.pages.dev/api/')) {   // the engine calling the licence server
-    const p = u.slice('https://billbox.pages.dev/api/'.length).split('/');
+  if (u.startsWith('https://billbox-app.pages.dev/api/')) {   // the engine calling the licence server
+    const p = u.slice('https://billbox-app.pages.dev/api/'.length).split('/');
     return onRequest({ request: new Request(u, opts), env, params: { path: p } });
   }
   return realFetch(url, opts);
 };
 const call = async (method, p, body, headers = {}) => {
-  const r = await onRequest({ request: new Request(`https://billbox.pages.dev/api/${p}`, { method, headers: { 'content-type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined }), env, params: { path: p.split('/') } });
+  const r = await onRequest({ request: new Request(`https://billbox-app.pages.dev/api/${p}`, { method, headers: { 'content-type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined }), env, params: { path: p.split('/') } });
   return { status: r.status, j: await r.json() };
 };
 const hmac = (k, t) => crypto.createHmac('sha256', k).update(t).digest('hex');

@@ -22,7 +22,7 @@ Yearly ₹1,499 · Lifetime ₹3,999 · Yearly $29 (outside India). Change them 
 - **Razorpay** (cards, UPI, net banking, wallets; international cards in USD once enabled on your Razorpay account).
   Razorpay charges its fee per payment.
 - **Direct UPI, no fees**: the buy page shows a UPI QR for `UPI_VPA`; the buyer e-mails you the UPI reference and you
-  issue the key on **billbox.pages.dev/admin.html** (Issue a licence).
+  issue the key on **billbox-app.pages.dev/admin.html** (Issue a licence).
 
 ## GitHub secrets (Settings › Secrets and variables › Actions)
 
@@ -33,7 +33,7 @@ Yearly ₹1,499 · Lifetime ₹3,999 · Yearly $29 (outside India). Change them 
 | `ADMIN_TOKEN` | password of admin.html and `/api/*/admin/*` |
 | `RZP_KEY_ID_TEST`, `RZP_KEY_SECRET_TEST` | Razorpay Dashboard › Test mode › Account & Settings › API keys |
 | `RZP_KEY_ID_LIVE`, `RZP_KEY_SECRET_LIVE` | the same in Live mode (after Razorpay activates your account) |
-| `RZP_WEBHOOK_SECRET` | optional: Razorpay › Webhooks › `https://billbox.pages.dev/api/live/webhook` (and `/api/test/webhook` in test mode), events `payment.captured`, `order.paid` |
+| `RZP_WEBHOOK_SECRET` | optional: Razorpay › Webhooks › `https://billbox-app.pages.dev/api/live/webhook` (and `/api/test/webhook` in test mode), events `payment.captured`, `order.paid` |
 | `UPI_VPA` | optional: your UPI ID for direct UPI payments, e.g. `akenterprises@okhdfc` |
 
 After adding or changing secrets: **Actions › Website › Run workflow** (main).
@@ -57,4 +57,4 @@ Cloudflare Pages on every push to `main` (other branches get a preview address).
    Custom domains › Set up a custom domain › `billbox.eu.org`.
 4. Then set `SITE_URL=https://billbox.eu.org` for `website/build.py` (canonical addresses and sitemap) and change
    `SITE` in `backend/src/services/license.js` and `ios/BillBoxCore/Sources/BillBoxCore/License.swift` (or keep
-   billbox.pages.dev there: it keeps working).
+   billbox-app.pages.dev there: it keeps working).

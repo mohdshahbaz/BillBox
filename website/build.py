@@ -5,7 +5,7 @@ Every page gets its title, description, canonical address, social cards and stru
 same navigation and footer. The feature videos come from website/video (node website/video/render.mjs)."""
 import html, json, os, datetime
 
-SITE = os.environ.get("SITE_URL", "https://billbox.pages.dev").rstrip("/")
+SITE = os.environ.get("SITE_URL", "https://billbox-app.pages.dev").rstrip("/")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
 EMAIL = "mohdshabaz12@gmail.com"
 SELLER = "AK Enterprises"

@@ -1,5 +1,5 @@
 /**
- * BillBox licence server (Cloudflare Pages Functions, at billbox.pages.dev/api/…). Two separate worlds:
+ * BillBox licence server (Cloudflare Pages Functions, at billbox-app.pages.dev/api/…). Two separate worlds:
  *
  *   /api/live/…   the public apps and the website: live Razorpay keys, licences signed with the live key
  *   /api/test/…   the owner's admin (test) apps: Razorpay test mode, licences signed with the test key
