@@ -11,6 +11,8 @@ name: Release
 on:
   push:
     tags: ['v*']
+    # pushing a branch release/15.8.0 (or release/15.8.0-admin) also makes that release: for tools that cannot push tags
+    branches: ['release/**']
   workflow_dispatch:
     inputs:
       version:
@@ -43,7 +45,7 @@ jobs:
           INPUT: ${{ github.event.inputs.version }}
           PRE: ${{ github.event.inputs.prerelease }}
         run: |
-          RAW="${INPUT:-${GITHUB_REF_NAME}}"; V="${RAW#v}"
+          RAW="${INPUT:-${GITHUB_REF_NAME}}"; RAW="${RAW#release/}"; V="${RAW#v}"
           [[ "$V" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::Version '$RAW' must look like 15.2.0 (or 15.2.0-beta1)"; exit 1; }
           BASE="${V%%-*}"; IFS=. read -r MA MI PA <<<"$BASE"; PA="${PA:-0}"
           echo "version=$V" >> "$GITHUB_OUTPUT"
