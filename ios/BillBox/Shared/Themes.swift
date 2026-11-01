@@ -13,11 +13,12 @@ struct AppTheme: Identifiable, Equatable {
     private static func ui(_ h: UInt32) -> UIColor {
         UIColor(red: CGFloat((h >> 16) & 255) / 255, green: CGFloat((h >> 8) & 255) / 255, blue: CGFloat(h & 255) / 255, alpha: 1)
     }
-    private static func dyn(_ light: UInt32, _ dark: UInt32) -> Color {
+    static func dyn(_ light: UInt32, _ dark: UInt32) -> Color {
         let l = ui(light), d = ui(dark)
         return Color(UIColor { tc in tc.userInterfaceStyle == .dark ? d : l })
     }
     private static func hex(_ h: UInt32) -> Color { Color(ui(h)) }
+    static let plainPage = Color(UIColor.systemGroupedBackground)
 
     static let all: [AppTheme] = [
         // calm greys, white panels, one indigo accent (the default)
@@ -37,19 +38,49 @@ struct AppTheme: Identifiable, Equatable {
         AppTheme(id: "crimson", name: "Crimson", accent: dyn(0xB91C1C, 0xF87171), card: dyn(0xFFFFFF, 0x2A1616), page: dyn(0xFBEFEF, 0x1E1010), swatch: [hex(0xB91C1C), hex(0xF5CFCF)]),
         AppTheme(id: "coffee", name: "Coffee", accent: dyn(0x7A4E2D, 0xC9925E), card: dyn(0xFFFFFF, 0x2A211B), page: dyn(0xF6EFE8, 0x1C1612), swatch: [hex(0x7A4E2D), hex(0xE9D8C6)]),
         AppTheme(id: "graphite", name: "Graphite", accent: dyn(0x1F2937, 0xE5E7EB), card: dyn(0xFFFFFF, 0x1C1C1E), page: dyn(0xF2F2F3, 0x000000), swatch: [hex(0x1F2937), hex(0xD1D5DB)]),
+        // 15.9
+        AppTheme(id: "teal", name: "Teal", accent: dyn(0x0F766E, 0x2DD4BF), card: dyn(0xFFFFFF, 0x132826), page: dyn(0xE9F6F4, 0x0D1A19), swatch: [hex(0x0F766E), hex(0xC3EDE7)]),
+        AppTheme(id: "sky", name: "Sky", accent: dyn(0x0284C7, 0x38BDF8), card: dyn(0xFFFFFF, 0x132634), page: dyn(0xEAF5FC, 0x0B1A24), swatch: [hex(0x0284C7), hex(0xC7E6F7)]),
+        AppTheme(id: "emerald", name: "Emerald", accent: dyn(0x047857, 0x34D399), card: dyn(0xFFFFFF, 0x13261D), page: dyn(0xE8F6EF, 0x0B1913), swatch: [hex(0x047857), hex(0xBDEBD3)]),
+        AppTheme(id: "plum", name: "Plum", accent: dyn(0x86198F, 0xE879F9), card: dyn(0xFFFFFF, 0x2A1A2E), page: dyn(0xF8EEF9, 0x1C1020), swatch: [hex(0x86198F), hex(0xEFCDF3)]),
+        AppTheme(id: "sand", name: "Sand", accent: dyn(0x8A6A3B, 0xD6B37A), card: dyn(0xFFFFFF, 0x2A241B), page: dyn(0xF7F2E9, 0x1C1812), swatch: [hex(0x8A6A3B), hex(0xEADFC9)]),
+        AppTheme(id: "peacock", name: "Peacock", accent: dyn(0x006D77, 0x4FD1C5), card: dyn(0xFFFFFF, 0x14292B), page: dyn(0xE6F4F5, 0x0B1A1C), swatch: [hex(0x006D77), hex(0xBFE6E9)]),
+        AppTheme(id: "cherry", name: "Cherry", accent: dyn(0x9F1239, 0xFB7185), card: dyn(0xFFFFFF, 0x2D1820), page: dyn(0xFCEEF2, 0x1E0F14), swatch: [hex(0x9F1239), hex(0xF7C8D5)]),
+        AppTheme(id: "olive", name: "Olive", accent: dyn(0x556B2F, 0xA3C46B), card: dyn(0xFFFFFF, 0x232918), page: dyn(0xF2F4EA, 0x161A0F), swatch: [hex(0x556B2F), hex(0xDCE3C4)]),
     ]
 
     static func named(_ id: String) -> AppTheme { all.first { $0.id == id } ?? all[0] }
     /// The chosen theme. Asked for by every table row and panel, so it is looked up once per theme change, not each time.
     private static var cached: (id: String, theme: AppTheme)?
     static var current: AppTheme {
-        let id = UserDefaults.standard.string(forKey: "theme") ?? "clean"
-        if let c = cached, c.id == id { return c.theme }
-        let t = named(id)
-        cached = (id, t)
+        let d = UserDefaults.standard
+        let id = d.string(forKey: "theme") ?? "clean"
+        let key = "\(id)|\(d.string(forKey: "accentOverride") ?? "")|\(d.string(forKey: "pageStyle") ?? "")"
+        if let c = cached, c.id == key { return c.theme }
+        let t = named(id).customised(accent: d.string(forKey: "accentOverride") ?? "", page: d.string(forKey: "pageStyle") ?? "")
+        cached = (key, t)
         return t
     }
-}
+
+    /// The theme with Settings › Appearance › Accent colour and Background applied.
+    func customised(accent a: String, page p: String) -> AppTheme {
+        let acc = accentChoices.first { $0.id == a }.map { AppTheme.dyn($0.light, $0.dark) } ?? accent
+        let pg: Color
+        switch p {
+        case "plain": pg = AppTheme.plainPage
+        case "tinted": pg = acc.opacity(0.10)
+        default: pg = page
+        }
+        return AppTheme(id: id, name: name, accent: acc, card: card, page: pg, swatch: swatch)
+    }}
+
+
+/// Settings › Appearance › Accent colour: the theme's own, or one of these (hex, light / dark).
+let accentChoices: [(id: String, name: String, light: UInt32, dark: UInt32)] = [
+    ("indigo", "Indigo", 0x4F46E5, 0x8B8CF8), ("blue", "Blue", 0x2563EB, 0x60A5FA), ("sky", "Sky", 0x0284C7, 0x38BDF8), ("teal", "Teal", 0x0F766E, 0x2DD4BF),
+    ("green", "Green", 0x15803D, 0x4ADE80), ("lime", "Lime", 0x4D7C0F, 0xA3E635), ("amber", "Amber", 0xB45309, 0xFBBF24), ("orange", "Orange", 0xC2410C, 0xFB923C),
+    ("red", "Red", 0xB91C1C, 0xF87171), ("pink", "Pink", 0xBE185D, 0xF472B6), ("purple", "Purple", 0x7E22CE, 0xC084FC), ("brown", "Brown", 0x7A4E2D, 0xC9925E),
+]
 
 /// Settings > Appearance: pick a colour theme and light / dark / automatic.
 @MainActor struct AppearanceSettings: View {
@@ -61,6 +92,9 @@ struct AppTheme: Identifiable, Equatable {
     @AppStorage("textSize") private var textSize = "default"
     @AppStorage("fontStyle") private var fontStyle = "system"
     @AppStorage("fontWeight") private var fontWeight = "regular"
+    @AppStorage("accentOverride") private var accentOverride = ""
+    @AppStorage("pageStyle") private var pageStyle = ""
+    @AppStorage("stripes") private var stripes = false
 
     var body: some View {
         ScrollView {
@@ -95,6 +129,31 @@ struct AppTheme: Identifiable, Equatable {
                     Text("Automatic").tag("auto"); Text("Light").tag("light"); Text("Dark").tag("dark")
                 }
                 .pickerStyle(.segmented).labelsHidden()
+                Group {
+                    Text("Accent colour").font(.headline)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 38), spacing: 10)], spacing: 10) {
+                        Button { accentOverride = "" } label: {
+                            Image(systemName: accentOverride.isEmpty ? "checkmark.circle.fill" : "circle.lefthalf.filled")
+                                .font(.system(size: 26)).foregroundStyle(AppTheme.named(themeId).accent)
+                        }
+                        .buttonStyle(.plain).accessibilityLabel("Theme's own colour")
+                        ForEach(accentChoices, id: \.id) { c in
+                            Button { accentOverride = c.id } label: {
+                                Circle().fill(AppTheme.dyn(c.light, c.dark)).frame(width: 30, height: 30)
+                                    .overlay(Image(systemName: "checkmark").font(.system(size: 13, weight: .bold)).foregroundStyle(.white).opacity(accentOverride == c.id ? 1 : 0))
+                            }
+                            .buttonStyle(.plain).accessibilityLabel(c.name + (accentOverride == c.id ? ", selected" : ""))
+                        }
+                    }
+                    Text("Background").font(.headline)
+                    Picker("Background", selection: $pageStyle) {
+                        Text("Theme").tag(""); Text("Plain").tag("plain"); Text("Tinted").tag("tinted")
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                    Toggle("Striped table rows", isOn: $stripes)
+                    Text("The accent colour replaces the theme's colour on buttons, icons and totals; Plain uses the system background, Tinted washes it with the accent.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Group {
                     Text("Letters").font(.headline)
                     Picker("Typeface", selection: $fontStyle) {

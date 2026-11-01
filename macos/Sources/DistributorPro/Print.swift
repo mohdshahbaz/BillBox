@@ -646,7 +646,7 @@ private func renderBitmapPDF(pages: [AnyView], size: CGSize) -> PDFDocument? {
 /// The page measurements for the company's bill design (Settings › Printing › Bill design) and text size.
 func billSpec(_ inv: JSON, _ co: JSON, full: Bool) -> Spec {
     let base = (full ? Spec.full : Spec.half).scaled(printScale(co))
-    return printStyle(co) == "marg" ? margSpec(base, inv, co) : base.withBank(co, inv)
+    return printStyle(co) != "classic" ? margSpec(base, inv, co) : base.withBank(co, inv)
 }
 
 /// One copy of one page of a bill, in the company's bill design.
@@ -654,7 +654,7 @@ func billSpec(_ inv: JSON, _ co: JSON, full: Bool) -> Spec {
 func billSheet(_ inv: JSON, _ co: JSON, rows: Range<Int>, page: Int, pages: Int, copy copyLabel: String, g: Spec) -> AnyView {
     // Settings › Printing › "ORIGINAL / DUPLICATE on each copy": off prints the copies without the words
     let copy = co.str("print_copy_label") == "0" ? "" : copyLabel
-    return printStyle(co) == "marg"
+    return printStyle(co) != "classic"
         ? AnyView(MargSheetView(inv: inv, co: co, rows: rows, page: page, pages: pages, copy: copy, g: g))
         : AnyView(InvoiceSheetView(inv: inv, co: co, rows: rows, page: page, pages: pages, copy: copy, g: g))
 }

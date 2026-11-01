@@ -7,12 +7,19 @@ struct BillBoxApp: App {
     @StateObject private var app = AppModel()
     @AppStorage("theme") private var themeId = "clean"
     @AppStorage("appearance") private var appearance = "auto"
+    @AppStorage("accentOverride") private var accentOverride = ""
+    @AppStorage("pageStyle") private var pageStyle = ""
     @Environment(\.scenePhase) private var phase
 
     /// The theme colour for what UIKit draws itself (alerts, the Files picker, the share sheet, the keyboard bar), which
     /// SwiftUI's tint does not reach.
-    @MainActor static func tintWindows(_ id: String) {
-        let c = UIColor(AppTheme.named(id).accent)
+    @MainActor private func themeChanged() {
+        BillBoxApp.tintWindows()
+        app.objectWillChange.send()       // every screen that shows the books redraws with the new colours
+    }
+
+    @MainActor static func tintWindows() {
+        let c = UIColor(AppTheme.current.accent)
         for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
             for w in scene.windows { w.tintColor = c }
         }
@@ -28,13 +35,16 @@ struct BillBoxApp: App {
             RootView()
                 .environmentObject(app)
                 .environment(\.locale, Locale(identifier: "en_IN"))
-                .tint(AppTheme.named(themeId).accent)
+                .tint(AppTheme.current.accent)
                 .preferredColorScheme(appearance == "light" ? .light : (appearance == "dark" ? .dark : nil))
                 .modifier(TextSizeChoice())
                 .modifier(FontChoice())
-                .id(themeId)
-                .onAppear { BillBoxApp.tintWindows(themeId) }
-                .onChange(of: themeId) { BillBoxApp.tintWindows($0) }
+                // no .id(theme) here: rebuilding every screen closed the open page (Settings › Appearance) on each change;
+                // the screens redraw instead, so the new colours show while the page stays open
+                .onAppear { BillBoxApp.tintWindows() }
+                .onChange(of: themeId) { _ in themeChanged() }
+                .onChange(of: accentOverride) { _ in themeChanged() }
+                .onChange(of: pageStyle) { _ in themeChanged() }
         }
         .onChange(of: phase) { p in
             switch p {

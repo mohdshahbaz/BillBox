@@ -450,7 +450,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
 fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder()): PdfBuilder {
     val n = inv.list("lines").size
     val base = (if (layout.isFullPage) Spec.full else Spec.half).scaled(printScale(co))
-    val marg = printStyle(co) == "marg"
+    val marg = printStyle(co) != "classic"   // Marg, Busy and Bizom are drawn by MargSheet
     val g = if (marg) margSpec(base, inv, co) else base.withBank(co, inv)
     // one copy of one page, in the company's bill design (Settings › Printing › Bill design)
     fun sheet(pen: Pen, r: IntRange, i: Int, n2: Int, label: String, oy: Float = 0f) {

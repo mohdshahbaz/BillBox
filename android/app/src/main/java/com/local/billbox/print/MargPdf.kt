@@ -13,12 +13,16 @@ import kotlin.math.max
 // Free / Pack columns, the GST class table with the totals beside it, the amount in words, and Terms | Receiver |
 // Authorised signatory at the bottom. Its own choices are the print_marg_* settings.
 
-/** The design the company chose: "classic" (BillBox) or "marg". */
-fun printStyle(co: J): String = if (co.str("print_style") == "marg") "marg" else "classic"
+/** The design the company chose: "classic" (BillBox), "marg", "busy" (like a Busy bill) or "bizom" (like a Bizom bill). */
+fun printStyle(co: J): String = co.str("print_style").takeIf { it in setOf("marg", "busy", "bizom") } ?: "classic"
+val billDesigns = listOf("classic" to "BillBox (clean, modern)", "marg" to "Marg style (like a Marg ERP bill)",
+    "busy" to "Busy style (tax invoice with full grid)", "bizom" to "Bizom style (distribution bill with scheme savings)")
 
-val margColours = listOf("blue" to "Marg blue", "mono" to "Black only (any printer)", "green" to "Green", "maroon" to "Maroon")
-/** (name and headings, filled bands) */
-private fun margInk(co: J): Pair<Int, Int> = when (co.str("print_marg_colour")) {
+val margColours = listOf("blue" to "Marg blue", "mono" to "Black only (any printer)", "green" to "Green", "maroon" to "Maroon", "teal" to "Teal", "orange" to "Orange")
+/** (name and headings, filled bands); each design's own colour until one is chosen: Busy black, Bizom teal */
+private fun margInk(co: J): Pair<Int, Int> = when (co.str("print_marg_colour").ifEmpty { when (printStyle(co)) { "busy" -> "mono"; "bizom" -> "teal"; else -> "blue" } }) {
+    "teal" -> Color.argb(255, 0, 107, 115) to Color.argb(255, 219, 242, 242)
+    "orange" -> Color.argb(255, 184, 84, 0) to Color.argb(255, 255, 235, 212)
     "mono" -> Color.BLACK to Color.argb(23, 0, 0, 0)
     "green" -> Color.argb(255, 18, 94, 33) to Color.argb(255, 219, 240, 217)
     "maroon" -> Color.argb(255, 122, 31, 43) to Color.argb(255, 247, 222, 224)
@@ -41,8 +45,20 @@ fun margShown(co: J): Set<String> {
     val set = raw.split(',').map { it.trim() }.toSet()
     return margOptionalColumns.filter { if (raw.isEmpty()) it.third else it.first in set }.map { it.first }.toSet()
 }
+/** Busy: S.N., Description of Goods, HSN/SAC, Qty, MRP, Price, Disc %, GST %, Amount (full grid). */
+val busyColumns = listOf(MargColumn("sn", "S.N.", 20f, 1), MargColumn("item", "Description of Goods", null, 0), MargColumn("hsn", "HSN/SAC", 40f, 1),
+    MargColumn("qty", "Qty", 58f, 2), MargColumn("mrp", "MRP", 36f, 2), MargColumn("rate", "Price", 42f, 2), MargColumn("dis", "Disc %", 26f, 2),
+    MargColumn("gst", "GST %", 26f, 2), MargColumn("amount", "Amount", 54f, 2))
+/** Bizom: #, SKU, MRP, Qty (cases/pieces), Free, Rate, Gross, Scheme discount, Tax %, Net. */
+val bizomColumns = listOf(MargColumn("sn", "#", 16f, 1), MargColumn("item", "SKU", null, 0), MargColumn("mrp", "MRP", 34f, 2),
+    MargColumn("qcp", "Qty C/P", 40f, 2), MargColumn("free", "Free", 24f, 2), MargColumn("rate", "Rate", 40f, 2), MargColumn("gross", "Gross", 46f, 2),
+    MargColumn("sch", "Sch. Disc", 40f, 2), MargColumn("gst", "Tax %", 26f, 2), MargColumn("amount", "Net Amt", 52f, 2))
+
 fun margCols(co: J, inter: Boolean): List<MargColumn> {
     val on = margShown(co)
+    val style = printStyle(co)
+    if (style == "busy" || style == "bizom")
+        return (if (style == "busy") busyColumns else bizomColumns).filter { c -> if (c.key in setOf("free", "mrp", "hsn", "dis")) c.key in on else true }
     val pcsOnly = co.str("print_qty") == "pcs"
     return margColumns.filter { c ->
         when (c.key) {
@@ -76,7 +92,9 @@ fun margSpec(base: Spec, inv: J, co: J): Spec {
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) n += 1
         totals = max(classH, n * 8f * f + 4 + 17 * f + 0.6f) + 13 * f + 1.2f
     }
-    return base.copy(tableHead = 15 * f, foot = 36 * f, totals = totals, strip = 26 * f, sellerBand = 52 * f, buyerBand = 0f, headNext = 18 * f)
+    // header heights of each design: Busy has a title line, the firm centred, then Billed to | bill details
+    val (strip, seller) = when (printStyle(co)) { "busy" -> 14f to 82f; "bizom" -> 34f to 44f; else -> 26f to 52f }
+    return base.copy(tableHead = 15 * f, foot = 36 * f, totals = totals, strip = strip * f, sellerBand = seller * f, buyerBand = 0f, headNext = 18 * f)
 }
 fun expText(d: String): String { val p = d.split('-'); return if (p.size >= 2 && p[0].length == 4) "${p[1]}/${p[0].takeLast(2)}" else "" }
 fun addDays(d: String, n: Int): String = try { java.time.LocalDate.parse(d).plusDays(n.toLong()).toString() } catch (_: Exception) { d }
@@ -89,6 +107,7 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
     private val accent = margInk(co).first
     private val band = margInk(co).second
     private val isNote = inv.str("doc_title") == "DEBIT NOTE"
+    private val style = printStyle(co)
     private val fs = g.fs
     private fun on(k: String, d: Boolean = true) = if (co.str(k).isEmpty()) d else co.str(k) != "0"
     private fun hc(s: String) = if (co.str("print_caps_head") == "1") s.uppercase() else s
@@ -104,7 +123,7 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         val head = if (first) g.headFirst else g.headNext
         val tableH = g.inner - head - g.foot - (if (last) g.totals else 0f)
         val top = y
-        if (first) header(pen, x, y, w) else nextHeader(pen, x, y, w)
+        if (first) when (style) { "busy" -> busyHeader(pen, x, y, w); "bizom" -> bizomHeader(pen, x, y, w); else -> header(pen, x, y, w) } else nextHeader(pen, x, y, w)
         y += head; pen.hLine(x, x + w, y, L)
         table(pen, x, y, w, tableH); y += tableH
         if (last) { pen.hLine(x, x + w, y, L); totals(pen, x, y, w); y += g.totals }
@@ -180,6 +199,71 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         group(right, dx + dw * 0.57f, dw * 0.43f)
     }
 
+    /** label : value lines with the colons lined up */
+    private fun kvGroup(pen: Pen, kv: List<Pair<String, String>>, gx: Float, gy: Float, gw: Float, lh: Float, size: Float) {
+        val labW = kv.maxOfOrNull { pen.width(it.first, size * fs) } ?: 0f
+        kv.forEachIndexed { i, (k, v) ->
+            val yy = gy + i * lh
+            pen.text(k, gx, yy, labW + 1, lh, size * fs, minScale = 1f)
+            pen.text(":", gx + labW + 3, yy, 4f, lh, size * fs, minScale = 1f)
+            pen.text(v, gx + labW + 9, yy, gw - labW - 9, lh, size * fs, 700, minScale = 0.6f)
+        }
+    }
+
+    /** Busy: "TAX INVOICE" line, the firm centred, then Billed to | the bill's details. */
+    private fun busyHeader(pen: Pen, x: Float, y: Float, w: Float) {
+        pen.shade(RectF(x, y, x + w, y + g.strip), band)
+        if (on("print_marg_page")) pen.text("Page ${page + 1}" + (if (pages > 1) " of $pages" else ""), x + 6, y, 110 * g.cw, g.strip, 6.5f * fs)
+        pen.text(if (docTitle == "GST INVOICE") "TAX INVOICE" else docTitle, x, y, w, g.strip, 10 * fs, 700, 1)
+        pen.text(copy, x + w - 6 - 110 * g.cw, y, 110 * g.cw, g.strip, 6 * fs, 700, 2, minScale = 0.6f)
+        var cy = y + g.strip
+        pen.hLine(x, x + w, cy, L)
+        val ch = 36 * fs
+        pen.text(hc(companyName), x + 6, cy + 1, w - 12, 16 * fs, 14 * fs, 700, 1, color = accent, minScale = 0.55f)
+        pen.text(co.str("company_address"), x + 6, cy + 16 * fs, w - 12, 9 * fs, 7 * fs, 400, 1, minScale = 0.7f)
+        val ids = listOf(co.str("company_phone").let { if (it.isEmpty()) "" else "Phone : $it" }, if (on("print_marg_email", false)) co.str("company_email") else "",
+            co.str("company_gstin").let { if (it.isEmpty()) "" else "GSTIN : $it" }).filter { it.isNotEmpty() }.joinToString("   ·   ")
+        pen.text(ids, x + 6, cy + 25 * fs, w - 12, 9 * fs, 7 * fs, 700, 1, minScale = 0.6f)
+        cy += ch
+        pen.hLine(x, x + w, cy, L)
+        val lw = w * 0.55f
+        pen.vLine(x + lw, cy, y + g.headFirst, L)
+        pen.text(if (isNote) "Supplier :" else "Billed to :", x + 6, cy + 2, lw - 12, 8 * fs, 6.5f * fs, color = Color.argb(150, 0, 0, 0))
+        pen.text(hc(inv.str("party_name").ifEmpty { "Cash customer" }), x + 6, cy + 2 + 8 * fs, lw - 12, 11 * fs, 9 * fs, 700, minScale = 0.6f)
+        var py = cy + 2 + 19 * fs
+        for ((t, b) in partyLines().take(3)) { pen.text(t, x + 6, py, lw - 12, 8.4f * fs, 7 * fs, if (b) 700 else 400, minScale = 0.65f); py += 8.4f * fs }
+        val det = mutableListOf(noLabel to inv.str("invoice_no"), "Dated" to Fmt.dmy(inv.str("date")),
+            "Place of Supply" to inv.str("party_state").ifEmpty { co.str("state_code").ifEmpty { "-" } }, "Reverse Charge" to "N")
+        if (!inv.o.has("doc_line") && on("print_salesman") && inv.str("salesman_name").isNotEmpty()) det.add("Salesman" to inv.str("salesman_name"))
+        if (inv.str("ewb_no").isNotEmpty()) det.add("E-way bill" to inv.str("ewb_no"))
+        kvGroup(pen, det.take(5), x + lw + 6, cy + 3, w - lw - 12, 8.6f * fs, 7f)
+    }
+
+    /** Bizom: the distributor and a big title on one line; the outlet with salesman, beat and payment on the next. */
+    private fun bizomHeader(pen: Pen, x: Float, y: Float, w: Float) {
+        pen.shade(RectF(x, y, x + w, y + g.sellerBand), band)
+        val rw = 200 * g.cw
+        pen.text(hc(companyName), x + 8, y + 3, w - rw - 16, 16 * fs, 13 * fs, 700, color = accent, minScale = 0.55f)
+        pen.text(co.str("company_address"), x + 8, y + 3 + 16 * fs, w - rw - 16, 9 * fs, 6.8f * fs, minScale = 0.7f)
+        val ids = listOf(co.str("company_gstin").let { if (it.isEmpty()) "" else "GSTIN $it" }, co.str("company_phone").let { if (it.isEmpty()) "" else "Ph $it" })
+            .filter { it.isNotEmpty() }.joinToString("  ·  ")
+        pen.text(ids, x + 8, y + 3 + 25 * fs, w - rw - 16, 9 * fs, 6.8f * fs, minScale = 0.6f)
+        pen.text(if (docTitle == "GST INVOICE") "TAX INVOICE" else docTitle, x + w - rw - 8, y + 3, rw, 15 * fs, 12 * fs, 700, 2, color = accent)
+        pen.text("$noLabel ${inv.str("invoice_no")}  ·  ${Fmt.dmy(inv.str("date"))}", x + w - rw - 8, y + 3 + 15 * fs, rw, 10 * fs, 7.5f * fs, 700, 2, minScale = 0.6f)
+        pen.text(copy + (if (on("print_marg_page") && pages > 1) "  ·  Page ${page + 1}/$pages" else ""), x + w - rw - 8, y + 3 + 25 * fs, rw, 8 * fs, 5.8f * fs, 400, 2, minScale = 0.6f)
+        val by = y + g.sellerBand
+        pen.hLine(x, x + w, by, 0.5f)
+        pen.text((if (isNote) "SUPPLIER  " else "OUTLET  ") + hc(inv.str("party_name").ifEmpty { "Cash customer" }), x + 8, by + 2, w - rw - 16, 11 * fs, 8.5f * fs, 700, minScale = 0.6f)
+        pen.text(partyLines().take(3).joinToString("  ·  ") { it.first }, x + 8, by + 2 + 11 * fs, w - rw - 16, 9 * fs, 6.6f * fs, minScale = 0.6f)
+        val det = mutableListOf<Pair<String, String>>()
+        if (!inv.o.has("doc_line")) {
+            if (on("print_salesman")) det.add("Salesman" to inv.str("salesman_name").ifEmpty { "-" })
+            if (inv.str("route_name").isNotEmpty()) det.add("Beat" to inv.str("route_name"))
+            det.add("Payment" to inv.str("pay_mode").lowercase().replaceFirstChar { it.uppercase() })
+        } else if (inv.str("doc_line").isNotEmpty()) det.add("Ref" to inv.str("doc_line"))
+        kvGroup(pen, det.take(3), x + w - rw, by + 2, rw - 8, 9.5f * fs, 6.8f)
+    }
+
     private fun partyTitle(): String {
         val name = inv.str("party_name").ifEmpty { "Cash customer" }
         if (isNote) return "Supplier: $name"
@@ -245,6 +329,10 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
             "gst", "igst" -> Fmt.amount(l.num("gst_rate"))
             "sgst", "cgst" -> Fmt.amount(l.num("gst_rate") / 2)
             "amount" -> Fmt.amount(l.num("amount"))
+            "qty" -> (if (ppb > 1 && co.str("print_qty") != "pcs") Fmt.boxPcs(qty, ppb) else "$qty Pcs") + (if (l.int("free_qty") > 0) " +${l.int("free_qty")}" else "")
+            "qcp" -> if (ppb > 1) "${qty / ppb}/${qty % ppb}" else "0/$qty"
+            "gross" -> Fmt.amount(l.num("taxable") + l.num("disc_amt"))
+            "sch" -> if (l.num("disc_amt") > 0.004) Fmt.amount(l.num("disc_amt")) else "-"
             else -> ""
         }
     }
@@ -260,11 +348,14 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         for (i in rows) {
             val l = lines.getOrNull(i) ?: continue
             cx = x
+            // Bizom: light stripes and a hairline under each row instead of column lines
+            if (style == "bizom" && i % 2 == 1) pen.shade(RectF(x, ry, x + w, ry + g.rowH), (band and 0x00FFFFFF) or (115 shl 24))
             cols.forEachIndexed { k, c -> pen.text(cellText(c, i, l), cx, ry, ws[k], g.rowH, 7.5f * fs, 400, c.align, minScale = 0.7f, pad = 2.5f); cx += ws[k] }
             ry += g.rowH
+            if (style == "bizom") pen.hLine(x, x + w, ry, 0.4f, Color.argb(46, 0, 0, 0))
         }
         cx = x
-        for (k in 0 until ws.size - 1) { cx += ws[k]; pen.vLine(cx, y, y + h, 0.6f) }
+        if (style != "bizom") for (k in 0 until ws.size - 1) { cx += ws[k]; pen.vLine(cx, y, y + h, 0.6f) }
         pen.hLine(x, x + w, y + g.tableHead, L)
     }
 
@@ -277,13 +368,23 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
 
     private fun totals(pen: Pen, x: Float, y: Float, w: Float) {
         val lines = inv.list("lines")
-        val rows = margClasses(inv, co).map { r ->
+        val rows = if (style == "busy") {
+            // Busy: the tax summary is by HSN/SAC and rate
+            fun key(l: J) = "${l.str("hsn").ifEmpty { "-" }}|${Fmt.amount(l.num("gst_rate"))}"
+            lines.map { key(it) }.distinct().map { k ->
+                val ls = lines.filter { key(it) == k }
+                fun sum(f: String) = ls.sumOf { it.num(f) }
+                val p = k.split('|')
+                ClassRow("${p[0]} @${p[1]}%", sum("taxable"), sum("disc_amt"), sum("sgst"), sum("cgst"), sum("igst"))
+            }
+        } else margClasses(inv, co).map { r ->
             val ls = lines.filter { abs(it.num("gst_rate") - r) < 0.001 }
             fun sum(k: String) = ls.sumOf { it.num(k) }
             ClassRow("GST ${Fmt.amount(r)}", sum("taxable"), sum("disc_amt"), sum("sgst"), sum("cgst"), sum("igst"))
         }
         val tot = ClassRow("TOTAL", rows.sumOf { it.taxable }, rows.sumOf { it.disc }, rows.sumOf { it.sgst }, rows.sumOf { it.cgst }, rows.sumOf { it.igst })
-        val heads = if (inter) listOf("CLASS", "TAXABLE", "DISC.", "IGST", "TOTAL GST", "AMOUNT") else listOf("CLASS", "TAXABLE", "DISC.", "SGST", "CGST", "TOTAL GST", "AMOUNT")
+        val firstHead = when (style) { "busy" -> "HSN/SAC"; "bizom" -> "TAX"; else -> "CLASS" }
+        val heads = if (inter) listOf(firstHead, "TAXABLE", "DISC.", "IGST", "TOTAL GST", "AMOUNT") else listOf(firstHead, "TAXABLE", "DISC.", "SGST", "CGST", "TOTAL GST", "AMOUNT")
         fun vals(r: ClassRow) = if (inter) listOf(r.label, Fmt.amount(r.taxable), Fmt.amount(r.disc), Fmt.amount(r.igst), Fmt.amount(r.gst), Fmt.amount(r.total))
             else listOf(r.label, Fmt.amount(r.taxable), Fmt.amount(r.disc), Fmt.amount(r.sgst), Fmt.amount(r.cgst), Fmt.amount(r.gst), Fmt.amount(r.total))
         val rh = (if (compactPrint(co)) 7.6f else 8.6f) * fs
@@ -304,6 +405,12 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         line(vals(tot), ty, rh, true)
         val tableEnd = ty + rh
         for (k in 1 until heads.size) pen.vLine(x + k * cw, y, tableEnd, 0.5f, Color.argb(178, 0, 0, 0))
+        // Bizom: what the outlet saved — scheme discounts plus the value of free pieces
+        val saved = lines.sumOf { it.num("disc_amt") + it.int("free_qty") * it.num("rate") }
+        if (style == "bizom" && saved > 0.004 && bank.isEmpty()) {
+            pen.hLine(x, x + tw, tableEnd, 0.4f)
+            pen.text("You saved ${Fmt.money(saved)} on this bill (schemes and free goods)", x + 4, tableEnd + 1, tw - 8, 9 * fs, 7.2f * fs, 700, color = accent, minScale = 0.6f)
+        }
         if (bank.isNotEmpty()) {
             // the bank details in the room under the GST classes
             pen.hLine(x, x + tw, tableEnd, 0.6f)
@@ -313,11 +420,14 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         pen.vLine(x + tw, y, y + upperH, L)
         // the totals beside it, ending in the grand total
         val sx = x + tw
-        val sums = mutableListOf("SUB TOTAL" to inv.num("subtotal"))
-        if (inv.num("discount") > 0) sums.add("LESS DISCOUNT" to -inv.num("discount"))
-        if (inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005) sums.add("TAXABLE VALUE" to inv.num("taxable"))
-        if (inter) sums.add("IGST PAYABLE" to inv.num("igst")) else { sums.add("SGST PAYABLE" to inv.num("sgst")); sums.add("CGST PAYABLE" to inv.num("cgst")) }
-        sums.add("ROUND OFF" to inv.num("round_off"))
+        val busy = style == "busy"; val bizom = style == "bizom"
+        fun lab(m: String, b: String, z: String) = if (busy) b else if (bizom) z else m
+        val sums = mutableListOf(lab("SUB TOTAL", "Taxable Amount", "Gross Amount") to inv.num("subtotal"))
+        if (inv.num("discount") > 0) sums.add(lab("LESS DISCOUNT", "Less : Discount", "Scheme / Discount") to -inv.num("discount"))
+        if (inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005) sums.add(lab("TAXABLE VALUE", "Taxable Value", "Taxable Value") to inv.num("taxable"))
+        if (inter) sums.add(lab("IGST PAYABLE", "Add : IGST", "IGST") to inv.num("igst"))
+        else { sums.add(lab("SGST PAYABLE", "Add : SGST", "SGST") to inv.num("sgst")); sums.add(lab("CGST PAYABLE", "Add : CGST", "CGST") to inv.num("cgst")) }
+        sums.add(lab("ROUND OFF", "Rounded Off", "Round off") to inv.num("round_off"))
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) sums.add("PAID" to inv.num("paid"))
         val gh = 17 * fs
         var sy = y + 2
@@ -327,7 +437,7 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         val gy = y + upperH - gh
         pen.shade(RectF(sx, gy, x + w, y + upperH), band)
         pen.hLine(sx, x + w, gy, 0.6f)
-        pen.text(if (isNote) "NOTE TOTAL" else "GRAND TOTAL", sx + 6, gy, sumW / 2, gh, 9.5f * fs, 700)
+        pen.text(if (isNote) "NOTE TOTAL" else lab("GRAND TOTAL", "Grand Total", "NET PAYABLE"), sx + 6, gy, sumW / 2, gh, 9.5f * fs, 700)
         pen.text(Fmt.amount(inv.num("total")), sx + sumW / 2, gy, sumW / 2 - 6, gh, 11 * fs, 700, 2)
         // amount in words (and the party's balance)
         val wy = y + upperH
@@ -360,7 +470,7 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         var cx = x + tw
         if (recW > 0) {
             pen.vLine(cx, y, y + h, L)
-            pen.text("Receiver", cx, y + 3, recW, 10 * fs, 8 * fs, 700, 1)
+            pen.text(when (style) { "busy" -> "Receiver's Signature"; "bizom" -> "Outlet stamp & sign"; else -> "Receiver" }, cx, y + 3, recW, 10 * fs, 8 * fs, 700, 1, minScale = 0.6f)
             pen.text("(signature and stamp)", cx, y + h - 9 * fs, recW, 8 * fs, 5.5f * fs, align = 1, color = Color.argb(140, 0, 0, 0))
             cx += recW
         }

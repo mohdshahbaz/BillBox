@@ -29,6 +29,8 @@ struct DistributorProApp: App {
     @StateObject private var app = AppModel()
     @AppStorage("theme") private var themeId = "clean"
     @AppStorage("appearance") private var appearance = "auto"
+    @AppStorage("accentOverride") private var accentOverride = ""
+    @AppStorage("pageStyle") private var pageStyle = ""
 
     var body: some Scene {
         WindowGroup("BillBox") {
@@ -36,12 +38,12 @@ struct DistributorProApp: App {
                 .environmentObject(app)
                 .frame(minWidth: 1080, minHeight: 680)
                 .environment(\.locale, Locale(identifier: "en_IN"))
-                .tint(AppTheme.named(themeId).accent)
-                .accentColor(AppTheme.named(themeId).accent)
+                .tint(AppTheme.current.accent)
+                .accentColor(AppTheme.current.accent)
                 .preferredColorScheme(appearance == "light" ? .light : (appearance == "dark" ? .dark : nil))
                 .modifier(FontChoice())
                 .modifier(InterfaceSizeChoice())
-                .id(themeId)
+                .id(themeId + accentOverride + pageStyle)
         }
         .commands {
             CommandGroup(replacing: .newItem) {}

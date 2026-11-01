@@ -24,6 +24,20 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.9 — Busy and Bizom bill designs, more themes, accent colours
+
+- **Two more bill designs** (Settings › Printing › Bill design), on iPhone, Mac and Android:
+  - **Busy style**: TAX INVOICE line, the firm centred, *Billed to* beside Invoice No. / Dated / Place of Supply / Reverse
+    Charge, a full-grid item table (S.N., Description of Goods, HSN/SAC, Qty, MRP, Price, Disc %, GST %, Amount), the tax
+    summary by HSN/SAC with Add : SGST / CGST and Rounded Off, and Receiver's Signature | Authorised signatory.
+  - **Bizom style**: distributor and TAX INVOICE on a coloured band, the outlet with salesman, beat and payment, a striped
+    table without column lines (SKU, MRP, Qty cases/pieces, Free, Rate, Gross, Scheme discount, Tax %, Net), "You saved ₹…"
+    (schemes and free goods) and NET PAYABLE.
+  - Both share the Marg style choices (colour — now also Teal and Orange — typeface, columns, compact totals…).
+- **iPhone: Settings › Appearance stays open** while you change the theme, so you see each one at once.
+- **Eight more themes** (Teal, Sky, Emerald, Plum, Sand, Peacock, Cherry, Olive), an **accent colour** of your own over any
+  theme, **Background** Theme / Plain / Tinted, and **striped table rows** (iPhone, Mac; accent and background on Android too).
+
 ## v15.8.2 — Google Drive shows "Connected" at once
 
 - iPhone and Mac: after connecting, Settings › Backup › Google Drive shows **Connected** (and the Client ID) straight away;

@@ -33,6 +33,15 @@ enum SimSelfTest {
                     try data.write(to: dir.appendingPathComponent("marg_\(n + 1).pdf"))
                     log.append("marg_\(n + 1).pdf \(data.count) bytes")
                 }
+                // the Busy and Bizom designs too
+                for design in ["busy", "bizom"] {
+                    var c = app.settings.raw
+                    c["print_style"] = design
+                    if let data = invoicePDF(inv, company: JSON(c), layout: .single)?.dataRepresentation() {
+                        try data.write(to: dir.appendingPathComponent("\(design)_\(n + 1).pdf"))
+                        log.append("\(design)_\(n + 1).pdf \(data.count) bytes")
+                    }
+                }
                 if n == 0 {
                     marg["print_marg_colour"] = "mono"; marg["print_marg_classes"] = "used"; marg["print_marg_font"] = "sans"
                     if let data = invoicePDF(inv, company: JSON(marg), layout: .a4FullOriginal)?.dataRepresentation() {

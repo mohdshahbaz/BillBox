@@ -32,6 +32,8 @@ class UiPrefs(private val p: SharedPreferences) {
     var fontWeight by mutableStateOf(p.getString("fontWeight", "regular") ?: "regular")
     var startPage by mutableStateOf(p.getString("startPage", "billing") ?: "billing")
     var showPhotoCard by mutableStateOf(p.getBoolean("showPhotoCard", true))
+    var accentOverride by mutableStateOf(p.getString("accentOverride", "") ?: "")
+    var pageStyle by mutableStateOf(p.getString("pageStyle", "") ?: "")
 
     fun set(key: String, v: String) {
         p.edit().putString(key, v).apply()
@@ -39,6 +41,7 @@ class UiPrefs(private val p: SharedPreferences) {
             "theme" -> theme = v; "appearance" -> appearance = v; "cardStyle" -> cardStyle = v; "corners" -> corners = v
             "density" -> density = v; "textSize" -> textSize = v; "startPage" -> startPage = v
             "fontStyle" -> fontStyle = v; "fontWeight" -> fontWeight = v
+            "accentOverride" -> accentOverride = v; "pageStyle" -> pageStyle = v
         }
     }
     fun setPhotoCard(v: Boolean) { p.edit().putBoolean("showPhotoCard", v).apply(); showPhotoCard = v }
@@ -69,7 +72,35 @@ val Themes = listOf(
     AppTheme("crimson", "Crimson", 0xFFB91C1C, 0xFFF87171, 0xFFFBEFEF, 0xFF1E1010),
     AppTheme("coffee", "Coffee", 0xFF7A4E2D, 0xFFC9925E, 0xFFF6EFE8, 0xFF1C1612),
     AppTheme("graphite", "Graphite", 0xFF1F2937, 0xFFE5E7EB, 0xFFF2F2F3, 0xFF000000),
+    AppTheme("teal", "Teal", 0xFF0F766E, 0xFF2DD4BF, 0xFFE9F6F4, 0xFF0D1A19),
+    AppTheme("sky", "Sky", 0xFF0284C7, 0xFF38BDF8, 0xFFEAF5FC, 0xFF0B1A24),
+    AppTheme("emerald", "Emerald", 0xFF047857, 0xFF34D399, 0xFFE8F6EF, 0xFF0B1913),
+    AppTheme("plum", "Plum", 0xFF86198F, 0xFFE879F9, 0xFFF8EEF9, 0xFF1C1020),
+    AppTheme("sand", "Sand", 0xFF8A6A3B, 0xFFD6B37A, 0xFFF7F2E9, 0xFF1C1812),
+    AppTheme("peacock", "Peacock", 0xFF006D77, 0xFF4FD1C5, 0xFFE6F4F5, 0xFF0B1A1C),
+    AppTheme("cherry", "Cherry", 0xFF9F1239, 0xFFFB7185, 0xFFFCEEF2, 0xFF1E0F14),
+    AppTheme("olive", "Olive", 0xFF556B2F, 0xFFA3C46B, 0xFFF2F4EA, 0xFF161A0F),
 )
+
+/** Settings › Appearance › Accent colour: the theme's own, or one of these (light, dark). */
+val AccentChoices = listOf(
+    Triple("indigo", 0xFF4F46E5, 0xFF8B8CF8), Triple("blue", 0xFF2563EB, 0xFF60A5FA), Triple("sky", 0xFF0284C7, 0xFF38BDF8), Triple("teal", 0xFF0F766E, 0xFF2DD4BF),
+    Triple("green", 0xFF15803D, 0xFF4ADE80), Triple("lime", 0xFF4D7C0F, 0xFFA3E635), Triple("amber", 0xFFB45309, 0xFFFBBF24), Triple("orange", 0xFFC2410C, 0xFFFB923C),
+    Triple("red", 0xFFB91C1C, 0xFFF87171), Triple("pink", 0xFFBE185D, 0xFFF472B6), Triple("purple", 0xFF7E22CE, 0xFFC084FC), Triple("brown", 0xFF7A4E2D, 0xFFC9925E))
+
+/** The theme with the chosen accent colour and background (Theme, Plain, Tinted). */
+fun customised(t: AppTheme, accent: String, page: String): AppTheme {
+    val a = AccentChoices.firstOrNull { it.first == accent }
+    val al = a?.second ?: t.accentLight; val ad = a?.third ?: t.accentDark
+    fun tint(c: Long, base: Long): Long {
+        // 10 % of the accent over the base colour
+        fun ch(v: Long, sh: Int) = (v shr sh) and 0xFF
+        fun mix(sh: Int) = (ch(base, sh) * 9 + ch(c, sh)) / 10
+        return (0xFFL shl 24) or (mix(16) shl 16) or (mix(8) shl 8) or mix(0)
+    }
+    val (pl, pd) = when (page) { "plain" -> 0xFFF2F2F7 to 0xFF000000; "tinted" -> tint(al, 0xFFFFFFFF) to tint(ad, 0xFF0C0C0E); else -> t.pageLight to t.pageDark }
+    return t.copy(accentLight = al, accentDark = ad, pageLight = pl, pageDark = pd)
+}
 
 private fun scheme(t: AppTheme, dark: Boolean): ColorScheme {
     val accent = Color(if (dark) t.accentDark else t.accentLight)
@@ -130,7 +161,7 @@ private fun typeFor(style: String, weight: String): Typography {
 fun BillBoxTheme(prefs: UiPrefs, content: @Composable () -> Unit) {
     val dark = when (prefs.appearance) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
     val ctx = LocalContext.current
-    val t = Themes.firstOrNull { it.id == prefs.theme } ?: Themes[0]
+    val t = customised(Themes.firstOrNull { it.id == prefs.theme } ?: Themes[0], prefs.accentOverride, prefs.pageStyle)
     val colors = if (t.id == "dynamic" && Build.VERSION.SDK_INT >= 31) {
         if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
     } else scheme(t, dark)

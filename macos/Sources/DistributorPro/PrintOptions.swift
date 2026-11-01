@@ -24,16 +24,16 @@ import SwiftUI
         })
     }
 
-    private var isMarg: Bool { printStyle(app.settings) == "marg" }
+    private var isMarg: Bool { printStyle(app.settings) != "classic" }
 
     var body: some View {
         Section {
             Picker("Bill design", selection: choice("print_style", "classic")) {
-                Text("BillBox (clean, modern)").tag("classic"); Text("Marg style (like a Marg ERP bill)").tag("marg")
+                ForEach(billDesigns, id: \.key) { Text($0.title).tag($0.key) }
             }
             Button { Task { await previewLatest() } } label: { Label("Preview on my latest bill", systemImage: "eye") }
         } header: { Text("Bill design") } footer: {
-            Text("Both designs use the paper layout, copies, text size and everything else on this page. Marg style has more choices of its own below.")
+            Text("Every design uses the paper layout, copies, text size and everything else on this page. Marg, Busy and Bizom styles share the choices below (colour, typeface, columns…).")
         }
         if isMarg {
             Section {
@@ -54,7 +54,7 @@ import SwiftUI
                     SettingTextField(title: "E-mail", key: "company_email", placeholder: "you@example.com", maxLength: 80)
                 }
                 }
-            } header: { Text("Marg style") } footer: {
+            } header: { Text(printStyle(app.settings) == "busy" ? "Busy style" : printStyle(app.settings) == "bizom" ? "Bizom style" : "Marg style") } footer: {
                 Text("Title: “Bill title” on this page (blank = GST INVOICE). A bill to another state shows IGST instead of SGST and CGST. “Black only” suits printers without colour.")
             }
         }

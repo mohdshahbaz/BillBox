@@ -181,6 +181,9 @@ struct Field: View {
 /// or flat) and its corner roundness.
 struct CardBackground: ViewModifier {
     @AppStorage("cardStyle") private var style = "soft"
+    // read so that panels redraw at once when the theme or its colours change
+    @AppStorage("theme") private var themeId = "clean"
+    @AppStorage("accentOverride") private var accentOverride = ""
     @AppStorage("corners") private var corners = "normal"
     let radius: CGFloat
 

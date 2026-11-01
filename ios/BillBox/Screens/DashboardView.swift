@@ -50,7 +50,7 @@ struct DashSnap {
                 let hidden = app.dashboardHidden, name = app.companyName
                 DashContent(s: s, period: $period, metric: $metric, pickedMonth: $pickedMonth, hidden: hidden,
                             companyName: name, app: app, photoPayments: { photoPayments = true },
-                            key: "\(s.version)|\(period)|\(metric)|\(pickedMonth ?? "")|\(hidden.sorted().joined(separator: ","))|\(name)")
+                            key: "\(s.version)|\(period)|\(metric)|\(pickedMonth ?? "")|\(hidden.sorted().joined(separator: ","))|\(name)|\(UserDefaults.standard.string(forKey: "theme") ?? "")|\(UserDefaults.standard.string(forKey: "accentOverride") ?? "")|\(UserDefaults.standard.string(forKey: "pageStyle") ?? "")")
                     .equatable()
             } else {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 300)

@@ -86,6 +86,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
 
     @StateObject private var layout: GridLayout
     @AppStorage("density") private var density = "regular"
+    @AppStorage("stripes") private var stripes = false
     /// Row height after Settings › Appearance › Table rows.
     private var rh: CGFloat { rowHeight * Density.factor(density) }
     @State private var dragging: String?
@@ -353,7 +354,8 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
             }
             Rectangle().fill(Theme.line.opacity(0.7)).frame(height: 0.5)
         }
-        .background(selected ? Theme.accent.opacity(0.14) : (highlighted == row.id && !clickSelects ? Color.primary.opacity(0.06) : Theme.card))
+        .background(selected ? Theme.accent.opacity(0.14) : (highlighted == row.id && !clickSelects ? Color.primary.opacity(0.06) : (stripes && idx % 2 == 1 ? Theme.accent.opacity(0.05) : Color.clear)))
+        .background(Theme.card)
         .contentShape(Rectangle())
         .modifier(RowTaps(enabled: selection != nil || onOpen != nil, single: { click(row, idx) }, double: { onOpen?(row) }))
         .contextMenu { if let menu { menu(row) } }

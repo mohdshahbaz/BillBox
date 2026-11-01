@@ -249,6 +249,21 @@ private fun AppearancePage() {
         Hint("“Your wallpaper” takes its colours from the phone's wallpaper (Android 12 and up). The theme applies at once and is remembered.")
         SectionHeader("Mode")
         Segments(listOf("auto" to "Automatic", "light" to "Light", "dark" to "Dark"), ui.appearance, { ui.set("appearance", it) })
+        SectionHeader("Accent colour")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            val own = Themes.firstOrNull { it.id == ui.theme } ?: Themes[0]
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(17.dp)).background(Color(own.accentLight))
+                .border(BorderStroke(if (ui.accentOverride.isEmpty()) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface), RoundedCornerShape(17.dp))
+                .clickable { ui.set("accentOverride", "") }, contentAlignment = Alignment.Center) { Text("A", color = Color.White, fontWeight = FontWeight.Bold) }
+            com.local.billbox.ui.AccentChoices.forEach { (id, light, _) ->
+                Box(Modifier.size(34.dp).clip(RoundedCornerShape(17.dp)).background(Color(light))
+                    .border(BorderStroke(if (ui.accentOverride == id) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface), RoundedCornerShape(17.dp))
+                    .clickable { ui.set("accentOverride", id) })
+            }
+        }
+        Hint("“A” is the theme's own colour; the others replace it on buttons, icons and totals.")
+        SectionHeader("Background")
+        Segments(listOf("" to "Theme", "plain" to "Plain", "tinted" to "Tinted"), ui.pageStyle, { ui.set("pageStyle", it) })
         SectionHeader("Panels")
         Segments(listOf("soft" to "Soft shadow", "outline" to "Outlined", "flat" to "Flat"), ui.cardStyle, { ui.set("cardStyle", it) })
         Segments(listOf("square" to "Square", "normal" to "Rounded", "round" to "Round"), ui.corners, { ui.set("corners", it) })
@@ -915,15 +930,15 @@ private fun PrintOptions() {
     fun setFlag(k: String, v: Boolean) = app.launch { app.saveSettings(mapOf(k to if (v) "1" else "0")) }
     SectionHeader("Bill design")
     val (style, setStyle) = settingChoice("print_style", "classic")
-    Choice("Bill design", listOf("classic" to "BillBox (clean, modern)", "marg" to "Marg style (like a Marg ERP bill)"), style, setStyle)
+    Choice("Bill design", com.local.billbox.print.billDesigns, style, setStyle)
     OutlinedButton(onClick = { app.launch {
         val r = Api.obj("GET", "/bills", query = mapOf("type" to "SALE", "from" to "2000-01-01", "to" to "2100-12-31"))
         val id = r.list("rows").firstOrNull()?.int("id")
         if (id == null) app.notify("There is no sale bill yet to show.", true) else com.local.billbox.print.Printing.invoice(id, app, true)
     } }) { Text("Preview on my latest bill") }
-    Hint("Both designs use the paper layout, copies, text size and everything else on this page. Marg style has more choices of its own below.")
-    if (style == "marg") {
-        SectionHeader("Marg style")
+    Hint("Every design uses the paper layout, copies, text size and everything else on this page. Marg, Busy and Bizom styles share the choices below (colour, typeface, columns…).")
+    if (style in setOf("marg", "busy", "bizom")) {
+        SectionHeader(when (style) { "busy" -> "Busy style"; "bizom" -> "Bizom style"; else -> "Marg style" })
         val (colour, setColour) = settingChoice("print_marg_colour", "blue")
         Choice("Colour", com.local.billbox.print.margColours, colour, setColour)
         val (face, setFace) = settingChoice("print_marg_font", "serif")
