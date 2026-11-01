@@ -51,7 +51,7 @@ rm -f secret.err
 
 step "Deploy ($BRANCH)"
 for i in 1 2 3 4; do
-  npx wrangler pages deploy dist --project-name=billbox-app --branch="${1:-main}"
+  npx wrangler pages deploy dist --project-name=billbox-app
   grep -q 'Rate limited' deploy.out || exit 1
   echo "rate limited, waiting $((i * 30)) s"; sleep $((i * 30))
 done
