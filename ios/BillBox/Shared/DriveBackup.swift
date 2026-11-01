@@ -21,12 +21,11 @@ import SwiftUI
     @State private var driveList: [JSON] = []
     @State private var listing = false
     @State private var fetching = ""
-    /// Changes whenever the keys or the connection change, so the rows are rebuilt (iOS kept the old rows after the
-    /// Files picker closed: Connect did not appear until BillBox was opened again).
-    private var phase: String { "\(connected)-\(hasKeys)-\(editingKeys)-\(code.isEmpty)" }
+    /// Keys were saved in this visit: Connect is offered even before the status has been read again.
+    @State private var keysSaved = false
 
     private var connected: Bool { status.bool("connected") }
-    private var hasKeys: Bool { !status.str("client_id").isEmpty && status.bool("has_secret") }
+    private var hasKeys: Bool { keysSaved || (!status.str("client_id").isEmpty && status.bool("has_secret")) }
 
     var body: some View {
         Section {
@@ -71,10 +70,11 @@ import SwiftUI
                     SecureField("Client secret", text: $secret)
                     DriveButton("Save keys", "checkmark.circle",
                                 disabled: busy || clientId.trimmingCharacters(in: .whitespaces).isEmpty || secret.trimmingCharacters(in: .whitespaces).isEmpty) { Task { await saveKeys() } }
+                    // Connect is always here too, so it can never go missing (Google's own message explains missing keys)
+                    DriveButton(busy ? "Connecting…" : "Connect Google Drive", "link.icloud", disabled: busy) { Task { await connect() } }
                     if hasKeys { DriveButton("Cancel", "xmark") { editingKeys = false } }
                 }
             }
-            .id(phase)
         } header: {
             Text("Google Drive")
         } footer: {
@@ -153,12 +153,16 @@ import SwiftUI
     /// Settings › Google Drive › Import: the client_secret_….json downloaded from Google Cloud holds both keys.
     private func importJSON() async {
         guard let text = await Files.pickJSON() else { return }
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            app.notify("That file could not be read. Download the JSON again in Google Cloud (Credentials › your client › Download JSON) and pick it from On My iPhone or Downloads.", error: true)
+            return
+        }
         // the Files picker is still closing: changes made now were lost on iPhone, so wait for it to finish
         try? await Task.sleep(nanoseconds: 450_000_000)
         busy = true; defer { busy = false }
         await app.guarded {
             status = try await API.obj("PUT", "/backup/drive/client", body: ["json": text])
-            editingKeys = false; secret = ""; clientId = ""
+            editingKeys = false; secret = ""; clientId = ""; keysSaved = true
             app.notify("Google keys imported. Now press Connect Google Drive.")
         }
         await load()
@@ -177,7 +181,7 @@ import SwiftUI
         busy = true; defer { busy = false }
         await app.guarded {
             status = try await API.obj("PUT", "/backup/drive/client", body: ["client_id": clientId, "client_secret": secret])
-            editingKeys = false; secret = ""
+            editingKeys = false; secret = ""; keysSaved = true
             app.notify("Google keys saved. Now press Connect Google Drive.")
         }
         await load()

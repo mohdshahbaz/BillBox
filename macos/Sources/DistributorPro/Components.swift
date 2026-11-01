@@ -362,8 +362,8 @@ enum Files {
     /// A JSON file chosen in Finder, as text (nil when cancelled or unreadable).
     @MainActor
     static func pickJSON() async -> String? {
-        guard let u = open(types: ["json"]) else { return nil }
-        return try? String(contentsOf: u, encoding: .utf8)
+        guard let u = open(types: ["json", "txt"]) else { return nil }
+        return (try? String(contentsOf: u, encoding: .utf8)) ?? ""   // "" = picked but unreadable (the caller says so)
     }
 
     @MainActor

@@ -8,6 +8,7 @@ public struct UTType: Hashable, Sendable {
     public static let data = UTType(exportedAs: "")
     public static let zip = UTType(exportedAs: "")
     public static let json = UTType(exportedAs: "")
+    public static let text = UTType(exportedAs: "")
     public static let commaSeparatedText = UTType(exportedAs: "")
     public static let item = UTType(exportedAs: "")
     public static let image = UTType(exportedAs: "")

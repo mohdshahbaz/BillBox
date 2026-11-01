@@ -57,12 +57,12 @@ class DrivePanel extends StatefulWidget {
 class _DrivePanelState extends State<DrivePanel> {
   Json status = {};
   final idCtl = TextEditingController(), secretCtl = TextEditingController();
-  bool editing = false, busy = false;
+  bool editing = false, busy = false, keysSaved = false;
   String code = '', link = 'https://www.google.com/device';
   Timer? _poll;
 
   bool get connected => status['connected'] == true;
-  bool get hasKeys => '${status['client_id'] ?? ''}'.isNotEmpty && status['has_secret'] == true;
+  bool get hasKeys => keysSaved || ('${status['client_id'] ?? ''}'.isNotEmpty && status['has_secret'] == true);
 
   @override
   void initState() {
@@ -93,9 +93,11 @@ class _DrivePanelState extends State<DrivePanel> {
     final r = await FilePicker.platform.pickFiles(dialogTitle: 'The client_secret_….json downloaded from Google Cloud', type: FileType.custom, allowedExtensions: ['json']);
     final path = r?.files.single.path;
     if (path == null) return;
+    final text = await File(path).readAsString().catchError((_) => '');
+    if (text.trim().isEmpty) { if (mounted) toast(context, 'That file could not be read. Download the JSON again in Google Cloud.', error: true); return; }
     await _run(() async {
-      final s = await Api.put('/backup/drive/client', {'json': await File(path).readAsString()}) as Json;
-      setState(() { status = s; editing = false; });
+      final s = await Api.put('/backup/drive/client', {'json': text}) as Json;
+      setState(() { status = s; editing = false; keysSaved = true; });
       if (mounted) toast(context, 'Google keys imported. Now press Connect Google Drive.');
     });
     await _load();
@@ -103,7 +105,7 @@ class _DrivePanelState extends State<DrivePanel> {
 
   Future<void> _saveKeys() => _run(() async {
         final s = await Api.put('/backup/drive/client', {'client_id': idCtl.text.trim(), 'client_secret': secretCtl.text.trim()}) as Json;
-        setState(() { status = s; editing = false; secretCtl.clear(); });
+        setState(() { status = s; editing = false; keysSaved = true; secretCtl.clear(); });
         if (mounted) toast(context, 'Google keys saved. Now press Connect Google Drive.');
       });
 
@@ -245,6 +247,7 @@ class _DrivePanelState extends State<DrivePanel> {
             AppField(controller: secretCtl, label: 'Client secret', obscure: true),
             const SizedBox(height: 8),
             _btn('Save keys', Icons.check_circle_outline, _saveKeys),
+            _btn('Connect Google Drive', Icons.add_link, _connect),
             if (hasKeys) _btn('Cancel', Icons.close, () => setState(() => editing = false)),
           ],
           const SizedBox(height: 4),

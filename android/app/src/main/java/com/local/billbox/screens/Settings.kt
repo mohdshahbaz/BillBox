@@ -523,6 +523,7 @@ private fun DriveSection(onRestore: (String) -> Unit = {}) {
     var until by remember { mutableStateOf(0L) }
     var busy by remember { mutableStateOf(false) }
     var driveList by remember { mutableStateOf<List<J>?>(null) }
+    var keysSaved by remember { mutableStateOf(false) }
     var fetching by remember { mutableStateOf("") }
     suspend fun load() { try { status = Api.get("/backup/drive") } catch (_: Exception) {} }
     LaunchedEffect(Unit) { load() }
@@ -542,7 +543,7 @@ private fun DriveSection(onRestore: (String) -> Unit = {}) {
         code = ""; app.notify("The code ran out. Press Connect Google Drive again.", true)
     }
     val connected = status.bool("connected")
-    val hasKeys = status.str("client_id").isNotEmpty() && status.bool("has_secret")
+    val hasKeys = keysSaved || (status.str("client_id").isNotEmpty() && status.bool("has_secret"))
     SectionHeader("Google Drive")
     Text(if (connected) "Connected: backups also go to Google Drive › BillBox Backups" else if (code.isEmpty()) "Not connected" else "Waiting for Google…", fontWeight = FontWeight.Medium,
         color = if (connected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurface)
@@ -584,8 +585,9 @@ private fun DriveSection(onRestore: (String) -> Unit = {}) {
         DriveBtn("Import the downloaded JSON file…", prominent = true, enabled = !busy) { app.launch {
             val (dir, name) = com.local.billbox.system.Platform.importPicked(false, "application/json", "*/*") ?: return@launch
             val text = java.io.File(dir, name).takeIf { it.exists() }?.readText() ?: ""
+            if (text.isBlank()) { app.notify("That file could not be read. Download the JSON again in Google Cloud (Credentials › your client › Download JSON).", true); return@launch }
             status = Api.obj("PUT", "/backup/drive/client", body = mapOf("json" to text))
-            editing = false; secret = ""; clientId = ""
+            editing = false; secret = ""; clientId = ""; keysSaved = true
             load()
             app.notify("Google keys imported. Now press Connect Google Drive.")
         } }
@@ -594,7 +596,16 @@ private fun DriveSection(onRestore: (String) -> Unit = {}) {
         Field("Client secret", secret, { secret = it })
         DriveBtn("Save keys", enabled = clientId.isNotBlank() && secret.isNotBlank()) { app.launch {
             status = Api.obj("PUT", "/backup/drive/client", body = mapOf("client_id" to clientId, "client_secret" to secret))
-            editing = false; secret = ""; load(); app.notify("Google keys saved. Now press Connect Google Drive.")
+            editing = false; secret = ""; keysSaved = true; load(); app.notify("Google keys saved. Now press Connect Google Drive.")
+        } }
+        DriveBtn(if (busy) "Connecting…" else "Connect Google Drive", enabled = !busy) { app.launch {
+            busy = true
+            try {
+                val r = Api.obj("POST", "/backup/drive/connect", body = emptyMap<String, Any>())
+                if (r.str("verification_url").isNotEmpty()) link = r.str("verification_url")
+                every = maxOf(5, r.int("interval")); until = System.currentTimeMillis() + maxOf(60, r.int("expires_in")) * 1000L
+                code = r.str("user_code")
+            } finally { busy = false }
         } }
         if (hasKeys) DriveBtn("Cancel") { editing = false }
     }

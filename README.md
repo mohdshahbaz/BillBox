@@ -24,6 +24,12 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.8.1 — Connect Google Drive always shows
+
+- **Google Drive**: **Connect Google Drive** shows at once after importing the JSON file or saving the keys, on every app
+  (iPhone, Mac, Android, Windows, Linux), and also sits under the key fields so it can never go missing. A JSON file that
+  cannot be read (for example still in iCloud) now says so instead of doing nothing; on iPhone the file is copied in first.
+
 ## v15.8 — Restore from Google Drive, Connect right after importing, faster iPhone dashboard, typefaces, compact totals
 
 - **Restore from Google Drive** (iPhone, Mac, Android): Settings › Backup › Google Drive › *Restore from Google Drive…* lists the

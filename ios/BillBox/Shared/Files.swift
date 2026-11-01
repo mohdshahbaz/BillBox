@@ -39,13 +39,13 @@ enum Files {
     /// A JSON file picked in Files, as text (nil when cancelled or unreadable).
     @MainActor
     static func pickJSON() async -> String? {
-        guard let url = await pick([.json]) else { return nil }
+        guard let url = await pick([.json, .text, .data], asCopy: true) else { return nil }
         let ok = url.startAccessingSecurityScopedResource()
         defer { if ok { url.stopAccessingSecurityScopedResource() } }
         var text: String?
         var err: NSError?
         NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &err) { u in text = try? String(contentsOf: u, encoding: .utf8) }
-        return text
+        return text ?? ""      // "" = picked but unreadable (the caller says so)
     }
 
     @MainActor
@@ -60,10 +60,10 @@ enum Files {
     /// The Files picker (UIDocumentPickerViewController). SwiftUI's fileImporter does not appear when another sheet or
     /// dialog modifier sits on the same screen, so BillBox presents the picker itself. nil when cancelled.
     @MainActor
-    static func pick(_ types: [UTType]) async -> URL? {
+    static func pick(_ types: [UTType], asCopy: Bool = false) async -> URL? {
         guard let top = topController() else { return nil }
         return await withCheckedContinuation { (c: CheckedContinuation<URL?, Never>) in
-            let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: false)
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: asCopy)
             picker.allowsMultipleSelection = false
             let d = PickerDelegate { url in c.resume(returning: url) }
             picker.delegate = d
