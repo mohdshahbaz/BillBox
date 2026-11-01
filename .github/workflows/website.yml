@@ -49,8 +49,10 @@ jobs:
       - name: Check the live site
         if: github.ref == 'refs/heads/main'
         run: |
-          sleep 20
+          sleep 25
+          R=""
           for p in / /mac/ /windows/ /pricing/ /buy.html /sitemap.xml /videos/mac.mp4; do
-            c=$(curl -s -o /dev/null -w '%{http_code}' "https://billbox-app.pages.dev$p"); echo "$c $p"
+            R="$R$(curl -s -o /dev/null -w '%{http_code}' "https://billbox-app.pages.dev$p") $p%0A"
           done
-          curl -s https://billbox-app.pages.dev/api/test/config | head -c 300; echo
+          for e in test live; do R="${R}api/$e/config: $(curl -s https://billbox-app.pages.dev/api/$e/config | head -c 400 | sed 's/%/%25/g')%0A"; done
+          echo "::notice title=Live site::$R"
