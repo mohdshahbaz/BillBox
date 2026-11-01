@@ -941,7 +941,7 @@ private fun PrintOptions() {
         SectionHeader(when (style) { "busy" -> "Busy style"; "bizom" -> "Bizom style"; else -> "Marg style" })
         val (colour, setColour) = settingChoice("print_marg_colour", "blue")
         Choice("Colour", com.local.billbox.print.margColours, colour, setColour)
-        val (face, setFace) = settingChoice("print_marg_font", "serif")
+        val (face, setFace) = settingChoice("print_marg_font", if (style == "marg") "serif" else "sans")
         Choice("Typeface", listOf("serif" to "Classic serif (like Marg)", "sans" to "Modern"), face, setFace)
         val (per, setPer) = settingChoice("print_marg_rate", "box")
         Choice("Rate and MRP per", listOf("box" to "Box (like Marg)", "pcs" to "Piece"), per, setPer)

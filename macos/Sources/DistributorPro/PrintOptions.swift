@@ -38,7 +38,7 @@ import SwiftUI
         if isMarg {
             Section {
                 Picker("Colour", selection: choice("print_marg_colour", "blue")) { ForEach(margColours, id: \.key) { Text($0.title).tag($0.key) } }
-                Picker("Typeface", selection: choice("print_marg_font", "serif")) { Text("Classic serif (like Marg)").tag("serif"); Text("Modern").tag("sans") }
+                Picker("Typeface", selection: choice("print_marg_font", printStyle(app.settings) == "marg" ? "serif" : "sans")) { Text("Classic serif (like Marg)").tag("serif"); Text("Modern").tag("sans") }
                 Picker("Rate and MRP per", selection: choice("print_marg_rate", "box")) { Text("Box (like Marg)").tag("box"); Text("Piece").tag("pcs") }
                 Picker("GST classes at the bottom", selection: choice("print_marg_classes", "all")) {
                     Text("5, 12, 18 and 28 always (like Marg)").tag("all"); Text("Only the rates on the bill").tag("used")
