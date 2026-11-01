@@ -24,6 +24,12 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.8.2 — Google Drive shows "Connected" at once
+
+- iPhone and Mac: after connecting, Settings › Backup › Google Drive shows **Connected** (and the Client ID) straight away;
+  before, the screen kept its old state until BillBox was opened again. The same fix lets the licence screen and other
+  status panels refresh at once.
+
 ## v15.8.1 — Connect Google Drive always shows
 
 - **Google Drive**: **Connect Google Drive** shows at once after importing the JSON file or saving the keys, on every app

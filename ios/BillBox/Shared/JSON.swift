@@ -14,7 +14,14 @@ struct JSON: Identifiable, Hashable {
 
     var id: Int { (raw["id"] as? Int) ?? rid }
 
-    static func == (a: JSON, b: JSON) -> Bool { a.id == b.id && a.rid == b.rid }
+    /// Rows with an "id" are the same row when their ids match (lists keep their selection). Objects without one (a
+    /// screen's status, totals, a report) are equal only when their contents are: SwiftUI skips a @State change that
+    /// compares equal, so a new Google Drive or licence status was not shown until BillBox was opened again.
+    static func == (a: JSON, b: JSON) -> Bool {
+        guard a.id == b.id && a.rid == b.rid else { return false }
+        if a.raw["id"] == nil && b.raw["id"] == nil { return NSDictionary(dictionary: a.raw).isEqual(to: b.raw) }
+        return true
+    }
     func hash(into h: inout Hasher) {
         h.combine(id)
         h.combine(rid)
