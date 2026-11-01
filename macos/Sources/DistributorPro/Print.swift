@@ -9,9 +9,9 @@ enum PrintLayout: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .halfSheets: return "Half sheets (A4 cut in two, or A5): Original on one, Duplicate on the next"
+        case .halfSheets: return "Half sheets: Original on one A4 page, Duplicate on the next, each at the top of the page"
         case .a4TwoUp: return "A4 sheet: Original on top, Duplicate below"
-        case .single: return "Half sheet (A4 cut in two, or A5): Original copy only"
+        case .single: return "Half sheet: Original copy only, at the top of an A4 page"
         case .a4Full: return "Full A4 page: Original + Duplicate, one copy per page"
         case .a4FullOriginal: return "Full A4 page: Original copy only"
         }
@@ -659,8 +659,13 @@ func billSheet(_ inv: JSON, _ co: JSON, rows: Range<Int>, page: Int, pages: Int,
         : AnyView(InvoiceSheetView(inv: inv, co: co, rows: rows, page: page, pages: pages, copy: copy, g: g))
 }
 
+/// A half-sheet copy pinned to the TOP of an A4 page (the lower half stays blank), so the original prints at the top of
+/// one page and the duplicate at the top of the next.
 @MainActor
-func invoicePDF(_ inv: JSON, company: JSON, layout: PrintLayout) -> PDFDocument? {
+func topOfA4Page(_ page: AnyView) -> AnyView { AnyView(VStack(spacing: 0) { page; Spacer(minLength: 0) }) }
+
+@MainActor
+func invoicePDF(_ inv: JSON, company: JSON, layout: PrintLayout, topOfA4: Bool = false) -> PDFDocument? {
     let n = inv.list("lines").count
     let g = billSpec(inv, company, full: layout.isFullPage)
     if layout == .a4TwoUp && paginate(n, g).count == 1 {
@@ -670,13 +675,16 @@ func invoicePDF(_ inv: JSON, company: JSON, layout: PrintLayout) -> PDFDocument?
     let labels = copyLabelsFor(company)
     let copies = (layout == .single || layout == .a4FullOriginal) ? [labels[0]] : labels
     let ranges = paginate(n, g)
+    // for printing: a half-sheet copy sits at the top of its own A4 page (original on one page, duplicate on the next)
+    let pin = topOfA4 && !layout.isFullPage
     var pages: [AnyView] = []
     for c in copies {
         for (i, r) in ranges.enumerated() {
-            pages.append(billSheet(inv, company, rows: r, page: i, pages: ranges.count, copy: c, g: g))
+            let sheet = billSheet(inv, company, rows: r, page: i, pages: ranges.count, copy: c, g: g)
+            pages.append(pin ? topOfA4Page(sheet) : sheet)
         }
     }
-    return renderPDF(pages: pages, size: g.size)
+    return renderPDF(pages: pages, size: pin ? CGSize(width: g.w, height: g.h * 2) : g.size)
 }
 
 // MARK: - Receipt voucher
@@ -757,7 +765,7 @@ func printInvoices(_ ids: [Int], app: AppModel) async {
         var nos: [String] = []
         for id in ids {
             let inv = try await API.obj("GET", "/invoices/\(id)")
-            guard let pdf = invoicePDF(inv, company: app.settings, layout: layout) else { continue }
+            guard let pdf = invoicePDF(inv, company: app.settings, layout: layout, topOfA4: true) else { continue }
             for k in 0..<pdf.pageCount { if let pg = pdf.page(at: k) { all.insert(pg, at: all.pageCount) } }
             nos.append(inv.str("invoice_no"))
         }
@@ -793,7 +801,7 @@ func printInvoice(_ id: Int, app: AppModel, forcePreview: Bool = false) async {
     await app.guarded {
         let inv = try await API.obj("GET", "/invoices/\(id)")
         let layout = PrintLayout.parse(app.settings.str("print_layout"))
-        guard let pdf = invoicePDF(inv, company: app.settings, layout: layout) else { throw APIError(message: "Could not prepare the invoice for printing", status: 0, code: nil) }
+        guard let pdf = invoicePDF(inv, company: app.settings, layout: layout, topOfA4: true) else { throw APIError(message: "Could not prepare the invoice for printing", status: 0, code: nil) }
         let printer = app.settings.str("print_printer")
         if app.settings.str("print_auto") == "1" && !forcePreview && !printer.isEmpty {
             if runPrint(pdf, printer: printer, silent: true) { markPrinted([id], app: app); app.notify("Sent \(inv.str("invoice_no")) to \(printer).") }
@@ -808,7 +816,7 @@ func printInvoice(_ id: Int, app: AppModel, forcePreview: Bool = false) async {
 func debitNotePDF(_ d: JSON, company: JSON, layout: PrintLayout) -> PDFDocument? {
     var raw = d.raw
     raw["lines"] = d.raw["print_lines"] ?? [Any]()
-    return invoicePDF(JSON(raw), company: company, layout: layout)
+    return invoicePDF(JSON(raw), company: company, layout: layout, topOfA4: true)
 }
 
 @MainActor
@@ -829,8 +837,8 @@ func printVoucher(_ no: String, app: AppModel) async {
         var segment = CharacterSet.alphanumerics
         segment.insert(charactersIn: "-._~")
         let v = try await API.obj("GET", "/vouchers/\(no.addingPercentEncoding(withAllowedCharacters: segment) ?? no)")
-        let pages = copyLabels.map { AnyView(VoucherSheetView(v: v, copy: $0)) }
-        guard let pdf = renderPDF(pages: pages, size: CGSize(width: Spec.half.w, height: Spec.half.h)) else { return }
+        let pages = copyLabels.map { topOfA4Page(AnyView(VoucherSheetView(v: v, copy: $0))) }
+        guard let pdf = renderPDF(pages: pages, size: CGSize(width: Spec.half.w, height: Spec.half.h * 2)) else { return }
         showPrintJob(PrintJob(title: "Receipt \(no)", fileName: "\(no).pdf", document: pdf), app: app)
     }
 }
@@ -882,7 +890,7 @@ func runPrint(_ pdf: PDFDocument, printer: String, silent: Bool) -> Bool {
                 Spacer()
                 Button("Close") { onClose() }.keyboardShortcut(.cancelAction)
                 Button("Print…") {
-                    if runPrint(job.document, printer: app.settings.str("print_printer"), silent: false) { markPrinted(job.invoiceIds, app: app) }
+                    if runPrint(job.document, printer: app.settings.str("print_printer"), silent: false) { markPrinted(job.invoiceIds, app: app); onClose() }
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)

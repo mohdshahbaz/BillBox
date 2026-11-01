@@ -24,9 +24,9 @@ import kotlin.math.roundToInt
 // The bill layouts of the Mac and iPhone (Print.swift), drawn as vector PDF pages with Android's PdfDocument.
 
 enum class PrintLayout(val id: String, val label: String) {
-    HalfSheets("halfSheets", "Half sheets (A4 cut in two, or A5): Original on one, Duplicate on the next"),
+    HalfSheets("halfSheets", "Half sheets: Original on one A4 page, Duplicate on the next, each at the top of the page"),
     A4TwoUp("a4TwoUp", "A4 sheet: Original on top, Duplicate below"),
-    Single("single", "Half sheet (A4 cut in two, or A5): Original copy only"),
+    Single("single", "Half sheet: Original copy only, at the top of an A4 page"),
     A4Full("a4Full", "Full A4 page: Original + Duplicate, one copy per page"),
     A4FullOriginal("a4FullOriginal", "Full A4 page: Original copy only");
 
@@ -447,7 +447,8 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
 }
 
 /** A bill as PDF in the chosen layout (A4 two-up falls back to half sheets when the bill is longer than one page). */
-fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder()): PdfBuilder {
+/** [topOfA4]: for printing, a half-sheet copy goes at the TOP of its own A4 page (lower half blank): original on one page, duplicate on the next. */
+fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder(), topOfA4: Boolean = false): PdfBuilder {
     val n = inv.list("lines").size
     val base = (if (layout.isFullPage) Spec.full else Spec.half).scaled(printScale(co))
     val marg = printStyle(co) != "classic"   // Marg, Busy and Bizom are drawn by MargSheet
@@ -468,7 +469,8 @@ fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder
     }
     val copies = if (layout == PrintLayout.Single || layout == PrintLayout.A4FullOriginal) listOf(labels[0]) else labels
     val ranges = paginate(n, g)
-    for (c in copies) ranges.forEachIndexed { i, r -> into.page(g.w, g.h) { pen -> sheet(pen, r, i, ranges.size, c) } }
+    val pageH = if (topOfA4 && !layout.isFullPage) g.h * 2 else g.h
+    for (c in copies) ranges.forEachIndexed { i, r -> into.page(g.w, pageH) { pen -> sheet(pen, r, i, ranges.size, c) } }
     return into
 }
 
@@ -476,16 +478,16 @@ fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder
 fun debitNotePdf(d: J, co: J, layout: PrintLayout): PdfBuilder {
     val raw = org.json.JSONObject(d.o.toString())
     raw.put("lines", d.o.optJSONArray("print_lines") ?: org.json.JSONArray())
-    return invoicePdf(J(raw), co, layout)
+    return invoicePdf(J(raw), co, layout, topOfA4 = true)
 }
 
-/** A receipt or payment voucher on a half sheet, one page per copy. */
+/** A receipt or payment voucher: one copy per A4 page, each at the top of the page. */
 fun voucherPdf(v: J): PdfBuilder {
     val b = PdfBuilder()
     val g = Spec.half
     val co = v.obj("company"); val party = v.obj("party")
     val received = v.str("direction") == "RECEIVED"
-    for (copy in copyLabels) b.page(g.w, g.h) { pen ->
+    for (copy in copyLabels) b.page(g.w, g.h * 2) { pen ->
         val x = g.m; val w = g.w - 2 * g.m; var y = g.m
         val top = y
         val cw = pen.width(copy, 7f, 700) + 8
