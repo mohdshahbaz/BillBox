@@ -37,8 +37,12 @@ ExecuteExternalTool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/X
 
 ExecuteExternalTool /Applications/Xcode_16.4.app/Contents/Developer/usr/bin/actool --version --output-format xml1
 
-Build description signature: 6c68013a5c375078a7309197967b905b
-Build description path: /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/XCBuildData/6c68013a5c375078a7309197967b905b.xcbuilddata
+Build description signature: f06041569e767105989c1c28f1e3b72f
+Build description path: /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/XCBuildData/f06041569e767105989c1c28f1e3b72f.xcbuilddata
+ClangStatCache /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache
+    cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
+    /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -o /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache
+
 CreateBuildDirectory /Users/runner/work/BillBox/BillBox/build/Build/Products
     cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
     builtin-create-build-directory /Users/runner/work/BillBox/BillBox/build/Build/Products
@@ -46,10 +50,6 @@ CreateBuildDirectory /Users/runner/work/BillBox/BillBox/build/Build/Products
 CreateBuildDirectory /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex
     cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
     builtin-create-build-directory /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex
-
-ClangStatCache /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache
-    cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
-    /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -o /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache
 
 CreateBuildDirectory /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator
     cd /Users/runner/work/BillBox/BillBox/ios/BillBox.xcodeproj
@@ -187,6 +187,10 @@ MkDir /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimula
     cd /Users/runner/work/BillBox/BillBox/ios
     /bin/mkdir -p /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app
 
+Ld /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/__preview.dylib normal (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios16.0-simulator -dynamiclib -isysroot /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -O0 -L/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -install_name @rpath/BillBox.debug.dylib -dead_strip -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_dependency_info.dat -o /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/__preview.dylib
+
 ProcessInfoPlistFile /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Info.plist /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/empty-BillBoxTests.plist (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     builtin-infoPlistUtility /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/empty-BillBoxTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -format binary -platform iphonesimulator -o /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Info.plist
@@ -194,10 +198,6 @@ ProcessInfoPlistFile /Users/runner/work/BillBox/BillBox/build/Build/Products/Deb
 CpResource /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Golden /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/Golden (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/Golden /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest
-
-Ld /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/__preview.dylib normal (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios16.0-simulator -dynamiclib -isysroot /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -O0 -L/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -install_name @rpath/BillBox.debug.dylib -dead_strip -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_dependency_info.dat -o /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/__preview.dylib
 
 MkDir /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/unthinned (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
@@ -238,119 +238,100 @@ SwiftDriver BillBox normal arm64 com.apple.xcode.tools.swift.compiler (in target
     cd /Users/runner/work/BillBox/BillBox/ios
     builtin-SwiftDriver -- /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BillBox -Onone -enforce-exclusivity\=checked @/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -target arm64-apple-ios16.0-simulator -g -module-cache-path /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/BillBox/BillBox/build/Index.noindex/DataStore -swift-version 5 -I /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache -output-file-map /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-generated-files.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-own-target-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-project-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-Swift.h -working-directory /Users/runner/work/BillBox/BillBox/ios -experimental-emit-module-separately -disable-cmo
 
-SwiftEmitModule normal arm64 Emitting\ module\ for\ BillBox (in target 'BillBox' from project 'BillBox')
-EmitSwiftModule normal arm64 (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 Compiling\ AppModel.swift,\ BillBoxApp.swift,\ CrashCatcher.swift,\ RootView.swift,\ SimSelfTest.swift,\ Print.swift,\ PrintMarg.swift,\ BillingView.swift,\ BillsView.swift,\ DashboardView.swift,\ DebitNotesView.swift,\ DeleteCompany.swift,\ EwayBillView.swift,\ ItemToolsView.swift,\ MargImportView.swift,\ PartiesView.swift,\ PaymentPhotoView.swift,\ PrintOptions.swift,\ PurchaseView.swift,\ ReportsView.swift,\ SalesmenView.swift,\ SettingsView.swift,\ StockSheets.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/AppModel.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/BillBoxApp.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/CrashCatcher.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/RootView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/SimSelfTest.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Print/Print.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Print/PrintMarg.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillingView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillsView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DashboardView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DebitNotesView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DeleteCompany.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/EwayBillView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/ItemToolsView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/MargImportView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PartiesView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PaymentPhotoView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PrintOptions.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PurchaseView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/ReportsView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/SalesmenView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/SettingsView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/StockSheets.swift (in target 'BillBox' from project 'BillBox')
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/AppModel.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/BillBoxApp.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/CrashCatcher.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/RootView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/SimSelfTest.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Print/Print.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Print/PrintMarg.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillingView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillsView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-/Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillsView.swift:160:13: warning: initialization of immutable value 'sale' was never used; consider replacing with assignment to '_' or removing it
-        let sale = r.str("type") == "SALE"
-        ~~~~^~~~
-        _
-/Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillsView.swift:175:17: warning: initialization of immutable value 'sale' was never used; consider replacing with assignment to '_' or removing it
-            let sale = r.str("type") == "SALE"
-            ~~~~^~~~
-            _
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DashboardView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DebitNotesView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DeleteCompany.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/EwayBillView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/ItemToolsView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/MargImportView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PartiesView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PaymentPhotoView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PrintOptions.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PurchaseView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/ReportsView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/SalesmenView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/SettingsView.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/StockSheets.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
 SwiftEmitModule normal arm64 Emitting\ module\ for\ BillBoxTests (in target 'BillBoxTests' from project 'BillBox')
-
 EmitSwiftModule normal arm64 (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 Compiling\ WebList.swift,\ XLSX.swift,\ Years.swift,\ BackupFilesTests.swift,\ BillMathTests.swift,\ ConcurrencyTests.swift,\ GoldenTests.swift,\ ParityCompare.swift,\ SimilarityTests.swift,\ ParityRunner.swift,\ BillMath.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/XLSX.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Years.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BackupFilesTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BillMathTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ConcurrencyTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/GoldenTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ParityCompare.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/SimilarityTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/ParityKit/ParityRunner.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/BillMath.swift (in target 'BillBoxTests' from project 'BillBox')
+SwiftCompile normal arm64 Compiling\ AutoCreate.swift,\ Backup.swift,\ Billing.swift,\ Category.swift,\ DebitNotes.swift,\ Drive.swift,\ Engine.swift,\ EwayBill.swift,\ ItemTools.swift,\ ItemsAPI.swift,\ JS.swift,\ License.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/AutoCreate.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Backup.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Billing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Category.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/DebitNotes.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Drive.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/License.swift (in target 'BillBoxTests' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/AutoCreate.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Backup.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Billing.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Category.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/DebitNotes.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Drive.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/License.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ BillBox (in target 'BillBox' from project 'BillBox')
+
+EmitSwiftModule normal arm64 (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 Compiling\ Utils.swift,\ WebList.swift,\ XLSX.swift,\ Years.swift,\ BackupFilesTests.swift,\ BillMathTests.swift,\ ConcurrencyTests.swift,\ GoldenTests.swift,\ ParityCompare.swift,\ SimilarityTests.swift,\ ParityRunner.swift,\ BillMath.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Utils.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/XLSX.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Years.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BackupFilesTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/BillMathTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ConcurrencyTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/GoldenTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/ParityCompare.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/SimilarityTests.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/ParityKit/ParityRunner.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/BillMath.swift (in target 'BillBoxTests' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Utils.swift (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:106: warning: expression implicitly coerced from 'Any?' to 'Any'
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                         ^~~~~~~~~~~~~~~~~~~
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:119: note: provide a default value to avoid this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                         ~~~~~~~~~~~~~^~~~~~
+                                                                                                                             ?? <#default value#>
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:119: note: force-unwrap the value to avoid this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                         ~~~~~~~~~~~~~^~~~~~
+                                                                                                                            !
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:119: note: explicitly cast to 'Any' with 'as Any' to silence this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                         ~~~~~~~~~~~~~^~~~~~
+                                                                                                                             as Any
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:135: warning: expression implicitly coerced from 'Any?' to 'Any'
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                                                      ^~~~~~~~~~~~~~~~
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:145: note: provide a default value to avoid this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                                                      ~~~~~~~~~~^~~~~~
+                                                                                                                                                       ?? <#default value#>
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:145: note: force-unwrap the value to avoid this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                                                      ~~~~~~~~~~^~~~~~
+                                                                                                                                                      !
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:145: note: explicitly cast to 'Any' with 'as Any' to silence this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                                                      ~~~~~~~~~~^~~~~~
+                                                                                                                                                       as Any
 
 SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
@@ -738,97 +719,10 @@ SwiftDriver\ Compilation\ Requirements BillBox normal arm64 com.apple.xcode.tool
     cd /Users/runner/work/BillBox/BillBox/ios
     builtin-Swift-Compilation-Requirements -- /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BillBox -Onone -enforce-exclusivity\=checked @/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -target arm64-apple-ios16.0-simulator -g -module-cache-path /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/BillBox/BillBox/build/Index.noindex/DataStore -swift-version 5 -I /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache -output-file-map /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-generated-files.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-own-target-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-project-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-Swift.h -working-directory /Users/runner/work/BillBox/BillBox/ios -experimental-emit-module-separately -disable-cmo
 
-SwiftMergeGeneratedHeaders /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources/BillBoxTests-Swift.h /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-Swift.h (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-swiftHeaderTool -arch arm64 /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-Swift.h -o /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources/BillBoxTests-Swift.h
-
-Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftmodule (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftmodule /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.swiftmodule
-
-Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.swiftdoc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftdoc (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftdoc /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.swiftdoc
-
-Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.abi.json /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.abi.json (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.abi.json /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.abi.json
-
-Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftsourceinfo (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftsourceinfo /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo
-
-SwiftMergeGeneratedHeaders /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/BillBox-Swift.h /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-Swift.h (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-swiftHeaderTool -arch arm64 /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-Swift.h -o /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/BillBox-Swift.h
-
-Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftmodule (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftmodule /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.swiftmodule
-
-Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.swiftdoc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftdoc (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftdoc /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.swiftdoc
-
-Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.abi.json /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.abi.json (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.abi.json /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.abi.json
-
-Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftsourceinfo (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftsourceinfo /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo
-
-SwiftCompile normal arm64 Compiling\ AutoCreate.swift,\ Backup.swift,\ Billing.swift,\ Category.swift,\ DebitNotes.swift,\ Drive.swift,\ Engine.swift,\ EwayBill.swift,\ ItemTools.swift,\ ItemsAPI.swift,\ JS.swift,\ MargImport.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/AutoCreate.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Backup.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Billing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Category.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/DebitNotes.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Drive.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift (in target 'BillBoxTests' from project 'BillBox')
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/AutoCreate.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Backup.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Billing.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Category.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/DebitNotes.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Drive.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift (in target 'BillBoxTests' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-
+SwiftCompile normal arm64 Compiling\ MargImport.swift,\ PDFParser.swift,\ PageText.swift,\ PartiesAPI.swift,\ PaymentSheet.swift,\ Pricing.swift,\ Purchases.swift,\ Reports.swift,\ Router.swift,\ SQLite.swift,\ Schema.swift,\ Unzip.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PDFParser.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PageText.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PartiesAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Pricing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Purchases.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Reports.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Router.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/SQLite.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Schema.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Unzip.swift (in target 'BillBoxTests' from project 'BillBox')
 SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
-
-SwiftCompile normal arm64 Compiling\ PDFParser.swift,\ PageText.swift,\ PartiesAPI.swift,\ PaymentSheet.swift,\ Pricing.swift,\ Purchases.swift,\ Reports.swift,\ Router.swift,\ SQLite.swift,\ Schema.swift,\ Unzip.swift,\ Utils.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PDFParser.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PageText.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PartiesAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Pricing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Purchases.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Reports.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Router.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/SQLite.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Schema.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Unzip.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Utils.swift (in target 'BillBoxTests' from project 'BillBox')
 
 SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PDFParser.swift (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
@@ -904,23 +798,211 @@ SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sou
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Utils.swift (in target 'BillBoxTests' from project 'BillBox')
+SwiftMergeGeneratedHeaders /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources/BillBoxTests-Swift.h /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-Swift.h (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-swiftHeaderTool -arch arm64 /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-Swift.h -o /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources/BillBoxTests-Swift.h
+
+SwiftDriverJobDiscovery normal arm64 Compiling AutoCreate.swift, Backup.swift, Billing.swift, Category.swift, DebitNotes.swift, Drive.swift, Engine.swift, EwayBill.swift, ItemTools.swift, ItemsAPI.swift, JS.swift, License.swift (in target 'BillBoxTests' from project 'BillBox')
+
+Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftmodule (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftmodule /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.swiftmodule
+
+Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.swiftdoc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftdoc (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftdoc /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.swiftdoc
+
+Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.abi.json /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.abi.json (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.abi.json /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/arm64-apple-ios-simulator.abi.json
+
+Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftsourceinfo (in target 'BillBoxTests' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftsourceinfo /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo
+
+SwiftMergeGeneratedHeaders /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/BillBox-Swift.h /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-Swift.h (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-swiftHeaderTool -arch arm64 /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox-Swift.h -o /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/BillBox-Swift.h
+
+Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftmodule (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftmodule /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.swiftmodule
+
+Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.swiftdoc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftdoc (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftdoc /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.swiftdoc
+
+Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.abi.json /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.abi.json (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.abi.json /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/arm64-apple-ios-simulator.abi.json
+
+Copy /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftsourceinfo (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.swiftsourceinfo /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo
+
+SwiftCompile normal arm64 Compiling\ Engine.swift,\ EwayBill.swift,\ ItemTools.swift,\ ItemsAPI.swift,\ JS.swift,\ License.swift,\ MargImport.swift,\ PDFParser.swift,\ PageText.swift,\ PartiesAPI.swift,\ PaymentSheet.swift,\ Pricing.swift,\ Purchases.swift,\ Reports.swift,\ Router.swift,\ SQLite.swift,\ Schema.swift,\ Unzip.swift,\ Utils.swift,\ WebList.swift,\ XLSX.swift,\ Years.swift,\ GeneratedAssetSymbols.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/License.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PDFParser.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PageText.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PartiesAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Pricing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Purchases.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Reports.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Router.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/SQLite.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Schema.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Unzip.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Utils.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/XLSX.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Years.swift /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftDriverJobDiscovery normal arm64 Compiling WebList.swift, XLSX.swift, Years.swift, BackupFilesTests.swift, BillMathTests.swift, ConcurrencyTests.swift, GoldenTests.swift, ParityCompare.swift, SimilarityTests.swift, ParityRunner.swift, BillMath.swift (in target 'BillBoxTests' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
 
-SwiftDriverJobDiscovery normal arm64 Compiling AutoCreate.swift, Backup.swift, Billing.swift, Category.swift, DebitNotes.swift, Drive.swift, Engine.swift, EwayBill.swift, ItemTools.swift, ItemsAPI.swift, JS.swift, MargImport.swift (in target 'BillBoxTests' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/License.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PDFParser.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PageText.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PartiesAPI.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:66: warning: expression implicitly coerced from 'Any?' to 'Any'
+                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
+                                                                 ^~~~~~~~~~~~~~~~~~~~
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:80: note: provide a default value to avoid this warning
+                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
+                                                                 ~~~~~~~~~~~~~~^~~~~~
+                                                                                      ?? <#default value#>
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:80: note: force-unwrap the value to avoid this warning
+                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
+                                                                 ~~~~~~~~~~~~~~^~~~~~
+                                                                                     !
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:80: note: explicitly cast to 'Any' with 'as Any' to silence this warning
+                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
+                                                                 ~~~~~~~~~~~~~~^~~~~~
+                                                                                      as Any
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:98: warning: expression implicitly coerced from 'Any?' to 'Any'
+                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
+                                                                                                 ^~~~~~~~~~~~~~~~~~
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:110: note: provide a default value to avoid this warning
+                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
+                                                                                                 ~~~~~~~~~~~~^~~~~~
+                                                                                                                    ?? <#default value#>
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:110: note: force-unwrap the value to avoid this warning
+                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
+                                                                                                 ~~~~~~~~~~~~^~~~~~
+                                                                                                                   !
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:110: note: explicitly cast to 'Any' with 'as Any' to silence this warning
+                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
+                                                                                                 ~~~~~~~~~~~~^~~~~~
+                                                                                                                    as Any
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Pricing.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Purchases.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Reports.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Router.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/SQLite.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Schema.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Unzip.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Utils.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:106: warning: expression implicitly coerced from 'Any?' to 'Any'
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                         ^~~~~~~~~~~~~~~~~~~
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:119: note: provide a default value to avoid this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                         ~~~~~~~~~~~~~^~~~~~
+                                                                                                                             ?? <#default value#>
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:119: note: force-unwrap the value to avoid this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                         ~~~~~~~~~~~~~^~~~~~
+                                                                                                                            !
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:119: note: explicitly cast to 'Any' with 'as Any' to silence this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                         ~~~~~~~~~~~~~^~~~~~
+                                                                                                                             as Any
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:135: warning: expression implicitly coerced from 'Any?' to 'Any'
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                                                      ^~~~~~~~~~~~~~~~
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:145: note: provide a default value to avoid this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                                                      ~~~~~~~~~~^~~~~~
+                                                                                                                                                       ?? <#default value#>
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:145: note: force-unwrap the value to avoid this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                                                      ~~~~~~~~~~^~~~~~
+                                                                                                                                                      !
+/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:145: note: explicitly cast to 'Any' with 'as Any' to silence this warning
+        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
+                                                                                                                                      ~~~~~~~~~~^~~~~~
+                                                                                                                                                       as Any
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/XLSX.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Years.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling Utils.swift, WebList.swift, XLSX.swift, Years.swift, BackupFilesTests.swift, BillMathTests.swift, ConcurrencyTests.swift, GoldenTests.swift, ParityCompare.swift, SimilarityTests.swift, ParityRunner.swift, BillMath.swift (in target 'BillBoxTests' from project 'BillBox')
 
 LinkAssetCatalog /Users/runner/work/BillBox/BillBox/ios/BillBox/Resources/Assets.xcassets (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     builtin-linkAssetCatalog --thinned /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/thinned --thinned-dependencies /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_dependencies_thinned --thinned-info-plist-content /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_generated_info.plist_thinned --unthinned /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_output/unthinned --unthinned-dependencies /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_dependencies_unthinned --unthinned-info-plist-content /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_generated_info.plist_unthinned --output /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app --plist-output /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_generated_info.plist
 note: Emplaced /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/AppIcon60x60@2x.png (in target 'BillBox' from project 'BillBox')
-note: Emplaced /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/Assets.car (in target 'BillBox' from project 'BillBox')
 note: Emplaced /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/AppIcon76x76@2x~ipad.png (in target 'BillBox' from project 'BillBox')
+note: Emplaced /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/Assets.car (in target 'BillBox' from project 'BillBox')
 
-SwiftCompile normal arm64 Compiling\ StockView.swift,\ API.swift,\ BillMath.swift,\ BillModel.swift,\ Compat.swift,\ Components.swift,\ DataGrid.swift,\ DriveBackup.swift,\ Files.swift,\ Format.swift,\ JSON.swift,\ PDFReaderWeb.swift,\ PDFText.swift,\ Themes.swift,\ WhatsApp.swift,\ WhatsAppWeb.swift,\ AutoCreate.swift,\ Backup.swift,\ Billing.swift,\ Category.swift,\ DebitNotes.swift,\ Drive.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/StockView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/API.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/BillMath.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/BillModel.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Compat.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Components.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/DataGrid.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/DriveBackup.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Files.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Format.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/JSON.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/PDFReaderWeb.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/PDFText.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Themes.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/WhatsApp.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/WhatsAppWeb.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/AutoCreate.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Backup.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Billing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Category.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/DebitNotes.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Drive.swift (in target 'BillBox' from project 'BillBox')
-
+SwiftCompile normal arm64 Compiling\ StockView.swift,\ API.swift,\ BillMath.swift,\ BillModel.swift,\ Compat.swift,\ Components.swift,\ DataGrid.swift,\ DriveBackup.swift,\ Files.swift,\ Format.swift,\ JSON.swift,\ LicenseView.swift,\ PDFReaderWeb.swift,\ PDFText.swift,\ Themes.swift,\ WhatsApp.swift,\ WhatsAppWeb.swift,\ AutoCreate.swift,\ Backup.swift,\ Billing.swift,\ Category.swift,\ DebitNotes.swift,\ Drive.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/StockView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/API.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/BillMath.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/BillModel.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Compat.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Components.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/DataGrid.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/DriveBackup.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Files.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Format.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/JSON.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/LicenseView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/PDFReaderWeb.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/PDFText.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/Themes.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/WhatsApp.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/WhatsAppWeb.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/AutoCreate.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Backup.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Billing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Category.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/DebitNotes.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Drive.swift (in target 'BillBox' from project 'BillBox')
 SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/StockView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
@@ -1122,6 +1204,26 @@ final class Once {
             ^
 
 SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/JSON.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+/Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/PDFText.swift:66:84: warning: capture of 'req' with non-sendable type 'VNRecognizeTextRequest' in a '@Sendable' closure
+                do { try VNImageRequestHandler(cgImage: cg, options: [:]).perform([req]) } catch { if once.first() { c.resume(throwing: error) } }
+                                                                                   ^
+/Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk/System/Library/Frameworks/Vision.framework/Headers/VNRecognizeTextRequest.h:31:12: note: class 'VNRecognizeTextRequest' does not conform to the 'Sendable' protocol
+@interface VNRecognizeTextRequest : VNImageBasedRequest <VNRequestProgressProviding>
+           ^
+/Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/PDFText.swift:3:1: warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'Vision'
+import Vision
+^
+@preconcurrency 
+/Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/PDFText.swift:66:103: warning: capture of 'once' with non-sendable type 'Once' in a '@Sendable' closure
+                do { try VNImageRequestHandler(cgImage: cg, options: [:]).perform([req]) } catch { if once.first() { c.resume(throwing: error) } }
+                                                                                                      ^
+/Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/PDFText.swift:73:13: note: class 'Once' does not conform to the 'Sendable' protocol
+final class Once {
+            ^
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/LicenseView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 /Users/runner/work/BillBox/BillBox/ios/BillBox/Shared/PDFText.swift:66:84: warning: capture of 'req' with non-sendable type 'VNRecognizeTextRequest' in a '@Sendable' closure
@@ -1365,163 +1467,114 @@ ProcessInfoPlistFile /Users/runner/work/BillBox/BillBox/build/Build/Products/Deb
     cd /Users/runner/work/BillBox/BillBox/ios
     builtin-infoPlistUtility /Users/runner/work/BillBox/BillBox/ios/BillBox/Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/PkgInfo -expandbuildsettings -format binary -platform iphonesimulator -additionalcontentfile /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/assetcatalog_generated_info.plist -o /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/Info.plist
 
-SwiftDriverJobDiscovery normal arm64 Compiling PDFParser.swift, PageText.swift, PartiesAPI.swift, PaymentSheet.swift, Pricing.swift, Purchases.swift, Reports.swift, Router.swift, SQLite.swift, Schema.swift, Unzip.swift, Utils.swift (in target 'BillBoxTests' from project 'BillBox')
+SwiftDriverJobDiscovery normal arm64 Compiling MargImport.swift, PDFParser.swift, PageText.swift, PartiesAPI.swift, PaymentSheet.swift, Pricing.swift, Purchases.swift, Reports.swift, Router.swift, SQLite.swift, Schema.swift, Unzip.swift (in target 'BillBoxTests' from project 'BillBox')
 
 SwiftDriver\ Compilation BillBoxTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     builtin-Swift-Compilation -- /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BillBoxTests -Onone -enforce-exclusivity\=checked @/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -target arm64-apple-ios16.0-simulator -g -module-cache-path /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/BillBox/BillBox/build/Index.noindex/DataStore -swift-version 5 -I /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -I /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk/Developer/Library/Frameworks -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/BillBox/BillBox/build/SDKStatCaches.noindex/iphonesimulator18.5-22F76-96ae0914227b19deccb34b33ba7b5dea.sdkstatcache -output-file-map /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/BillBox/BillBox/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-generated-files.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-own-target-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests-project-headers.hmap -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests-Swift.h -working-directory /Users/runner/work/BillBox/BillBox/ios -experimental-emit-module-separately -disable-cmo
 
-SwiftCompile normal arm64 Compiling\ Engine.swift,\ EwayBill.swift,\ ItemTools.swift,\ ItemsAPI.swift,\ JS.swift,\ MargImport.swift,\ PDFParser.swift,\ PageText.swift,\ PartiesAPI.swift,\ PaymentSheet.swift,\ Pricing.swift,\ Purchases.swift,\ Reports.swift,\ Router.swift,\ SQLite.swift,\ Schema.swift,\ Unzip.swift,\ Utils.swift,\ WebList.swift,\ XLSX.swift,\ Years.swift,\ GeneratedAssetSymbols.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PDFParser.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PageText.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PartiesAPI.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Pricing.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Purchases.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Reports.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Router.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/SQLite.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Schema.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Unzip.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Utils.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/XLSX.swift /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Years.swift /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'BillBox' from project 'BillBox')
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Engine.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 Compiling\ AppModel.swift,\ BillBoxApp.swift,\ CrashCatcher.swift,\ RootView.swift,\ SimSelfTest.swift,\ Print.swift,\ PrintMarg.swift,\ BillingView.swift,\ BillsView.swift,\ DashboardView.swift,\ DebitNotesView.swift,\ DeleteCompany.swift,\ EwayBillView.swift,\ ItemToolsView.swift,\ MargImportView.swift,\ PartiesView.swift,\ PaymentPhotoView.swift,\ PrintOptions.swift,\ PurchaseView.swift,\ ReportsView.swift,\ SalesmenView.swift,\ SettingsView.swift,\ StockSheets.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/AppModel.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/BillBoxApp.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/CrashCatcher.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/RootView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/App/SimSelfTest.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Print/Print.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Print/PrintMarg.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillingView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillsView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DashboardView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DebitNotesView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DeleteCompany.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/EwayBillView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/ItemToolsView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/MargImportView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PartiesView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PaymentPhotoView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PrintOptions.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PurchaseView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/ReportsView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/SalesmenView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/SettingsView.swift /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/StockSheets.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/AppModel.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/EwayBill.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/BillBoxApp.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemTools.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/CrashCatcher.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/ItemsAPI.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/RootView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/JS.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/App/SimSelfTest.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/MargImport.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Print/Print.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PDFParser.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Print/PrintMarg.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PageText.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillingView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PartiesAPI.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillsView.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+/Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillsView.swift:160:13: warning: initialization of immutable value 'sale' was never used; consider replacing with assignment to '_' or removing it
+        let sale = r.str("type") == "SALE"
+        ~~~~^~~~
+        _
+/Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/BillsView.swift:175:17: warning: initialization of immutable value 'sale' was never used; consider replacing with assignment to '_' or removing it
+            let sale = r.str("type") == "SALE"
+            ~~~~^~~~
+            _
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DashboardView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:66: warning: expression implicitly coerced from 'Any?' to 'Any'
-                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
-                                                                 ^~~~~~~~~~~~~~~~~~~~
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:80: note: provide a default value to avoid this warning
-                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
-                                                                 ~~~~~~~~~~~~~~^~~~~~
-                                                                                      ?? <#default value#>
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:80: note: force-unwrap the value to avoid this warning
-                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
-                                                                 ~~~~~~~~~~~~~~^~~~~~
-                                                                                     !
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:80: note: explicitly cast to 'Any' with 'as Any' to silence this warning
-                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
-                                                                 ~~~~~~~~~~~~~~^~~~~~
-                                                                                      as Any
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:98: warning: expression implicitly coerced from 'Any?' to 'Any'
-                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
-                                                                                                 ^~~~~~~~~~~~~~~~~~
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:110: note: provide a default value to avoid this warning
-                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
-                                                                                                 ~~~~~~~~~~~~^~~~~~
-                                                                                                                    ?? <#default value#>
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:110: note: force-unwrap the value to avoid this warning
-                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
-                                                                                                 ~~~~~~~~~~~~^~~~~~
-                                                                                                                   !
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/PaymentSheet.swift:210:110: note: explicitly cast to 'Any' with 'as Any' to silence this warning
-                    let v = try Vouchers.record(db, ["party_id": r["party_id"] ?? nil, "amount": r["amount"] ?? nil, "date": date, "mode": mode,
-                                                                                                 ~~~~~~~~~~~~^~~~~~
-                                                                                                                    as Any
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Pricing.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DebitNotesView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Purchases.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/DeleteCompany.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Reports.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/EwayBillView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Router.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/ItemToolsView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/SQLite.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/MargImportView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Schema.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PartiesView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Unzip.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PaymentPhotoView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Utils.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PrintOptions.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:106: warning: expression implicitly coerced from 'Any?' to 'Any'
-        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
-                                                                                                         ^~~~~~~~~~~~~~~~~~~
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:119: note: provide a default value to avoid this warning
-        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
-                                                                                                         ~~~~~~~~~~~~~^~~~~~
-                                                                                                                             ?? <#default value#>
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:119: note: force-unwrap the value to avoid this warning
-        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
-                                                                                                         ~~~~~~~~~~~~~^~~~~~
-                                                                                                                            !
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:119: note: explicitly cast to 'Any' with 'as Any' to silence this warning
-        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
-                                                                                                         ~~~~~~~~~~~~~^~~~~~
-                                                                                                                             as Any
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:135: warning: expression implicitly coerced from 'Any?' to 'Any'
-        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
-                                                                                                                                      ^~~~~~~~~~~~~~~~
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:145: note: provide a default value to avoid this warning
-        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
-                                                                                                                                      ~~~~~~~~~~^~~~~~
-                                                                                                                                                       ?? <#default value#>
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:145: note: force-unwrap the value to avoid this warning
-        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
-                                                                                                                                      ~~~~~~~~~~^~~~~~
-                                                                                                                                                      !
-/Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/WebList.swift:77:145: note: explicitly cast to 'Any' with 'as Any' to silence this warning
-        var r = try ItemTools.extractList(db, ["html": String(decoding: data, as: UTF8.self), "company": b["company"] ?? nil, "case": b["case"] ?? nil])
-                                                                                                                                      ~~~~~~~~~~^~~~~~
-                                                                                                                                                       as Any
-
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/XLSX.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/PurchaseView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Sources/BillBoxCore/Years.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/ReportsView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/SalesmenView.swift (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     
 
-SwiftDriverJobDiscovery normal arm64 Compiling Engine.swift, EwayBill.swift, ItemTools.swift, ItemsAPI.swift, JS.swift, MargImport.swift, PDFParser.swift, PageText.swift, PartiesAPI.swift, PaymentSheet.swift, Pricing.swift, Purchases.swift, Reports.swift, Router.swift, SQLite.swift, Schema.swift, Unzip.swift, Utils.swift, WebList.swift, XLSX.swift, Years.swift, GeneratedAssetSymbols.swift (in target 'BillBox' from project 'BillBox')
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/SettingsView.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/BillBox/BillBox/ios/BillBox/Screens/StockSheets.swift (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling Engine.swift, EwayBill.swift, ItemTools.swift, ItemsAPI.swift, JS.swift, License.swift, MargImport.swift, PDFParser.swift, PageText.swift, PartiesAPI.swift, PaymentSheet.swift, Pricing.swift, Purchases.swift, Reports.swift, Router.swift, SQLite.swift, Schema.swift, Unzip.swift, Utils.swift, WebList.swift, XLSX.swift, Years.swift, GeneratedAssetSymbols.swift (in target 'BillBox' from project 'BillBox')
 
 Ld /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/BillBoxTests normal (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
@@ -1530,21 +1583,19 @@ Ld /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator
 ExtractAppIntentsMetadata (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --module-name BillBoxTests --sdk-root /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk --xcode-version 16F6 --platform-family iOS --deployment-target 16.0 --bundle-identifier com.local.billbox.tests --output /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest --target-triple arm64-apple-ios16.0-simulator --binary-file /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/BillBoxTests --dependency-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests_dependency_info.dat --stringsdata-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.SwiftFileList --metadata-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/Objects-normal/arm64/BillBoxTests.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
-2026-10-31 20:42:48.045 appintentsmetadataprocessor[12891:40859] Starting appintentsmetadataprocessor export
-2026-10-31 20:42:48.064 appintentsmetadataprocessor[12891:40859] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+2026-11-01 04:17:23.353 appintentsmetadataprocessor[12297:40202] Starting appintentsmetadataprocessor export
+2026-11-01 04:17:23.363 appintentsmetadataprocessor[12297:40202] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
 
 CopySwiftLibs /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     builtin-swiftStdLibTool --copy --verbose --scan-executable /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/BillBoxTests --scan-folder /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Frameworks --scan-folder /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/PlugIns --scan-folder /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/SystemExtensions --scan-folder /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Extensions --platform iphonesimulator --toolchain /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Frameworks --strip-bitcode --scan-executable /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
 Ignoring --strip-bitcode because --sign was not passed
 
-SwiftDriverJobDiscovery normal arm64 Compiling StockView.swift, API.swift, BillMath.swift, BillModel.swift, Compat.swift, Components.swift, DataGrid.swift, DriveBackup.swift, Files.swift, Format.swift, JSON.swift, PDFReaderWeb.swift, PDFText.swift, Themes.swift, WhatsApp.swift, WhatsAppWeb.swift, AutoCreate.swift, Backup.swift, Billing.swift, Category.swift, DebitNotes.swift, Drive.swift (in target 'BillBox' from project 'BillBox')
-
 AppIntentsSSUTraining (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsnltrainingprocessor --infoplist-path /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Info.plist --temp-dir-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/ssu --bundle-id com.local.billbox.tests --product-path /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest --extracted-metadata-path /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest/Metadata.appintents --metadata-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBoxTests.build/BillBoxTests.DependencyMetadataFileList --archive-ssu-assets
-2026-10-31 20:42:48.150 appintentsnltrainingprocessor[12979:41048] Parsing options for appintentsnltrainingprocessor
-2026-10-31 20:42:48.158 appintentsnltrainingprocessor[12979:41048] No AppShortcuts found - Skipping.
+2026-11-01 04:17:23.585 appintentsnltrainingprocessor[12324:40269] Parsing options for appintentsnltrainingprocessor
+2026-11-01 04:17:23.587 appintentsnltrainingprocessor[12324:40269] No AppShortcuts found - Skipping.
 
 RegisterExecutionPolicyException /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
@@ -1553,6 +1604,8 @@ RegisterExecutionPolicyException /Users/runner/work/BillBox/BillBox/build/Build/
 Touch /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest (in target 'BillBoxTests' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     /usr/bin/touch -c /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBoxTests.xctest
+
+SwiftDriverJobDiscovery normal arm64 Compiling StockView.swift, API.swift, BillMath.swift, BillModel.swift, Compat.swift, Components.swift, DataGrid.swift, DriveBackup.swift, Files.swift, Format.swift, JSON.swift, LicenseView.swift, PDFReaderWeb.swift, PDFText.swift, Themes.swift, WhatsApp.swift, WhatsAppWeb.swift, AutoCreate.swift, Backup.swift, Billing.swift, Category.swift, DebitNotes.swift, Drive.swift (in target 'BillBox' from project 'BillBox')
 
 SwiftDriverJobDiscovery normal arm64 Compiling AppModel.swift, BillBoxApp.swift, CrashCatcher.swift, RootView.swift, SimSelfTest.swift, Print.swift, PrintMarg.swift, BillingView.swift, BillsView.swift, DashboardView.swift, DebitNotesView.swift, DeleteCompany.swift, EwayBillView.swift, ItemToolsView.swift, MargImportView.swift, PartiesView.swift, PaymentPhotoView.swift, PrintOptions.swift, PurchaseView.swift, ReportsView.swift, SalesmenView.swift, SettingsView.swift, StockSheets.swift (in target 'BillBox' from project 'BillBox')
 
@@ -1573,22 +1626,22 @@ Ld /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator
     cd /Users/runner/work/BillBox/BillBox/ios
     /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios16.0-simulator -isysroot /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk -O0 -L/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -F/Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator -Xlinker -rpath -Xlinker @executable_path -Xlinker -rpath -Xlinker @executable_path/Frameworks -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -e ___debug_blank_executor_main -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_dylib -Xlinker /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-DebugDylibPath-normal-arm64.txt -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_instlnm -Xlinker /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-DebugDylibInstallName-normal-arm64.txt -Xlinker -filelist -Xlinker /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox-ExecutorLinkFileList-normal-arm64.txt /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/BillBox.debug.dylib -o /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/BillBox
 
+ExtractAppIntentsMetadata (in target 'BillBox' from project 'BillBox')
+    cd /Users/runner/work/BillBox/BillBox/ios
+    /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --module-name BillBox --sdk-root /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk --xcode-version 16F6 --platform-family iOS --deployment-target 16.0 --bundle-identifier com.local.billbox --output /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app --target-triple arm64-apple-ios16.0-simulator --binary-file /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/BillBox --dependency-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_dependency_info.dat --stringsdata-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftFileList --metadata-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-11-01 04:17:54.433 appintentsmetadataprocessor[14055:44379] Starting appintentsmetadataprocessor export
+2026-11-01 04:17:54.442 appintentsmetadataprocessor[14055:44379] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
 CopySwiftLibs /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     builtin-swiftStdLibTool --copy --verbose --scan-executable /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/BillBox.debug.dylib --scan-folder /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/Frameworks --scan-folder /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/PlugIns --scan-folder /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/SystemExtensions --scan-folder /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/Extensions --platform iphonesimulator --toolchain /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
 Ignoring --strip-bitcode because --sign was not passed
 
-ExtractAppIntentsMetadata (in target 'BillBox' from project 'BillBox')
-    cd /Users/runner/work/BillBox/BillBox/ios
-    /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --module-name BillBox --sdk-root /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.5.sdk --xcode-version 16F6 --platform-family iOS --deployment-target 16.0 --bundle-identifier com.local.billbox --output /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app --target-triple arm64-apple-ios16.0-simulator --binary-file /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/BillBox --dependency-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox_dependency_info.dat --stringsdata-file /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftFileList --metadata-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/Objects-normal/arm64/BillBox.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
-2026-10-31 20:43:09.156 appintentsmetadataprocessor[14141:43909] Starting appintentsmetadataprocessor export
-2026-10-31 20:43:09.160 appintentsmetadataprocessor[14141:43909] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
-
 AppIntentsSSUTraining (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
     /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsnltrainingprocessor --infoplist-path /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/Info.plist --temp-dir-path /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/ssu --bundle-id com.local.billbox --product-path /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app --extracted-metadata-path /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app/Metadata.appintents --metadata-file-list /Users/runner/work/BillBox/BillBox/build/Build/Intermediates.noindex/BillBox.build/Debug-iphonesimulator/BillBox.build/BillBox.DependencyMetadataFileList --archive-ssu-assets
-2026-10-31 20:43:09.198 appintentsnltrainingprocessor[14142:43910] Parsing options for appintentsnltrainingprocessor
-2026-10-31 20:43:09.199 appintentsnltrainingprocessor[14142:43910] No AppShortcuts found - Skipping.
+2026-11-01 04:17:54.466 appintentsnltrainingprocessor[14066:44406] Parsing options for appintentsnltrainingprocessor
+2026-11-01 04:17:54.467 appintentsnltrainingprocessor[14066:44406] No AppShortcuts found - Skipping.
 
 RegisterExecutionPolicyException /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app (in target 'BillBox' from project 'BillBox')
     cd /Users/runner/work/BillBox/BillBox/ios
@@ -1602,69 +1655,69 @@ Touch /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimula
     cd /Users/runner/work/BillBox/BillBox/ios
     /usr/bin/touch -c /Users/runner/work/BillBox/BillBox/build/Build/Products/Debug-iphonesimulator/BillBox.app
 
-Test Suite 'All tests' started at 2026-10-31 20:43:35.049.
-Test Suite 'BillBoxTests.xctest' started at 2026-10-31 20:43:35.051.
-Test Suite 'BackupFilesTests' started at 2026-10-31 20:43:35.052.
+Test Suite 'All tests' started at 2026-11-01 04:18:05.354.
+Test Suite 'BillBoxTests.xctest' started at 2026-11-01 04:18:05.357.
+Test Suite 'BackupFilesTests' started at 2026-11-01 04:18:05.357.
 Test Case '-[BillBoxTests.BackupFilesTests testBackupFailureKeepsItsReason]' started.
-Test Case '-[BillBoxTests.BackupFilesTests testBackupFailureKeepsItsReason]' passed (0.143 seconds).
+Test Case '-[BillBoxTests.BackupFilesTests testBackupFailureKeepsItsReason]' passed (0.077 seconds).
 Test Case '-[BillBoxTests.BackupFilesTests testBackupFolderFollowsTheAppFolder]' started.
-Test Case '-[BillBoxTests.BackupFilesTests testBackupFolderFollowsTheAppFolder]' passed (0.051 seconds).
+Test Case '-[BillBoxTests.BackupFilesTests testBackupFolderFollowsTheAppFolder]' passed (0.026 seconds).
 Test Case '-[BillBoxTests.BackupFilesTests testLocateSingleCompanyFile]' started.
-Test Case '-[BillBoxTests.BackupFilesTests testLocateSingleCompanyFile]' passed (0.007 seconds).
+Test Case '-[BillBoxTests.BackupFilesTests testLocateSingleCompanyFile]' passed (0.005 seconds).
 Test Case '-[BillBoxTests.BackupFilesTests testUnzipStoredAndDeflated]' started.
-Test Case '-[BillBoxTests.BackupFilesTests testUnzipStoredAndDeflated]' passed (0.742 seconds).
+Test Case '-[BillBoxTests.BackupFilesTests testUnzipStoredAndDeflated]' passed (0.527 seconds).
 Test Case '-[BillBoxTests.BackupFilesTests testZippedMacBackupRestores]' started.
-Test Case '-[BillBoxTests.BackupFilesTests testZippedMacBackupRestores]' passed (1.113 seconds).
-Test Suite 'BackupFilesTests' passed at 2026-11-01 02:13:37.109.
-	 Executed 5 tests, with 0 failures (0 unexpected) in 2.055 (2.058) seconds
-Test Suite 'BillMathTests' started at 2026-11-01 02:13:37.110.
+Test Case '-[BillBoxTests.BackupFilesTests testZippedMacBackupRestores]' passed (0.742 seconds).
+Test Suite 'BackupFilesTests' passed at 2026-11-01 09:48:06.739.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 1.378 (1.381) seconds
+Test Suite 'BillMathTests' started at 2026-11-01 09:48:06.740.
 Test Case '-[BillBoxTests.BillMathTests testLiveBillTotalsMatchMac]' started.
-Test Case '-[BillBoxTests.BillMathTests testLiveBillTotalsMatchMac]' passed (1.306 seconds).
+Test Case '-[BillBoxTests.BillMathTests testLiveBillTotalsMatchMac]' passed (0.917 seconds).
 Test Case '-[BillBoxTests.BillMathTests testPaiseRoundingLikeMac]' started.
 Test Case '-[BillBoxTests.BillMathTests testPaiseRoundingLikeMac]' passed (0.001 seconds).
-Test Suite 'BillMathTests' passed at 2026-11-01 02:13:38.418.
-	 Executed 2 tests, with 0 failures (0 unexpected) in 1.307 (1.308) seconds
-Test Suite 'ConcurrencyTests' started at 2026-11-01 02:13:38.418.
+Test Suite 'BillMathTests' passed at 2026-11-01 09:48:07.658.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.918 (0.918) seconds
+Test Suite 'ConcurrencyTests' started at 2026-11-01 09:48:07.658.
 Test Case '-[BillBoxTests.ConcurrencyTests testManyRequestsAtOnceAreSafe]' started.
-Test Case '-[BillBoxTests.ConcurrencyTests testManyRequestsAtOnceAreSafe]' passed (0.127 seconds).
-Test Suite 'ConcurrencyTests' passed at 2026-11-01 02:13:38.546.
-	 Executed 1 test, with 0 failures (0 unexpected) in 0.127 (0.128) seconds
-Test Suite 'GoldenTests' started at 2026-11-01 02:13:38.547.
+Test Case '-[BillBoxTests.ConcurrencyTests testManyRequestsAtOnceAreSafe]' passed (0.080 seconds).
+Test Suite 'ConcurrencyTests' passed at 2026-11-01 09:48:07.738.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.080 (0.080) seconds
+Test Suite 'GoldenTests' started at 2026-11-01 09:48:07.738.
 Test Case '-[BillBoxTests.GoldenTests testIPhoneBackupHasMacLayoutAndRestores]' started.
-Test Case '-[BillBoxTests.GoldenTests testIPhoneBackupHasMacLayoutAndRestores]' passed (2.400 seconds).
+Test Case '-[BillBoxTests.GoldenTests testIPhoneBackupHasMacLayoutAndRestores]' passed (1.631 seconds).
 Test Case '-[BillBoxTests.GoldenTests testMacBackupRestoresOnIPhone]' started.
-Test Case '-[BillBoxTests.GoldenTests testMacBackupRestoresOnIPhone]' passed (0.728 seconds).
+Test Case '-[BillBoxTests.GoldenTests testMacBackupRestoresOnIPhone]' passed (0.567 seconds).
 Test Case '-[BillBoxTests.GoldenTests testMergingMacBackupMatchesMac]' started.
-Test Case '-[BillBoxTests.GoldenTests testMergingMacBackupMatchesMac]' passed (0.771 seconds).
+Test Case '-[BillBoxTests.GoldenTests testMergingMacBackupMatchesMac]' passed (0.530 seconds).
 Test Case '-[BillBoxTests.GoldenTests testPdfPageTextMatchesMacWithoutWatermarks]' started.
 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/GoldenTests.swift:108: -[BillBoxTests.GoldenTests testPdfPageTextMatchesMacWithoutWatermarks] : Test skipped - private test files (real supplier bills) not present
 Test Case '-[BillBoxTests.GoldenTests testPdfPageTextMatchesMacWithoutWatermarks]' skipped (0.012 seconds).
 Test Case '-[BillBoxTests.GoldenTests testRandomBillsMatchMac]' started.
-Test Case '-[BillBoxTests.GoldenTests testRandomBillsMatchMac]' passed (2.318 seconds).
+Test Case '-[BillBoxTests.GoldenTests testRandomBillsMatchMac]' passed (1.783 seconds).
 Test Case '-[BillBoxTests.GoldenTests testSingleCompanyFileFromMacMatchesMac]' started.
-Test Case '-[BillBoxTests.GoldenTests testSingleCompanyFileFromMacMatchesMac]' passed (0.188 seconds).
+Test Case '-[BillBoxTests.GoldenTests testSingleCompanyFileFromMacMatchesMac]' passed (0.222 seconds).
 Test Case '-[BillBoxTests.GoldenTests testSupplierBillParserMatchesMac]' started.
 /Users/runner/work/BillBox/BillBox/ios/BillBoxCore/Tests/BillBoxCoreTests/GoldenTests.swift:108: -[BillBoxTests.GoldenTests testSupplierBillParserMatchesMac] : Test skipped - private test files (real supplier bills) not present
-Test Case '-[BillBoxTests.GoldenTests testSupplierBillParserMatchesMac]' skipped (0.002 seconds).
+Test Case '-[BillBoxTests.GoldenTests testSupplierBillParserMatchesMac]' skipped (0.005 seconds).
 Test Case '-[BillBoxTests.GoldenTests testWorkingSessionMatchesMac]' started.
-Test Case '-[BillBoxTests.GoldenTests testWorkingSessionMatchesMac]' passed (0.568 seconds).
-Test Suite 'GoldenTests' passed at 2026-11-01 02:13:45.536.
-	 Executed 8 tests, with 2 tests skipped and 0 failures (0 unexpected) in 6.987 (6.989) seconds
-Test Suite 'SimilarityTests' started at 2026-11-01 02:13:45.537.
+Test Case '-[BillBoxTests.GoldenTests testWorkingSessionMatchesMac]' passed (0.534 seconds).
+Test Suite 'GoldenTests' passed at 2026-11-01 09:48:13.025.
+	 Executed 8 tests, with 2 tests skipped and 0 failures (0 unexpected) in 5.285 (5.286) seconds
+Test Suite 'SimilarityTests' started at 2026-11-01 09:48:13.025.
 Test Case '-[BillBoxTests.SimilarityTests testScoresMatchMac]' started.
-Test Case '-[BillBoxTests.SimilarityTests testScoresMatchMac]' passed (0.004 seconds).
-Test Suite 'SimilarityTests' passed at 2026-11-01 02:13:45.541.
-	 Executed 1 test, with 0 failures (0 unexpected) in 0.004 (0.004) seconds
-Test Suite 'BillBoxTests.xctest' passed at 2026-11-01 02:13:45.542.
-	 Executed 17 tests, with 2 tests skipped and 0 failures (0 unexpected) in 10.480 (10.490) seconds
-Test Suite 'All tests' passed at 2026-11-01 02:13:45.542.
-	 Executed 17 tests, with 2 tests skipped and 0 failures (0 unexpected) in 10.480 (10.493) seconds
-2026-10-31 20:43:46.116 xcodebuild[6520:24674] [MT] IDETestOperationsObserverDebug: 36.453 elapsed -- Testing started completed.
-2026-10-31 20:43:46.116 xcodebuild[6520:24674] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
-2026-10-31 20:43:46.116 xcodebuild[6520:24674] [MT] IDETestOperationsObserverDebug: 36.453 sec, +36.453 sec -- end
+Test Case '-[BillBoxTests.SimilarityTests testScoresMatchMac]' passed (0.002 seconds).
+Test Suite 'SimilarityTests' passed at 2026-11-01 09:48:13.027.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'BillBoxTests.xctest' passed at 2026-11-01 09:48:13.027.
+	 Executed 17 tests, with 2 tests skipped and 0 failures (0 unexpected) in 7.662 (7.670) seconds
+Test Suite 'All tests' passed at 2026-11-01 09:48:13.028.
+	 Executed 17 tests, with 2 tests skipped and 0 failures (0 unexpected) in 7.662 (7.674) seconds
+2026-11-01 04:18:13.556 xcodebuild[7462:27666] [MT] IDETestOperationsObserverDebug: 18.765 elapsed -- Testing started completed.
+2026-11-01 04:18:13.556 xcodebuild[7462:27666] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-11-01 04:18:13.556 xcodebuild[7462:27666] [MT] IDETestOperationsObserverDebug: 18.765 sec, +18.765 sec -- end
 
 Test session results, code coverage, and logs:
-	/Users/runner/work/BillBox/BillBox/build/Logs/Test/Test-BillBox-2026.10.31_20-40-59-+0000.xcresult
+	/Users/runner/work/BillBox/BillBox/build/Logs/Test/Test-BillBox-2026.11.01_04-16-07-+0000.xcresult
 
 ** TEST SUCCEEDED **
 
