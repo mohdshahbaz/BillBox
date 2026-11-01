@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploys website/dist and the licence server (functions/) to Cloudflare Pages project "billbox-app" (billbox-app.pages.dev).
+# Deploys website static assets and the licence server (functions/) to Cloudflare Pages project "billbox-app" (billbox-app.pages.dev).
 # Needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID; copies the licence and Razorpay secrets that are set.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -50,10 +50,21 @@ for s in LICENSE_KEY_LIVE LICENSE_KEY_TEST ADMIN_TOKEN RZP_KEY_ID_LIVE RZP_KEY_S
 done
 rm -f secret.err
 
+# Automatically select 'dist' or 'public' build folder depending on what your build script outputs
+BUILD_DIR="dist"
+[ -d "public" ] && BUILD_DIR="public"
+echo "Deploying build directory: $BUILD_DIR"
+
 step "Deploy ($BRANCH)"
 for i in 1 2 3 4; do
-  npx wrangler pages deploy dist --project-name="${PROJECT_NAME}" 2>&1 | tee deploy.out
-  grep -q 'Rate limited' deploy.out || exit 0
-  echo "rate limited, waiting $((i * 30)) s"; sleep $((i * 30))
+  npx wrangler pages deploy "$BUILD_DIR" --project-name="${PROJECT_NAME}" 2>&1 | tee deploy.log
+  if grep -q 'Rate limited' deploy.log; then
+    echo "rate limited, waiting $((i * 30)) s"; sleep $((i * 30))
+    continue
+  fi
+  if grep -q 'Success' deploy.log || [ ${PIPESTATUS[0]} -eq 0 ]; then
+    exit 0
+  fi
+  break
 done
 exit 1
