@@ -24,6 +24,12 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.9.1 — Half-sheet bills print whole
+
+- Half-sheet bills (A4 cut in two / A5) are sent to the printer as portrait pages with the bill turned onto them, on
+  iPhone, Mac and Android. Before, many printers printed the landscape page upright and cut off the right half of the
+  bill (HSN, quantities, rates and amounts missing).
+
 ## v15.9 — Busy and Bizom bill designs, more themes, accent colours
 
 - **Two more bill designs** (Settings › Printing › Bill design), on iPhone, Mac and Android:

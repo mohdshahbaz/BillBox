@@ -17,12 +17,12 @@ open class Paint(flags: Int = 0) {
     fun measureText(text: String): Float = 0f
     val fontMetrics: FontMetrics get() = FontMetrics()
     class FontMetrics { @JvmField var ascent = 0f; @JvmField var descent = 0f }
-    companion object { const val ANTI_ALIAS_FLAG = 1; const val LINEAR_TEXT_FLAG = 64; const val SUBPIXEL_TEXT_FLAG = 128 }
+    companion object { const val ANTI_ALIAS_FLAG = 1; const val FILTER_BITMAP_FLAG = 2; const val LINEAR_TEXT_FLAG = 64; const val SUBPIXEL_TEXT_FLAG = 128 }
 }
 open class PathEffect
 class DashPathEffect(intervals: FloatArray, phase: Float) : PathEffect()
 class RectF(left: Float, top: Float, right: Float, bottom: Float)
-class Rect { val left = 0; val top = 0; fun centerY(): Int = 0; fun height(): Int = 0 }
+class Rect(l: Int = 0, t: Int = 0, r: Int = 0, b: Int = 0) { val left = 0; val top = 0; fun centerY(): Int = 0; fun height(): Int = 0 }
 class Typeface { companion object { const val NORMAL = 0; const val BOLD = 1; val DEFAULT: Typeface = Typeface(); val SERIF: Typeface = Typeface(); fun create(family: Typeface?, style: Int): Typeface = Typeface(); fun create(family: String?, style: Int): Typeface = Typeface() } }
 object Color { const val WHITE = -1; const val BLACK = -16777216; fun argb(a: Int, r: Int, g: Int, b: Int): Int = 0 }
 class Canvas {
@@ -31,6 +31,7 @@ class Canvas {
     fun drawLine(x1: Float, y1: Float, x2: Float, y2: Float, paint: Paint) {}
     fun drawRect(r: RectF, paint: Paint) {}
     fun save(): Int = 0; fun restore() {}; fun translate(dx: Float, dy: Float) {}
+    fun rotate(degrees: Float) {}; fun drawBitmap(b: Bitmap, src: Rect?, dst: RectF, paint: Paint?) {}
 }
 class ImageDecoder {
     class Source

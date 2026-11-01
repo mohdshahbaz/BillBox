@@ -805,7 +805,10 @@ func runPrint(_ pdf: PDFDocument, jobName: String, silent: Bool, done: ((Bool) -
     let info = UIPrintInfo(dictionary: nil)
     info.outputType = .general
     info.jobName = jobName
-    info.orientation = size.width > size.height ? .landscape : .portrait
+    // always portrait: a half-sheet bill is turned a quarter onto the portrait A5 / half-A4 paper by PDFFitRenderer.
+    // Asking for landscape made many printers (and printers shared from a PC or Mac) print it upright and cut off the
+    // right half of the bill.
+    info.orientation = .portrait
     pc.printInfo = info
     let chooser = PaperChooser(pageSize: size)
     PaperChooser.current = chooser

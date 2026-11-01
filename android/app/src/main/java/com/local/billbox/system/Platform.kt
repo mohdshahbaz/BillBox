@@ -227,8 +227,46 @@ object Platform {
         try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) {}
     }
 
+    /**
+     * A landscape bill (half sheet) turned a quarter onto portrait pages, for printing: many printers print a landscape
+     * page upright on A5 paper and cut off the right half of the bill. Drawn at 300 dpi, so the print stays sharp.
+     */
+    private fun portraitForPrint(pdf: File): File {
+        val fd = ParcelFileDescriptor.open(pdf, ParcelFileDescriptor.MODE_READ_ONLY)
+        val r = android.graphics.pdf.PdfRenderer(fd)
+        try {
+            if (r.pageCount == 0) return pdf
+            val first = r.openPage(0); val landscape = first.width > first.height; first.close()
+            if (!landscape) return pdf
+            val out = android.graphics.pdf.PdfDocument()
+            for (i in 0 until r.pageCount) {
+                val pg = r.openPage(i)
+                val w = pg.width; val h = pg.height                      // points
+                val k = 300f / 72f
+                val bmp = Bitmap.createBitmap((w * k).toInt(), (h * k).toInt(), Bitmap.Config.ARGB_8888)
+                bmp.eraseColor(android.graphics.Color.WHITE)
+                pg.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                pg.close()
+                val op = out.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(h, w, i + 1).create())
+                val c = op.canvas
+                c.translate(h.toFloat(), 0f)
+                c.rotate(90f)
+                c.drawBitmap(bmp, android.graphics.Rect(0, 0, bmp.width, bmp.height), android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()), android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+                out.finishPage(op)
+                bmp.recycle()
+            }
+            val f = File(pdf.parentFile, "print-" + pdf.name)
+            FileOutputStream(f).use { out.writeTo(it) }
+            out.close()
+            return f
+        } catch (_: Exception) {
+            return pdf
+        } finally { r.close(); fd.close() }
+    }
+
     /** Sends a ready PDF to Android's print service (any printer, or Save as PDF). */
-    fun print(pdf: File, jobName: String) {
+    fun print(source: File, jobName: String) {
+        val pdf = portraitForPrint(source)
         val pm = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
         pm.print(jobName, object : PrintDocumentAdapter() {
             override fun onLayout(old: PrintAttributes?, new: PrintAttributes?, cancel: CancellationSignal?, cb: LayoutResultCallback, extras: android.os.Bundle?) {

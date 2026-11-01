@@ -847,8 +847,10 @@ func runPrint(_ pdf: PDFDocument, printer: String, silent: Bool) -> Bool {
     // The page already carries its own white margin, so it is printed at its real size.
     let size = pdf.page(at: 0)?.bounds(for: .mediaBox).size ?? Paper.a4
     if size.width > size.height {
+        // portrait A5 with the bill turned onto it (autoRotate below): asking for landscape made some printers print the
+        // page upright and cut off the right half of the bill
         info.paperSize = Paper.a5
-        info.orientation = .landscape
+        info.orientation = .portrait
     } else {
         info.paperSize = Paper.a4
         info.orientation = .portrait
