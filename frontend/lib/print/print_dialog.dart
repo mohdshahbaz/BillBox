@@ -73,7 +73,8 @@ Future<List<Printer>> _printers() async {
   }
 }
 
-PdfPageFormat _formatFor(PrintLayout l) => l == PrintLayout.a4TwoUp ? Geo.a4Format : Geo.halfFormat;
+// Every layout is now built on A4 pages (half-sheet copies sit at the top of the page).
+PdfPageFormat _formatFor(PrintLayout l) => Geo.a4Format;
 
 Future<void> _send(PrintJob job, Printer printer, PrintLayout layout) async {
   try {
@@ -139,20 +140,24 @@ class _PrintManagerState extends State<PrintManager> {
     final bytes = await pdf;
     await _savePrefs();
     final title = widget.title;
+    var sent = false;
     if (printer != null && direct) {
       final job = PrintJobs.instance.add(title, printer!.name, layout.name, copies, bytes);
       await _send(job, printer!, layout);
-      if (mounted && job.status == JobStatus.done) toast(context, 'Printed on ${printer!.name}');
+      sent = job.status == JobStatus.done;
+      if (sent && mounted) toast(context, 'Printed on ${printer!.name}');
     } else {
       // Platforms without direct printing fall back to the system print sheet.
       final job = PrintJobs.instance.add(title, 'System print sheet', layout.name, copies, bytes);
       try {
-        await Printing.layoutPdf(onLayout: (_) async => bytes, name: title, format: _formatFor(layout));
+        sent = await Printing.layoutPdf(onLayout: (_) async => bytes, name: title, format: _formatFor(layout));
         PrintJobs.instance.update(job, JobStatus.done);
       } catch (e) {
         PrintJobs.instance.update(job, JobStatus.failed, '$e');
       }
     }
+    // Printed: close the print dialog. On failure or a cancelled system sheet it stays open so the error / retry is visible.
+    if (sent && mounted) Navigator.of(context).pop();
   }
 
   @override

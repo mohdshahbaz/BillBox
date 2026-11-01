@@ -6,9 +6,9 @@
 /// "continued" header, and the totals block goes only on the last sheet of each copy.
 ///
 /// Layouts:
-///   halfSheets : ORIGINAL pages, then DUPLICATE pages, each page = one half-A4 sheet
+///   halfSheets : ORIGINAL pages, then DUPLICATE pages. Each copy sits at the TOP of its own A4 page (lower half blank)
 ///   a4TwoUp    : A4 sheets, ORIGINAL in the top half, DUPLICATE in the bottom half (same page number), cut line between
-///   single     : ORIGINAL only, half-A4
+///   single     : ORIGINAL only, at the top of an A4 page
 import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -20,9 +20,9 @@ enum PrintLayout { halfSheets, a4TwoUp, single }
 
 extension PrintLayoutInfo on PrintLayout {
   String get label => switch (this) {
-        PrintLayout.halfSheets => 'Half-A4 sheets: Original + Duplicate, one copy per sheet',
+        PrintLayout.halfSheets => 'Half-A4 copies: Original on page 1, Duplicate on next page (both at top)',
         PrintLayout.a4TwoUp => 'A4 sheet: Original on top, Duplicate below',
-        PrintLayout.single => 'Half-A4: Original copy only',
+        PrintLayout.single => 'Half-A4: Original copy only (at top of page)',
       };
   static PrintLayout parse(String? s) => PrintLayout.values.firstWhere((l) => l.name == s, orElse: () => PrintLayout.halfSheets);
 }
@@ -62,6 +62,18 @@ List<List<int>> paginate(int n) {
   }
   return pages;
 }
+
+/// One half-A4 copy per A4 page, pinned to the top edge (the lower half of the page stays blank), so the
+/// original prints at the top of page 1 and the duplicate at the top of the next page.
+pw.Page a4TopPage(pw.Widget sheet) => pw.Page(
+      pageFormat: Geo.a4Format,
+      margin: pw.EdgeInsets.zero,
+      build: (_) => pw.Column(
+        mainAxisAlignment: pw.MainAxisAlignment.start,
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [sheet],
+      ),
+    );
 
 final _money = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: 2);
 num _n(dynamic v) => v is num ? v : (num.tryParse('${v ?? ''}') ?? 0);
@@ -333,7 +345,7 @@ Future<Uint8List> buildInvoicePdf(Json inv, Json co, PrintLayout layout) async {
     final copies = layout == PrintLayout.single ? [copyLabels[0]] : copyLabels;
     for (final copy in copies) {
       for (var p = 0; p < pages.length; p++) {
-        doc.addPage(pw.Page(pageFormat: Geo.halfFormat, margin: pw.EdgeInsets.zero, build: (_) => sheet(copy, p)));
+        doc.addPage(a4TopPage(sheet(copy, p)));
       }
     }
   }
