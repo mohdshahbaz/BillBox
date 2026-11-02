@@ -210,7 +210,49 @@ pw.Widget _headNext(Json inv, Json co, String copy) => pw.SizedBox(
       ]),
     );
 
-pw.Widget _totals(Json inv) {
+/// The bank details as (label, value) rows: Bank, A/c name, A/c no., IFSC, Branch, Address (empty ones left out).
+List<List<String>> _bankRows(Json co) {
+  if ('${co['print_bank_block'] ?? ''}' == '0') return [];
+  String v(String k) => '${co[k] ?? ''}'.trim();
+  final code = v('bank_branch_code');
+  final branch = v('bank_branch') + (code.isEmpty ? '' : (v('bank_branch').isEmpty ? 'Code $code' : ' ($code)'));
+  return [
+    ['Bank', v('bank_name')],
+    ['A/c name', v('bank_ac_name')],
+    ['A/c no.', v('bank_ac_no')],
+    ['IFSC', v('bank_ifsc')],
+    ['Branch', branch],
+    ['Address', v('bank_address')],
+  ].where((r) => r[1].isNotEmpty).toList();
+}
+
+/// The bank details as a small table above "Amount in words": labels in one column, a tab, values in the next, lined up.
+/// [room] is the height left in the totals band; rows that do not fit are left off.
+pw.Widget _bankTab(Json co, double room) {
+  const lh = 7.2;
+  final all = _bankRows(co);
+  if (all.isEmpty) return pw.SizedBox();
+  final heading = room >= (all.length + 1) * lh + 3;
+  final fit = ((room - 3 - (heading ? lh : 0)) / lh).floor().clamp(0, all.length);
+  if (fit == 0) return pw.SizedBox();
+  return pw.Padding(
+    padding: const pw.EdgeInsets.only(top: 3),
+    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      if (heading) pw.SizedBox(height: lh, child: pw.Text('BANK DETAILS', style: _s(5.5, bold: true))),
+      for (final r in all.take(fit))
+        pw.SizedBox(
+          height: lh,
+          child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.SizedBox(width: 38, child: pw.Text('${r[0]}:', style: _s(6, bold: true), maxLines: 1)),
+            pw.SizedBox(width: 4),
+            pw.Expanded(child: pw.Text(r[1], style: _s(6.5), maxLines: 1)),
+          ]),
+        ),
+    ]),
+  );
+}
+
+pw.Widget _totals(Json inv, Json co) {
   final intra = inv['supply'] != 'INTER';
   final g = (inv['gst_summary'] as List).cast<Json>().take(6).toList();
   pw.Widget srow(List<String> v, {bool bold = false}) => pw.SizedBox(
@@ -233,6 +275,8 @@ pw.Widget _totals(Json inv) {
         ]),
       );
   final due = _n(inv['total']) - _n(inv['paid']);
+  // room left in the left column once the GST rows and "Amount in words" (two lines) have their height
+  final bankRoom = Geo.totals - 3 - (9.0 * (1 + g.length) + 3 + 16);
   return pw.SizedBox(
     height: Geo.totals,
     child: pw.Container(
@@ -243,6 +287,7 @@ pw.Widget _totals(Json inv) {
           child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
             srow(['GST %', 'Taxable', intra ? 'CGST' : 'IGST', if (intra) 'SGST'], bold: true),
             for (final x in g) srow(['${_n(x['rate'])}%', _m(x['taxable']), intra ? _m(x['cgst']) : _m(x['igst']), if (intra) _m(x['sgst'])]),
+            _bankTab(co, bankRoom),
             pw.SizedBox(height: 3),
             pw.Text('Amount in words: ${inv['amount_words']}', style: _s(6.5), maxLines: 2),
           ]),
@@ -308,7 +353,7 @@ pw.Widget _sheet(Json inv, Json co, String copy, List<Json> rows, int startNo, i
         ),
         for (var i = 0; i < rows.length; i++) _row(startNo + i + 1, rows[i]),
         pw.Spacer(),
-        if (last) _totals(inv),
+        if (last) _totals(inv, co),
         _foot(inv, co, copy, page, pages),
       ]),
     ),

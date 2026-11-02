@@ -78,10 +78,9 @@ data class Spec(val w: Float, val h: Float, val m: Float, val rowH: Float, val t
         if (abs(inv.num("round_off")) > 0) n += 1
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) n += 1
         val right = 4 + n * 9f * f + 4 + 19f * f
-        var left = 8f
-        if (on("print_gst_table")) left += (maxOf(1, inv.list("gst_summary").size) + 1) * 8.5f * f + 1
-        if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) left += 10f * f
-        if (on("print_words")) left += 8f * f + 18f * f
+        var left = leftOther(co, inv, f)
+        val bankH = bankTabHeight(co, f)
+        if (bankH > 0f && left + bankH + 2 <= totals) left += bankH   // the bank block rides in this room when it fits
         return copy(totals = minOf(totals, ceil(maxOf(right, left) + 2)))
     }
     fun withBankBlock(co: J): Spec {
@@ -126,6 +125,22 @@ fun bankLine(pen: Pen, pairs: List<Pair<String, String>>, x: Float, top: Float, 
     var cx = x
     for ((t, wt) in parts) { if (cx >= x + w) break; cx += pen.text(t, cx, top, x + w - cx, h, size * k, wt, minScale = 1f) }
 }
+
+/** The bank details as (label, value) rows for the aligned block above "Amount in words": Bank, A/c name, A/c no., IFSC, Branch, Address. */
+fun bankTabRows(co: J): List<Pair<String, String>> = bankLines(co).flatten().map { (k, v) -> (if (k.isEmpty()) "Address" else k) to v }
+/** Height of that block: a small heading and one line per row. */
+fun bankTabHeight(co: J, fs: Float): Float = bankTabRows(co).let { if (it.isEmpty()) 0f else (it.size + 1) * 7.6f * fs + 3f }
+/** Height the left side of the totals band already needs without the bank block (GST table, balance, amount in words). */
+fun leftOther(co: J, inv: J, f: Float): Float {
+    fun on(k: String) = co.str(k).isEmpty() || co.str(k) != "0"
+    var left = 8f
+    if (on("print_gst_table")) left += (maxOf(1, inv.list("gst_summary").size) + 1) * 8.5f * f + 1
+    if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) left += 10f * f
+    if (on("print_words")) left += 8f * f + 18f * f
+    return left
+}
+/** True when the bank block fits in the totals band of this page design (otherwise the bank lines stay in the footer). */
+fun bankTabFits(co: J, inv: J, g: Spec): Boolean { val h = bankTabHeight(co, g.fs); return h > 0f && leftOther(co, inv, g.fs) + h + 2 <= g.totals + 0.5f }
 
 /** Splits n item rows into pages (always at least one page). */
 fun paginate(n: Int, g: Spec): List<IntRange> {
@@ -220,6 +235,8 @@ class PdfBuilder {
 
 /** One copy of a bill (or debit note) on one page, inside one ruled frame, at (ox, oy). */
 class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pages: Int, val copy: String, val g: Spec) {
+    /** The bank details sit in the totals band, left of the totals, on the last page when they fit there. */
+    private val bankTab = page == pages - 1 && bankTabFits(co, inv, g)
     private val first = page == 0
     private val last = page == pages - 1
     private val docTitle = inv.str("doc_title").ifEmpty { co.str("print_title").ifEmpty { "TAX INVOICE" }.uppercase() }
@@ -380,6 +397,17 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
                 ly += rowH
             }
         }
+        if (bankTab) {
+            // the bank details as a small table: labels in one column, a tab, the values in the next, lined up under each other
+            val lh = 7.6f * fs; val labW = 38f * g.cw
+            var by = ly + (if (on("print_gst_table")) 3f else 0f)
+            pen.text("BANK DETAILS", lx, by, 120f, lh, 6f * fs, 700, color = MUTED, minScale = 1f); by += lh
+            for ((k, v) in bankTabRows(co)) {
+                pen.text("$k:", lx, by, labW, lh, 6.5f * fs, 700, minScale = 0.7f)
+                pen.text(v, lx + labW + 4f, by, w - rightW - 12 - labW - 4f, lh, 7f * fs, 600, minScale = 0.6f)
+                by += lh
+            }
+        }
         val wordsTop = y + g.totals - 4 - 8f * fs - 18f * fs
         if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) {
             val by = if (on("print_words")) wordsTop - 10f * fs else y + g.totals - 14f * fs
@@ -415,7 +443,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
 
     private fun footer(pen: Pen, x: Float, y: Float, w: Float) {
         val top = y + 3
-        val bankL = bankLines(co)
+        val bankL = if (bankTab) emptyList() else bankLines(co)
         val sigW = if (bankL.isEmpty()) w / 3 else 130 * g.cw
         val leftW = if (bankL.isEmpty()) w / 3 * 1.3f else (w - sigW) * 0.42f
         val pay = co.str("print_bank")

@@ -83,11 +83,9 @@ struct Spec {
         if abs(inv.num("round_off")) > 0 { n += 1 }
         if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { n += 1 }
         let right = CGFloat(n) * 9 * f + 6 + 17 * f
-        let rates = max(1, inv.list("gst_summary").count)
-        var left: CGFloat = 8
-        if on("print_gst_table") { left += CGFloat(rates + 1) * 8.6 * f + 3 }
-        if co.str("print_balance") == "1" && inv.has("party_prev_balance") { left += 9 * f }
-        if on("print_words") { left += 7 * f + 2 * 9.2 * f }
+        var left = leftOther(co, inv, f)
+        let bankH = bankTabHeight(co, f)
+        if bankH > 0 && left + bankH + 2 <= totals { left += bankH }   // the bank block rides in this room when it fits
         let need = (max(right, left) + 2).rounded(.up)
         return Spec(w: w, h: h, m: m, rowH: rowH, tableHead: tableHead, foot: foot, totals: min(totals, need),
                     strip: strip, sellerBand: sellerBand, buyerBand: buyerBand, headNext: headNext, fs: fs, cw: cw)
@@ -141,6 +139,22 @@ func bankLineText(_ pairs: [(String, String)], size: CGFloat, serif: Bool = fals
     }
     return t
 }
+
+/// The bank details as (label, value) rows for the aligned block above "Amount in words": Bank, A/c name, A/c no., IFSC, Branch, Address.
+func bankTabRows(_ co: JSON) -> [(String, String)] { bankLines(co).flatMap { $0 }.map { ($0.0.isEmpty ? "Address" : $0.0, $0.1) } }
+/// Height of that block: a small heading and one line per row.
+func bankTabHeight(_ co: JSON, _ fs: CGFloat) -> CGFloat { let n = bankTabRows(co).count; return n == 0 ? 0 : CGFloat(n + 1) * 7.6 * fs + 3 }
+/// Height the left side of the totals band already needs without the bank block (GST table, balance, amount in words).
+func leftOther(_ co: JSON, _ inv: JSON, _ f: CGFloat) -> CGFloat {
+    func on(_ k: String) -> Bool { co.str(k).isEmpty || co.str(k) != "0" }
+    var left: CGFloat = 8
+    if on("print_gst_table") { left += CGFloat(max(1, inv.list("gst_summary").count) + 1) * 8.6 * f + 3 }
+    if co.str("print_balance") == "1" && inv.has("party_prev_balance") { left += 9 * f }
+    if on("print_words") { left += 7 * f + 2 * 9.2 * f }
+    return left
+}
+/// True when the bank block fits in the totals band of this page design (otherwise the bank lines stay in the footer).
+func bankTabFits(_ co: JSON, _ inv: JSON, _ g: Spec) -> Bool { let h = bankTabHeight(co, g.fs); return h > 0 && leftOther(co, inv, g.fs) + h + 2 <= g.totals + 0.5 }
 
 func bankRows(_ co: JSON) -> [(String, String)] {
     if co.str("print_bank_block") == "0" { return [] }
@@ -432,6 +446,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
         HStack(alignment: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 1.5) {
                 if on("print_gst_table") { gstTable }
+                if bankTab { bankTabBlock.padding(.top, on("print_gst_table") ? 2 : 0) }
                 Spacer(minLength: 2)
                 if co.str("print_balance") == "1" && inv.has("party_prev_balance") {
                     t("Previous balance \(balanceText(inv.num("party_prev_balance")))   ·   This bill \(Fmt.money(inv.num("total") - inv.num("paid")))   ·   Now due \(balanceText(inv.num("party_balance_after")))", 6.5, weight: .semibold)
@@ -450,6 +465,23 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                 .overlay(alignment: .leading) { vRule(frameLine) }
         }
         .frame(height: g.totals, alignment: .top)
+    }
+
+    /// The bank details sit in the totals band, left of the totals, on the last page when they fit there.
+    private var bankTab: Bool { page == pages - 1 && bankTabFits(co, inv, g) }
+
+    /// The bank details as a small table: labels in one column, a tab, the values in the next, lined up under each other.
+    private var bankTabBlock: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            t("BANK DETAILS", 6, bold: true).foregroundStyle(muted).frame(height: 7.6 * g.fs, alignment: .leading)
+            ForEach(Array(bankTabRows(co).enumerated()), id: \.offset) { _, r in
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    t(r.0 + ":", 6.5, bold: true).lineLimit(1).minimumScaleFactor(0.7).frame(width: 38 * g.cw, alignment: .leading)
+                    t(r.1, 7, weight: .semibold).lineLimit(1).minimumScaleFactor(0.6)
+                }
+                .frame(height: 7.6 * g.fs, alignment: .leading)
+            }
+        }
     }
 
     /// Bank details, one per line with the labels lined up (BANK NAME:, ACCOUNT NUMBER: …).
@@ -526,7 +558,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
 
     /// Terms (and your own lines) on the left, the bank details in the middle, the company's signature block on the right.
     private var footer: some View {
-        let bank = bankLines(co)
+        let bank: [[(String, String)]] = bankTab ? [] : bankLines(co)
         // fixed shares of the width, so long bank lines can never push the terms or the signature off the page
         let W = g.w - 2 * g.m - 4
         let sigW: CGFloat = bank.isEmpty ? (W - 16) / 3 : 130 * g.cw

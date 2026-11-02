@@ -134,6 +134,7 @@ enum WhatsApp {
             }
             if !web.connected {
                 Section {
+                    Button { Task { await web.linkOnThisPhone() } } label: { Label("Link with QR code (opens WhatsApp)", systemImage: "qrcode") }
                     Field("Your WhatsApp number", text: $linkNumber, prompt: Text("10-digit mobile")).keyboardType(.phonePad)
                     Button("Link with phone number") { Task { await web.linkWithPhone(linkNumber, countryCode: cc) } }
                         .disabled(linkNumber.filter(\.isNumber).count < 10)
@@ -141,7 +142,7 @@ enum WhatsApp {
                         Text(web.linkCode).font(.system(size: 34, weight: .bold, design: .monospaced)).frame(maxWidth: .infinity).textSelection(.enabled)
                     }
                 } header: { Text("WhatsApp is on this iPhone?") } footer: {
-                    Text("A QR code can't be scanned by the same phone that shows it. Instead: type your WhatsApp number and tap Link with phone number. BillBox shows an 8-letter code. Then in WhatsApp: Settings › Linked devices › Link a device › Link with phone number instead, and type the code (WhatsApp usually also shows a notification for it). BillBox connects by itself once the code is accepted.")
+                    Text("Link with QR code: BillBox saves the QR code to Photos and opens WhatsApp. There go to Settings › Linked devices › Link a device, tap the photo button on the scanner and pick the newest picture; BillBox connects by itself. If your WhatsApp has no photo button, or the code has expired, use the phone number way: type your WhatsApp number and tap Link with phone number. BillBox shows an 8-letter code. Then in WhatsApp: Settings › Linked devices › Link a device › Link with phone number instead, and type the code (WhatsApp usually also shows a notification for it). BillBox connects by itself once the code is accepted.")
                 }
             }
             Section {
