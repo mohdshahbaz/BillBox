@@ -5,7 +5,7 @@ const assert = require('assert');
 const db = require('../src/db');
 const { buildInvoice, createInvoice, updateInvoice, deleteInvoice, getInvoice } = require('../src/services/billing');
 const { createPurchase, updatePurchase, deletePurchase, previewPurchase, getPurchase } = require('../src/services/purchases');
-const { recordVoucher, getVoucher } = require('../src/services/vouchers');
+const { recordVoucher, getVoucher, deleteLedgerEntry } = require('../src/services/vouchers');
 const { buildXlsx } = require('../src/utils/xlsx');
 const { parseInvoicePages, parseInvoiceText, packFromName, mrpFromName } = require('../src/services/pdfParser');
 const { createMissing } = require('../src/services/autoCreate');
@@ -156,6 +156,39 @@ db.withCompany(id1, () => {
     const r = recordVoucher({ party_id: sup.id, direction: 'PAID', amount: 100, mode: 'CASH' });
     assert.ok(r.voucher_no.startsWith('PAY/'));
     assert.strictEqual(r.balance, Math.round((b0 + 100) * 100) / 100);
+  });
+  ok('a receipt can be deleted from the ledger: balance and receipts table go back', () => {
+    const p = party('Gupta General Store');
+    const before = bal(p.id), rc = db.prepare('SELECT COUNT(*) n FROM receipts').get().n;
+    const r = recordVoucher({ party_id: p.id, direction: 'RECEIVED', amount: 250, mode: 'CASH' });
+    assert.strictEqual(Math.round((before - bal(p.id)) * 100) / 100, 250);
+    const line = db.prepare("SELECT id FROM ledger WHERE type='RECEIPT' AND ref_no=?").get(r.voucher_no);
+    const d = deleteLedgerEntry(line.id);
+    assert.strictEqual(d.ok, true);
+    assert.strictEqual(Math.round(bal(p.id) * 100) / 100, Math.round(before * 100) / 100);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) n FROM receipts').get().n, rc);
+  });
+  ok('a supplier payment can be deleted from the ledger', () => {
+    const sup = db.prepare("SELECT * FROM parties WHERE type='SUPPLIER' LIMIT 1").get();
+    const before = bal(sup.id), pc = db.prepare('SELECT COUNT(*) n FROM payments').get().n;
+    const r = recordVoucher({ party_id: sup.id, direction: 'PAID', amount: 75, mode: 'CASH' });
+    deleteLedgerEntry(db.prepare("SELECT id FROM ledger WHERE type='PAYMENT' AND ref_no=?").get(r.voucher_no).id);
+    assert.strictEqual(Math.round(bal(sup.id) * 100) / 100, Math.round(before * 100) / 100);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) n FROM payments').get().n, pc);
+  });
+  ok('a payment taken at billing, deleted from the ledger, lowers the bill\'s paid amount', () => {
+    const p = party('Gupta General Store');
+    const id = createInvoice({ party_id: p.id, pay_mode: 'CASH', lines: [{ item_id: item('BEV001').id, boxes: 0, pcs: 5 }] });
+    const inv = db.prepare('SELECT total, paid FROM invoices WHERE id=?').get(id);
+    assert.ok(inv.paid > 0);
+    const line = db.prepare("SELECT l.id FROM ledger l JOIN receipts r ON r.receipt_no=l.ref_no WHERE r.invoice_id=? AND l.type='RECEIPT'").get(id);
+    deleteLedgerEntry(line.id);
+    assert.strictEqual(db.prepare('SELECT paid FROM invoices WHERE id=?').get(id).paid, 0);
+  });
+  ok('a bill\'s own ledger line cannot be deleted from the ledger', () => {
+    const line = db.prepare("SELECT id FROM ledger WHERE type='INVOICE' LIMIT 1").get();
+    assert.ok(throws(() => deleteLedgerEntry(line.id), 400));
+    assert.ok(throws(() => deleteLedgerEntry(99999999), 404));
   });
   ok('voucher details for printing include amount in words', () => {
     const r = recordVoucher({ party_id: party('Gupta General Store').id, direction: 'RECEIVED', amount: 1000, mode: 'UPI' });

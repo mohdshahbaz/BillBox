@@ -112,6 +112,9 @@ fun PartiesScreen() {
     var creating by remember { mutableStateOf(false) }
     var ledgerFor by remember { mutableStateOf<J?>(null) }
     var voucherFor by remember { mutableStateOf<J?>(null) }
+    // set when "Record receipt / payment" was started from the ledger: the ledger opens again afterwards, on the year of the new line
+    var ledgerReturn by remember { mutableStateOf<J?>(null) }
+    var ledgerYear by remember { mutableStateOf("") }
     var photo by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<J?>(null) }
     var confirmBulk by remember { mutableStateOf(false) }
@@ -143,9 +146,9 @@ fun PartiesScreen() {
                 else if (parties.isEmpty()) EmptyState(if (supplier) "No suppliers" else "No customers", if (supplier) "Suppliers are added automatically when you scan their bill." else "Add your first customer.", Icons.Default.People)
                 else DataTable(parties, "parties", phone = listOf("name", "balance", "contact", "type"), selected = selection.toSet(), keyOf = { it.id }, selecting = selecting,
                     onToggle = { p -> if (p.id in selection) selection.remove(p.id) else selection.add(p.id) },
-                    onOpen = { ledgerFor = it },
+                    onOpen = { ledgerYear = ""; ledgerFor = it },
                     menu = { p -> listOfNotNull(
-                        RowAction("Ledger…", Icons.AutoMirrored.Filled.List) { ledgerFor = p },
+                        RowAction("Ledger…", Icons.AutoMirrored.Filled.List) { ledgerYear = ""; ledgerFor = p },
                         RowAction(if (supplier) "Record payment…" else "Record receipt…", Icons.Default.CurrencyRupee) { voucherFor = p },
                         if (selection.size > 1 && p.id in selection) RowAction("Delete ${selection.size} selected…", Icons.Default.Delete, true) { confirmBulk = true } else null,
                         RowAction("Edit…", Icons.Default.Edit) { editing = p },
@@ -171,8 +174,10 @@ fun PartiesScreen() {
 
     if (creating) PartyForm(null, if (supplier) "SUPPLIER" else "RETAILER", routes, salesmen, { creating = false }) { load() }
     editing?.let { p -> PartyForm(p, "RETAILER", routes, salesmen, { editing = null }) { load() } }
-    ledgerFor?.let { p -> LedgerDialog(p, { ledgerFor = null }) { ledgerFor = null; voucherFor = p } }
-    voucherFor?.let { p -> VoucherForm(p, { voucherFor = null }) { load() } }
+    ledgerFor?.let { p -> LedgerDialog(p, { ledgerFor = null }, ledgerYear, { load() }) { ledgerReturn = p; ledgerYear = ""; ledgerFor = null; voucherFor = p } }
+    voucherFor?.let { p ->
+        VoucherForm(p, { voucherFor = null; ledgerReturn?.let { r -> ledgerReturn = null; ledgerFor = r } }, { d -> ledgerYear = fyLabelOf(d) }) { load() }
+    }
     if (photo) PaymentPhotoDialog({ photo = false }) { load() }
     deleteTarget?.let { t ->
         Confirm("Delete ${t.str("name")}?", "Parties with bills or ledger entries are archived instead.", "Delete", {
@@ -286,13 +291,27 @@ fun PartyForm(party: J?, defaultType: String, routes: List<J>, salesmen: List<J>
     }
 }
 
+/** "2026-27" for a date like 2026-11-02 (the financial year runs 1 April to 31 March). */
+private fun fyLabelOf(iso: String): String {
+    val q = iso.split("-")
+    val y = q.getOrNull(0)?.toIntOrNull() ?: return ""
+    val m = q.getOrNull(1)?.toIntOrNull() ?: return ""
+    val s = if (m >= 4) y else y - 1
+    return "$s-${"%02d".format((s + 1) % 100)}"
+}
+
 @Composable
-fun LedgerDialog(party: J, onDismiss: () -> Unit, onVoucher: () -> Unit) {
+fun LedgerDialog(party: J, onDismiss: () -> Unit, initialYear: String = "", onChanged: suspend () -> Unit = {}, onVoucher: () -> Unit) {
     val app = LocalApp.current
     var data by remember { mutableStateOf<J?>(null) }
     // the financial year shown; earlier years too
-    var year by remember { mutableStateOf(app.fyLabel) }
-    LaunchedEffect(party.id, year) { data = null; app.guarded { data = try { app.ledger(party, year) } catch (e: Exception) { app.notify(e.message ?: "", true); J() } } }
+    var year by remember { mutableStateOf(initialYear.ifEmpty { app.fyLabel }) }
+    var reload by remember { mutableStateOf(0) }
+    var deleteTarget by remember { mutableStateOf<J?>(null) }
+    // receipts, payments and opening balances can be deleted here; a bill's own line is removed by deleting or editing the bill
+    fun deletable(e: J) = e.str("type") in listOf("RECEIPT", "PAYMENT", "OPENING")
+    fun askDelete(e: J) { if (deletable(e)) deleteTarget = e else app.notify("That line belongs to a bill. Delete or edit the bill to remove it.") }
+    LaunchedEffect(party.id, year, reload) { data = null; app.guarded { data = try { app.ledger(party, year) } catch (e: Exception) { app.notify(e.message ?: "", true); J() } } }
     val entries = data?.list("entries") ?: emptyList()
     val bal = data?.num("balance") ?: 0.0
     InfoDialog("${party.str("name")} · ledger · FY $year", onDismiss, scroll = false, actions = {
@@ -308,7 +327,8 @@ fun LedgerDialog(party: J, onDismiss: () -> Unit, onVoucher: () -> Unit) {
         data?.let { d -> if (kotlin.math.abs(d.num("opening_balance")) > 0.005) Hint("Opening balance for FY $year, brought forward from earlier years: ${balanceText(d.num("opening_balance"))}") }
         OutlinedButton(onClick = onVoucher) { Icon(Icons.Default.CurrencyRupee, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Record receipt / payment") }
         Box(Modifier.weight(1f)) {
-            if (data == null) Loading() else DataTable(entries, "ledger", columns = listOf(
+            if (data == null) Loading() else DataTable(entries, "ledger", onOpen = { askDelete(it) },
+                menu = { e -> listOfNotNull(if (deletable(e)) RowAction("Delete this line…", Icons.Default.Delete, true) { askDelete(e) } else null) }, columns = listOf(
                 Col("Date", "date", 95) { r -> Cell(Fmt.dmy(r.str("date"))) },
                 Col("Type", "type", 90) { r -> Cell(r.str("type")) },
                 Col("Reference", "ref", 120) { r -> Cell(r.str("ref_no")) },
@@ -318,12 +338,24 @@ fun LedgerDialog(party: J, onDismiss: () -> Unit, onVoucher: () -> Unit) {
                 Col("Balance", "balance", 120, end = true) { r -> Cell(balanceText(r.num("balance")), bold = true, end = true) },
             ))
         }
-        Hint("Dr = they owe you. Cr = you owe them.")
+        Hint("Dr = they owe you. Cr = you owe them. Tap a receipt, payment or opening line to delete it.")
+    }
+    deleteTarget?.let { t ->
+        val amt = if (t.num("credit") > 0) t.num("credit") else t.num("debit")
+        Confirm("Delete ${t.str("type").lowercase()} ${t.str("ref_no")} · ${Fmt.money(amt)}?", "The voucher behind it is removed too and the balance is worked out again. This cannot be undone.", "Delete", {
+            app.launch {
+                val book = app.yearChoices.firstOrNull { it.label == year }?.bookId
+                Api.obj("DELETE", "/ledger/${t.id}", company = if (book == app.companyId) null else book)
+                app.notify("Deleted ${t.str("type").lowercase()} ${t.str("ref_no")}.")
+                reload++
+                onChanged()
+            }
+        }, { deleteTarget = null }, destructive = true)
     }
 }
 
 @Composable
-fun VoucherForm(party: J, onDismiss: () -> Unit, done: suspend () -> Unit) {
+fun VoucherForm(party: J, onDismiss: () -> Unit, saved: (String) -> Unit = {}, done: suspend () -> Unit) {
     val app = LocalApp.current
     val supplier = party.str("type") == "SUPPLIER"
     var direction by remember { mutableStateOf(if (supplier) "PAID" else "RECEIVED") }
@@ -336,6 +368,7 @@ fun VoucherForm(party: J, onDismiss: () -> Unit, done: suspend () -> Unit) {
         canSave = (amount.toDoubleOrNull() ?: 0.0) > 0, onSave = {
             val r = Api.obj("POST", "/vouchers", body = mapOf("party_id" to party.id.toString(), "direction" to direction, "amount" to amount, "mode" to mode, "date" to date, "reference" to reference))
             app.notify("Saved ${r.str("voucher_no")}.")
+            saved(date)
             done()
             val no = r.str("voucher_no")
             if (no.isNotEmpty() && printIt) Printing.voucher(no, app)

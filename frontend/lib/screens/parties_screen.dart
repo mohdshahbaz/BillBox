@@ -67,7 +67,8 @@ class _PartiesState extends State<PartiesScreen> {
     });
   }
 
-  Future<void> _voucher(Json p) async {
+  /// Returns the date of the saved payment (null when cancelled or it failed).
+  Future<String?> _voucher(Json p) async {
     final supplier = p['type'] == 'SUPPLIER';
     final v = await formDialog(context, 'Payment · ${p['name']}', [
       FieldSpec('direction', 'Direction', initial: supplier ? 'PAID' : 'RECEIVED', options: const {'RECEIVED': 'Received from them (money in)', 'PAID': 'Paid to them (money out)'}),
@@ -76,15 +77,18 @@ class _PartiesState extends State<PartiesScreen> {
       FieldSpec('date', 'Date', initial: todayStr(), date: true),
       const FieldSpec('reference', 'Reference / cheque no. (optional)'),
     ], okLabel: 'Record payment');
-    if (v == null || !mounted) return;
+    if (v == null || !mounted) return null;
+    String? savedDate;
     await guard(context, () async {
       final r = await Api.post('/vouchers', v..['party_id'] = '${p['id']}') as Json;
+      savedDate = '${v['date'] ?? ''}';
       if (mounted) toast(context, '${r['voucher_no']} recorded. ${_balText(r['balance'])}');
       await _load();
       if (mounted && await confirm(context, 'Print voucher?', '${r['voucher_no']} for ${money(r['amount'])}', ok: 'Print')) {
         if (mounted) await printVoucher(context, '${r['voucher_no']}');
       }
     });
+    return savedDate;
   }
 
   String _balText(dynamic b) {
@@ -93,52 +97,90 @@ class _PartiesState extends State<PartiesScreen> {
     return n > 0 ? 'To receive ${money(n)}' : 'To pay ${money(-n)}';
   }
 
-  Future<void> _ledger(Json p) async {
+  /// "2026-27" for a date like 2026-11-02 (the financial year runs 1 April to 31 March).
+  String _fyOf(String iso) {
+    final q = iso.split('-');
+    if (q.length < 2) return '';
+    final y = int.tryParse(q[0]), m = int.tryParse(q[1]);
+    if (y == null || m == null) return '';
+    final s = m >= 4 ? y : y - 1;
+    return '$s-${((s + 1) % 100).toString().padLeft(2, '0')}';
+  }
+
+  /// The party's ledger. Receipts, payments and opening balances can be deleted here; a bill's own line is removed by
+  /// deleting or editing the bill. After "Record payment" the ledger opens again, on the year of the new line.
+  Future<void> _ledger(Json p, {String fy = ''}) async {
+    var wantVoucher = false;
     await guard(context, () async {
-      final l = await Api.get('/parties/${p['id']}/ledger') as Json;
+      Future<Json> fetch() async => await Api.get('/parties/${p['id']}/ledger', fy.isEmpty ? null : {'fy': fy}) as Json;
+      var l = await fetch();
       if (!mounted) return;
-      final rows = (l['entries'] as List).cast<Json>();
       await showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('${p['name']} · ledger'),
-          content: SizedBox(
-            width: math.min(820.0, MediaQuery.sizeOf(ctx).width - 80),
-            height: math.min(460.0, MediaQuery.sizeOf(ctx).height - 220),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_balText(l['balance']), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: num_(l['balance']) > 0 ? Palette.turmeric : (num_(l['balance']) < 0 ? Palette.brick : Palette.leaf))),
-              const SizedBox(height: 8),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: table(['Date', 'Type', 'Reference', 'Narration', 'Debit', 'Credit', 'Balance'], [
-                    for (final r in rows)
-                      [
-                        t(dmy(r['date'])),
-                        t('${r['type']}'),
-                        t('${r['ref_no'] ?? ''}'),
-                        t('${r['narration'] ?? ''}'),
-                        t(num_(r['debit']) > 0 ? money(r['debit']) : ''),
-                        t(num_(r['credit']) > 0 ? money(r['credit']) : ''),
-                        t('${money(num_(r['balance']).abs())} ${num_(r['balance']) > 0 ? 'Dr' : (num_(r['balance']) < 0 ? 'Cr' : '')}', bold: true),
-                      ],
-                  ], numeric: {4, 5, 6}),
+        builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) {
+          final rows = (l['entries'] as List).cast<Json>();
+          bool deletable(Json r) => const ['RECEIPT', 'PAYMENT', 'OPENING'].contains(r['type']);
+          Future<void> remove(Json r) async {
+            final amt = num_(r['credit']) > 0 ? r['credit'] : r['debit'];
+            if (!await confirm(ctx, 'Delete ${r['type']} ${r['ref_no'] ?? ''} · ${money(amt)}?', 'The voucher behind it is removed too and the balance is worked out again. This cannot be undone.', ok: 'Delete', danger: true)) return;
+            if (!mounted) return;
+            await guard(context, () async {
+              await Api.delete('/ledger/${r['id']}');
+              l = await fetch();
+              if (mounted) toast(context, 'Deleted ${r['type']} ${r['ref_no'] ?? ''}.');
+              setSt(() {});
+              await _load();
+            });
+          }
+
+          return AlertDialog(
+            title: Text('${p['name']} · ledger${fy.isEmpty ? '' : ' · FY $fy'}'),
+            content: SizedBox(
+              width: math.min(860.0, MediaQuery.sizeOf(ctx).width - 80),
+              height: math.min(460.0, MediaQuery.sizeOf(ctx).height - 220),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(_balText(l['balance']), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: num_(l['balance']) > 0 ? Palette.turmeric : (num_(l['balance']) < 0 ? Palette.brick : Palette.leaf))),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: table(['Date', 'Type', 'Reference', 'Narration', 'Debit', 'Credit', 'Balance', ''], [
+                      for (final r in rows)
+                        [
+                          t(dmy(r['date'])),
+                          t('${r['type']}'),
+                          t('${r['ref_no'] ?? ''}'),
+                          t('${r['narration'] ?? ''}'),
+                          t(num_(r['debit']) > 0 ? money(r['debit']) : ''),
+                          t(num_(r['credit']) > 0 ? money(r['credit']) : ''),
+                          t('${money(num_(r['balance']).abs())} ${num_(r['balance']) > 0 ? 'Dr' : (num_(r['balance']) < 0 ? 'Cr' : '')}', bold: true),
+                          deletable(r)
+                              ? IconButton(tooltip: 'Delete this line', icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => remove(r))
+                              : const SizedBox.shrink(),
+                        ],
+                    ], numeric: {4, 5, 6}),
+                  ),
                 ),
-              ),
-              const Text('Dr = they owe you. Cr = you owe them.', style: TextStyle(color: Palette.muted, fontSize: 12)),
-            ]),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-            FilledButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _voucher(p);
-                },
-                child: const Text('Record payment')),
-          ],
-        ),
+                const Text('Dr = they owe you. Cr = you owe them. Use the bin to delete a receipt, payment or opening line.', style: TextStyle(color: Palette.muted, fontSize: 12)),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+              FilledButton(
+                  onPressed: () {
+                    wantVoucher = true;
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Record payment')),
+            ],
+          );
+        }),
       );
     });
+    if (wantVoucher && mounted) {
+      final d = await _voucher(p);
+      // the ledger comes back either way, on the year of the line that was just saved
+      if (mounted) await _ledger(p, fy: d == null ? fy : _fyOf(d));
+    }
   }
 
   @override

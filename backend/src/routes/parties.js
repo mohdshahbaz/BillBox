@@ -2,7 +2,7 @@ const router = require('express').Router();
 const db = require('../db');
 const { h, HttpError, blank, today, normDays } = require('../utils/misc');
 const { r2 } = require('../utils/gst');
-const { recordVoucher, getVoucher } = require('../services/vouchers');
+const { recordVoucher, getVoucher, deleteLedgerEntry } = require('../services/vouchers');
 const Sheet = require('../services/paymentSheet');
 
 const { fyRange } = require('../utils/fy');
@@ -126,6 +126,7 @@ router.get('/parties/:id/ledger', h((req, res) => {
 // ---------- vouchers: money received from / paid to a party ----------
 router.get('/vouchers/:no', h((req, res) => res.json(getVoucher(req.params.no))));
 router.post('/vouchers', h((req, res) => res.status(201).json(recordVoucher(req.body))));
+router.delete('/ledger/:id', h((req, res) => res.json(deleteLedgerEntry(Number(req.params.id)))));
 router.post('/receipts/sheet/parse', h((req, res) => res.json(Sheet.parseSheet(req.body))));
 router.post('/receipts/sheet', h((req, res) => res.status(201).json(Sheet.saveSheet(req.body))));
 router.post('/receipts', h((req, res) => res.status(201).json(recordVoucher({ ...req.body, direction: 'RECEIVED' }))));  // v1 compatibility

@@ -182,6 +182,7 @@ public final class Router {
         case ("GET", 3, "parties") where s[2] == "ledger": return ok(try ledger(db, s[1], q))
         case ("GET", 2, "vouchers"): return ok(try Vouchers.get(db, s[1]))
         case ("POST", 1, "vouchers"): return .json(201, try Vouchers.record(db, b))
+        case ("DELETE", 2, "ledger"): return ok(try Vouchers.deleteLedgerEntry(db, s[1]))
         case ("POST", 3, "receipts") where s[1] == "sheet" && s[2] == "parse": return ok(try PaymentSheet.parse(db, b))
         case ("POST", 2, "receipts") where s[1] == "sheet": return .json(201, try PaymentSheet.save(db, b))
         case ("POST", 1, "receipts"):

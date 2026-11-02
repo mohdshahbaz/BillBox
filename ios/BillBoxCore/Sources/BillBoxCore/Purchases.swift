@@ -292,6 +292,37 @@ enum Vouchers {
         }
     }
 
+    /// Delete one line of a party's ledger (backend/src/services/vouchers.js deleteLedgerEntry).
+    ///   RECEIPT / PAYMENT -> the voucher behind it goes too (and a bill's "paid" amount comes down by it)
+    ///   OPENING           -> the opening balance line is removed
+    ///   INVOICE / PURCHASE / DEBIT_NOTE -> refused: those lines belong to a bill
+    static func deleteLedgerEntry(_ db: Database, _ id: String) throws -> Row {
+        try db.transaction {
+            guard let e = try db.prepare("SELECT * FROM ledger WHERE id=?").get(id) else { throw HttpError(404, "Ledger entry not found") }
+            let type = e.s("type") ?? ""
+            if type == "RECEIPT" {
+                if let r = try db.prepare("SELECT id, invoice_id, amount FROM receipts WHERE receipt_no=?").get(e.v("ref_no")) {
+                    if JS.truthy(r["invoice_id"]) {
+                        try db.prepare("UPDATE invoices SET paid = MAX(0, ROUND(paid - ?, 2)) WHERE id=?").run(r.n("amount"), r.v("invoice_id"))
+                    }
+                    try db.prepare("DELETE FROM receipts WHERE id=?").run(r.v("id"))
+                }
+            } else if type == "PAYMENT" {
+                if let p = try db.prepare("SELECT id, purchase_id, amount FROM payments WHERE voucher_no=?").get(e.v("ref_no")) {
+                    if JS.truthy(p["purchase_id"]) {
+                        try db.prepare("UPDATE purchases SET paid = MAX(0, ROUND(paid - ?, 2)) WHERE id=?").run(p.n("amount"), p.v("purchase_id"))
+                    }
+                    try db.prepare("DELETE FROM payments WHERE id=?").run(p.v("id"))
+                }
+            } else if type != "OPENING" {
+                throw HttpError(400, "This line belongs to a bill. Delete or edit the bill itself to remove it.")
+            }
+            try db.prepare("DELETE FROM ledger WHERE id=?").run(e.v("id"))
+            return ["ok": true, "deleted": ["type": type, "ref_no": e.v("ref_no") ?? NSNull()] as Row,
+                    "balance": r2(try Billing.partyBalance(db, e.v("party_id")))] as Row
+        }
+    }
+
     /// Everything the print engine needs for a receipt / payment voucher.
     static func get(_ db: Database, _ voucherNo: String) throws -> Row {
         let rec = try db.prepare("SELECT receipt_no no, date, party_id, mode, amount, reference FROM receipts WHERE receipt_no=?").get(voucherNo)

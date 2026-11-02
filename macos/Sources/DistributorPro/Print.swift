@@ -46,7 +46,7 @@ enum Paper {
 
 /// A page is made of fixed-height blocks, so how many item rows fit is plain arithmetic and nothing is ever clipped.
 /// If the items do not fit, the invoice continues on the next page. Half sheet = 210 x 148.5 mm, full page = A4.
-/// `m` is the white margin all round (about 7 mm on a half sheet, 12 mm on A4) so nothing falls in the printer's unprintable edge.
+/// `m` is the white margin all round (about 4 mm on a half sheet, 5 mm on A4) so nothing falls in the printer's unprintable edge.
 struct Spec {
     let w: CGFloat, h: CGFloat, m: CGFloat
     let rowH: CGFloat, tableHead: CGFloat, foot: CGFloat, totals: CGFloat
@@ -99,9 +99,9 @@ struct Spec {
                     strip: strip, sellerBand: sellerBand, buyerBand: buyerBand, headNext: headNext, fs: fs, cw: cw)
     }
 
-    static let half = Spec(w: 595.276, h: 420.945, m: 24, rowH: 12, tableHead: 15, foot: 26, totals: 91,
+    static let half = Spec(w: 595.276, h: 420.945, m: 12, rowH: 12, tableHead: 15, foot: 26, totals: 91,
                            strip: 15, sellerBand: 56, buyerBand: 0, headNext: 18, fs: 1, cw: 1)
-    static let full = Spec(w: 595.276, h: 841.89, m: 34, rowH: 16, tableHead: 20, foot: 32, totals: 112,
+    static let full = Spec(w: 595.276, h: 841.89, m: 14, rowH: 16, tableHead: 20, foot: 32, totals: 112,
                            strip: 19, sellerBand: 68, buyerBand: 0, headNext: 24, fs: 1.15, cw: 1.0)
 }
 

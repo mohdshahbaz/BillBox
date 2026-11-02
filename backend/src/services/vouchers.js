@@ -49,4 +49,33 @@ function getVoucher(voucherNo) {
   };
 }
 
-module.exports = { recordVoucher, getVoucher };
+/**
+ * Delete one line of a party's ledger.
+ *   RECEIPT / PAYMENT  -> the voucher behind it goes too (and a bill's "paid" amount comes down by it)
+ *   OPENING            -> the opening balance line is removed
+ *   INVOICE / PURCHASE / DEBIT_NOTE -> refused: those lines belong to a bill, so the bill is deleted or edited instead
+ * One transaction: the ledger, the voucher and the bill's paid amount change together or not at all.
+ */
+const deleteLedgerEntry = db.transaction((id) => {
+  const e = db.prepare('SELECT * FROM ledger WHERE id=?').get(id);
+  if (!e) throw new HttpError(404, 'Ledger entry not found');
+  if (e.type === 'RECEIPT') {
+    const r = db.prepare('SELECT id, invoice_id, amount FROM receipts WHERE receipt_no=?').get(e.ref_no);
+    if (r) {
+      if (r.invoice_id) db.prepare('UPDATE invoices SET paid = MAX(0, ROUND(paid - ?, 2)) WHERE id=?').run(r.amount, r.invoice_id);
+      db.prepare('DELETE FROM receipts WHERE id=?').run(r.id);
+    }
+  } else if (e.type === 'PAYMENT') {
+    const p = db.prepare('SELECT id, purchase_id, amount FROM payments WHERE voucher_no=?').get(e.ref_no);
+    if (p) {
+      if (p.purchase_id) db.prepare('UPDATE purchases SET paid = MAX(0, ROUND(paid - ?, 2)) WHERE id=?').run(p.amount, p.purchase_id);
+      db.prepare('DELETE FROM payments WHERE id=?').run(p.id);
+    }
+  } else if (e.type !== 'OPENING') {
+    throw new HttpError(400, 'This line belongs to a bill. Delete or edit the bill itself to remove it.');
+  }
+  db.prepare('DELETE FROM ledger WHERE id=?').run(e.id);
+  return { ok: true, deleted: { type: e.type, ref_no: e.ref_no }, balance: r2(partyBalance(e.party_id)) };
+});
+
+module.exports = { recordVoucher, getVoucher, deleteLedgerEntry };

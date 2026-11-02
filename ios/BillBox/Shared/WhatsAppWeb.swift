@@ -26,6 +26,9 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     /// The customer whose chat is open right now and the chat's heading at that moment. The next bill to the same number
     /// reuses the open chat instead of loading WhatsApp Web again (the heading changes if someone opens another chat by hand).
     private var openChat: (phone: String, heading: String)?
+    /// Once the chat is open, attaching and sending must finish by this time, so one stuck step can never hold up every bill after it.
+    private var abortAt = Date.distantFuture
+    private var overtime: Bool { Date() > abortAt }
     /// The way of attaching the PDF that worked last time is tried first (each way that does not work costs seconds).
     private var attachOrder: [String] {
         let all = ["paste", "drop", "input"]
@@ -304,7 +307,9 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         }
         chain = Task { _ = await job.value }
         settling = Task { _ = await job.value; _ = await self.run(Self.js(Self.settleScript)) }
-        if let e = await job.value { throw e }
+        let failure = await job.value
+        if status == "Sending…" { status = connected ? "Connected" : "Not connected" }   // never stay stuck on "Sending…"
+        if let e = failure { throw e }
     }
 
     /// Loads WhatsApp Web ahead of the first bill (on the billing screen), so the first send does not pay for starting it up.
@@ -370,6 +375,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         }
         if shownLogin { showing = false }
         connected = true
+        abortAt = Date().addingTimeInterval(50)
         trace.mark("chat")
         if !reuse { await pause(ms: 100) }   // the chat box has just been mounted: a moment for its paste handler (was 200 ms)
 
@@ -393,10 +399,11 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
                 _ = await run(Self.js(Self.prepareScript), args)   // again, in case the page reloaded and forgot the file
             }
             _ = await run(Self.js(Self.attachScript), ["method": method])
-            let ok = await previewOpen(seconds: method == "input" ? 8 : 5)
+            let ok = await previewOpen(seconds: method == "input" ? 6 : 3)
             tried.append("\(method):\(ok ? "yes" : "no")")
             if ok { opened = true; UserDefaults.standard.set(method, forKey: "wa_attach_first"); trace.mark("attach-\(method)"); break }
             await closePreviewIfAny()
+            if overtime { break }
         }
         guard opened else {
             let diag = await run(Self.js(Self.diagnose))
@@ -421,17 +428,22 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
             openChat = nil
             let diag = await run(Self.js(Self.diagnose))
             lastResult += " " + diag
+            // the bill is attached but the send click was not confirmed: open the WhatsApp page so the green Send icon can be tapped
+            if await run(Self.js("return previewOpen() ? 'y' : 'n';")) == "y" {
+                showing = true
+                throw SendError(message: "The bill is attached in the chat. Tap the green Send icon on the WhatsApp page that opened.")
+            }
             throw SendError(message: "WhatsApp Web attached the bill but could not confirm it was sent (\(result)). Check the chat before sending again.")
         }
     }
 
     private func ensureComposer(phone: String) async -> Bool {
         var reloaded = false
-        for i in 0..<360 {
+        for i in 0..<60 {
             let st = await pageState()
             if st == "composer" { return true }
             if st == "invalid" { return false }
-            if i == 120 && !reloaded {
+            if i == 28 && !reloaded {
                 reloaded = true
                 await load("https://web.whatsapp.com/send?phone=\(phone)")
             }
@@ -452,7 +464,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
         return 'ok';
         """))
-        await pause(ms: 400)
+        await pause(ms: 150)
     }
 
     // MARK: scripts that run inside the WhatsApp Web page
@@ -594,14 +606,14 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     if (!cands.length && !cap) return 'no-send-button';
     for (const b of cands) {
       press(b);
-      if (await wait(changed, 3000)) break;
-      b.click();
       if (await wait(changed, 2000)) break;
+      b.click();
+      if (await wait(changed, 1500)) break;
     }
     if (!changed() && cap) {
       cap.focus();
       for (const t of ['keydown', 'keypress', 'keyup']) cap.dispatchEvent(new KeyboardEvent(t, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
-      await wait(changed, 3000);
+      await wait(changed, 2000);
     }
     return changed() ? 'clicked' + note : 'preview-stayed';
     """#

@@ -90,8 +90,8 @@ data class Spec(val w: Float, val h: Float, val m: Float, val rowH: Float, val t
     fun cap(first: Boolean, last: Boolean): Int = floor((inner - (if (first) headFirst else headNext) - tableHead - foot - (if (last) totals else 0f)) / rowH).toInt()
 
     companion object {
-        val half = Spec(595.276f, 420.945f, 20f, 12f, 15f, 26f, 91f, 15f, 56f, 0f, 18f, 1f, 1f)
-        val full = Spec(595.276f, 841.89f, 34f, 16f, 20f, 32f, 112f, 19f, 68f, 0f, 24f, 1.15f, 1.0f)
+        val half = Spec(595.276f, 420.945f, 12f, 12f, 15f, 26f, 91f, 15f, 56f, 0f, 18f, 1f, 1f)
+        val full = Spec(595.276f, 841.89f, 14f, 16f, 20f, 32f, 112f, 19f, 68f, 0f, 24f, 1.15f, 1.0f)
     }
 }
 

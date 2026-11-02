@@ -31,7 +31,7 @@ const copyLabels = ['ORIGINAL FOR RECIPIENT', 'DUPLICATE FOR TRANSPORTER/SUPPLIE
 
 class Geo {
   static const double w = 595.276, h = 420.945; // half of A4 (portrait 595.276 x 841.89)
-  static const double m = 14; // sheet margin
+  static const double m = 12; // sheet margin (narrow: more item rows)
   static const double rowH = 12, headFirst = 76, headNext = 30, tableHead = 14, foot = 22, totals = 92;
   static const double inner = h - 2 * m;
   static final halfFormat = PdfPageFormat(w, h, marginAll: 0);

@@ -15,6 +15,9 @@ import SwiftUI
     @State private var creating = false
     @State private var ledgerFor: JSON?
     @State private var voucherFor: JSON?
+    /// Set when "Record receipt / payment" was started from the ledger: the ledger opens again afterwards, showing the new line.
+    @State private var ledgerReturn: JSON?
+    @State private var ledgerYear = ""
     @State private var photoPayments = false
     @AppStorage("showPhotoCard") private var showPhotoCard = true
     @State private var deleteTarget: JSON?
@@ -41,7 +44,7 @@ import SwiftUI
     }
 
     private var grid: some View {
-        DataGrid(parties, layoutKey: "parties", selection: $selection, selecting: $selecting, onOpen: { ledgerFor = $0 }, menu: { AnyView(partyMenu($0)) }) {
+        DataGrid(parties, layoutKey: "parties", selection: $selection, selecting: $selecting, onOpen: { openLedger($0) }, menu: { AnyView(partyMenu($0)) }) {
             GridColumn("Party", id: "name", min: 150, ideal: 220) { (p: JSON) in Text(p.str("name")).fontWeight(.medium).lineLimit(2) }
             GridColumn("Type", id: "type", min: 70, ideal: 90) { (p: JSON) in Text(p.str("type").capitalized) }
             GridColumn("GSTIN", id: "gstin", min: 110, ideal: 150) { (p: JSON) in Text(p.str("gstin")).monospacedDigit() }
@@ -61,7 +64,7 @@ import SwiftUI
     }
 
     @ViewBuilder private func partyMenu(_ p: JSON) -> some View {
-        Button { ledgerFor = p } label: { Label("Ledger…", systemImage: "list.bullet.rectangle") }
+        Button { openLedger(p) } label: { Label("Ledger…", systemImage: "list.bullet.rectangle") }
         Button { voucherFor = p } label: { Label(supplier ? "Record payment…" : "Record receipt…", systemImage: "indianrupeesign.circle") }
         Divider()
         if selection.count > 1 && selection.contains(p.id) {
@@ -93,8 +96,17 @@ import SwiftUI
         v
         .sheet(isPresented: $creating) { PartySheet(party: nil, defaultType: supplier ? "SUPPLIER" : "RETAILER", routes: routes, salesmen: salesmen) { await load() } }
         .sheet(item: $editing) { p in PartySheet(party: p, defaultType: "RETAILER", routes: routes, salesmen: salesmen) { await load() } }
-        .sheet(item: $ledgerFor) { p in LedgerSheet(party: p, onVoucher: { voucherFor = p }) }
-        .sheet(item: $voucherFor) { p in VoucherSheet(party: p) { await load() } }
+        .sheet(item: $ledgerFor) { p in
+            LedgerSheet(party: p, initialYear: ledgerYear, onVoucher: { ledgerReturn = p; ledgerYear = ""; voucherFor = p }, onChanged: { await load() })
+        }
+        .sheet(item: $voucherFor) { p in VoucherSheet(party: p, saved: { ledgerYear = fyLabelOf($0) }, done: { await load() }) }
+        .onChange(of: voucherFor?.id) { id in
+            // the voucher sheet closed (saved or cancelled): bring the ledger back, on the year of the new line
+            guard id == nil, let p = ledgerReturn else { return }
+            ledgerReturn = nil
+            Task { await pause(ms: 600); openLedger(p, year: ledgerYear) }
+        }
+
         .sheet(isPresented: $photoPayments) { PaymentPhotoSheet { await load() } }
         .confirmationDialog("Delete \(deleteTarget?.str("name") ?? "")?", isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
@@ -265,12 +277,28 @@ import SwiftUI
     }
 }
 
+extension PartiesView {
+    func openLedger(_ p: JSON, year: String = "") { ledgerYear = year; ledgerFor = p }
+
+    /// "2026-27" for a date like 2026-11-02 (the financial year runs 1 April to 31 March).
+    func fyLabelOf(_ iso: String) -> String {
+        let q = iso.split(separator: "-")
+        guard q.count >= 2, let y = Int(q[0]), let m = Int(q[1]) else { return "" }
+        let s = m >= 4 ? y : y - 1
+        return "\(s)-\(String(format: "%02d", (s + 1) % 100))"
+    }
+}
+
 @MainActor struct LedgerSheet: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     let party: JSON
+    var initialYear = ""
     let onVoucher: () -> Void
+    /// Called after a line is deleted, so the party list shows the new balance.
+    var onChanged: (() async -> Void)? = nil
     @State private var data: JSON?
+    @State private var deleteTarget: JSON?
     /// The financial year shown; earlier years too (Year menu).
     @State private var year = ""
 
@@ -300,7 +328,7 @@ import SwiftUI
                     Text("Opening balance for FY \(shownYear), brought forward from earlier years: \(balanceText(d.num("opening_balance")))")
                         .font(.callout).foregroundStyle(.secondary)
                 }
-                DataGrid(entries, layoutKey: "ledger") {
+                DataGrid(entries, layoutKey: "ledger", onOpen: { askDelete($0) }, menu: { AnyView(rowMenu($0)) }) {
                     GridColumn("Date", id: "date", min: 80, ideal: 95) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
                     GridColumn("Type", id: "type", min: 70, ideal: 90) { (r: JSON) in Text(r.str("type")) }
                     GridColumn("Reference", id: "ref", min: 80, ideal: 120) { (r: JSON) in Text(r.str("ref_no")) }
@@ -309,14 +337,49 @@ import SwiftUI
                     GridColumn("Credit", id: "credit", min: 80, ideal: 100, align: .trailing) { (r: JSON) in Text(r.num("credit") > 0 ? Fmt.money(r, "credit") : "").mono() }
                     GridColumn("Balance", id: "balance", min: 100, ideal: 120, align: .trailing) { (r: JSON) in Text(balanceText(r.num("balance"))).mono().fw(.semibold) }
                 }
-                Text("Dr = they owe you. Cr = you owe them.").font(.caption).foregroundStyle(.secondary)
+                Text("Dr = they owe you. Cr = you owe them. \(Tap a receipt, payment or opening line to delete it.)").font(.caption).foregroundStyle(.secondary)
             }
         }
-        .task { if year.isEmpty { year = app.fyLabel }; await load() }
+        .task { if year.isEmpty { year = initialYear.isEmpty ? app.fyLabel : initialYear }; await load() }
         .onChange(of: year) { _ in Task { await load() } }
+        .confirmationDialog(deleteTitle, isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), titleVisibility: .visible) {
+            Button("Delete this line", role: .destructive) { if let t = deleteTarget { Task { await delete(t) } } }
+            Button("Cancel", role: .cancel) { deleteTarget = nil }
+        } message: {
+            Text("The voucher behind it is removed too and the balance is worked out again. This cannot be undone.")
+        }
     }
 
     private var shownYear: String { year.isEmpty ? app.fyLabel : year }
+
+    /// Receipts, payments and opening balances can be deleted here; a bill's own line is removed by deleting or editing the bill.
+    private func deletable(_ e: JSON) -> Bool { ["RECEIPT", "PAYMENT", "OPENING"].contains(e.str("type")) }
+
+    private func askDelete(_ e: JSON) {
+        if deletable(e) { deleteTarget = e }
+        else { app.notify("That line belongs to a bill. Delete or edit the bill to remove it.") }
+    }
+
+    @ViewBuilder private func rowMenu(_ e: JSON) -> some View {
+        if deletable(e) { Button("Delete this line…", role: .destructive) { askDelete(e) } }
+    }
+
+    private var deleteTitle: String {
+        guard let t = deleteTarget else { return "Delete this line?" }
+        let amt = t.num("credit") > 0 ? t.num("credit") : t.num("debit")
+        return "Delete \(t.str("type").capitalized) \(t.str("ref_no")) · \(Fmt.money(amt))?"
+    }
+
+    private func delete(_ e: JSON) async {
+        deleteTarget = nil
+        let book = app.yearChoices.first { $0.label == shownYear }?.bookId
+        await app.guarded {
+            _ = try await API.obj("DELETE", "/ledger/\(e.id)", company: book == app.companyId ? nil : book)
+            app.notify("Deleted \(e.str("type").capitalized) \(e.str("ref_no")).")
+            await load()
+            await onChanged?()
+        }
+    }
 
     private func load() async {
         do { data = try await app.ledger(for: party, year: shownYear) } catch { data = JSON(); app.notify(error.localizedDescription, error: true) }
@@ -326,6 +389,7 @@ import SwiftUI
 @MainActor struct VoucherSheet: View {
     @EnvironmentObject private var app: AppModel
     let party: JSON
+    var saved: ((String) -> Void)? = nil
     let done: () async -> Void
     @State private var direction = ""
     @State private var amount = ""
@@ -344,6 +408,7 @@ import SwiftUI
                 "amount": amount, "mode": mode, "date": date, "reference": reference,
             ])
             app.notify("Saved \(r.str("voucher_no")).")
+            saved?(date)
             await done()
             let no = r.str("voucher_no")
             if !no.isEmpty && app.settings.str("voucher_print") != "0" { await printVoucher(no, app: app) }   // Settings › Parties & Payments   // the preview opens once this sheet has closed

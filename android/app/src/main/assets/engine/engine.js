@@ -4773,7 +4773,28 @@ content-type: application/octet-stream\r
           company: { name: co.company_name, address: co.company_address, gstin: co.company_gstin, phone: co.company_phone }
         };
       }
-      module.exports = { recordVoucher, getVoucher };
+      var deleteLedgerEntry = db2.transaction((id) => {
+        const e = db2.prepare("SELECT * FROM ledger WHERE id=?").get(id);
+        if (!e) throw new HttpError2(404, "Ledger entry not found");
+        if (e.type === "RECEIPT") {
+          const r = db2.prepare("SELECT id, invoice_id, amount FROM receipts WHERE receipt_no=?").get(e.ref_no);
+          if (r) {
+            if (r.invoice_id) db2.prepare("UPDATE invoices SET paid = MAX(0, ROUND(paid - ?, 2)) WHERE id=?").run(r.amount, r.invoice_id);
+            db2.prepare("DELETE FROM receipts WHERE id=?").run(r.id);
+          }
+        } else if (e.type === "PAYMENT") {
+          const p = db2.prepare("SELECT id, purchase_id, amount FROM payments WHERE voucher_no=?").get(e.ref_no);
+          if (p) {
+            if (p.purchase_id) db2.prepare("UPDATE purchases SET paid = MAX(0, ROUND(paid - ?, 2)) WHERE id=?").run(p.amount, p.purchase_id);
+            db2.prepare("DELETE FROM payments WHERE id=?").run(p.id);
+          }
+        } else if (e.type !== "OPENING") {
+          throw new HttpError2(400, "This line belongs to a bill. Delete or edit the bill itself to remove it.");
+        }
+        db2.prepare("DELETE FROM ledger WHERE id=?").run(e.id);
+        return { ok: true, deleted: { type: e.type, ref_no: e.ref_no }, balance: r2(partyBalance(e.party_id)) };
+      });
+      module.exports = { recordVoucher, getVoucher, deleteLedgerEntry };
     }
   });
 
@@ -5018,7 +5039,7 @@ content-type: application/octet-stream\r
       var db2 = require_db();
       var { h, HttpError: HttpError2, blank, today, normDays } = require_misc();
       var { r2 } = require_gst();
-      var { recordVoucher, getVoucher } = require_vouchers();
+      var { recordVoucher, getVoucher, deleteLedgerEntry } = require_vouchers();
       var Sheet = require_paymentSheet();
       var { fyRange } = require_fy();
       var BAL_AT = `COALESCE((SELECT SUM(debit)-SUM(credit) FROM ledger l WHERE l.party_id=p.id AND l.date <= @to),0)`;
@@ -5131,6 +5152,7 @@ content-type: application/octet-stream\r
       }));
       router.get("/vouchers/:no", h((req, res) => res.json(getVoucher(req.params.no))));
       router.post("/vouchers", h((req, res) => res.status(201).json(recordVoucher(req.body))));
+      router.delete("/ledger/:id", h((req, res) => res.json(deleteLedgerEntry(Number(req.params.id)))));
       router.post("/receipts/sheet/parse", h((req, res) => res.json(Sheet.parseSheet(req.body))));
       router.post("/receipts/sheet", h((req, res) => res.status(201).json(Sheet.saveSheet(req.body))));
       router.post("/receipts", h((req, res) => res.status(201).json(recordVoucher({ ...req.body, direction: "RECEIVED" }))));
