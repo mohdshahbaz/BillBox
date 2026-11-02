@@ -129,6 +129,13 @@ extension PrintOptionsSections {
     }
 
     var body: some View {
+        // one stable group carries the loading, so the form is not rebuilt each time a section is redrawn
+        Group { content }
+            .onChange(of: app.settings) { _ in Task { await load() } }
+            .task { await load() }
+    }
+
+    @ViewBuilder private var content: some View {
         Section {
             Button { Task { await useMarg() } } label: { Label("Use Marg's numbering (A000001, P000001, DNB00001)", systemImage: "number") }
             Toggle("Put the financial year in the number", isOn: flag("num_fy", true))
@@ -136,8 +143,6 @@ extension PrintOptionsSections {
         } header: { Text("Numbering") } footer: {
             Text("A new number always carries on after the highest one already used with the same prefix — including bills imported from Marg — so numbers never clash. After a Marg import BillBox takes Marg's pattern by itself, unless you chose your own numbering here first.")
         }
-        .onChange(of: app.settings) { _ in Task { await load() } }
-        .task { await load() }
         ForEach(Self.series, id: \.key) { x in
             let r = rows.first { $0.str("series") == x.key }
             Section {

@@ -18,6 +18,8 @@ import AppKit
             MargImportView().tabItem { Label("Import from Marg", systemImage: "square.and.arrow.down.on.square") }.tag("marg")
             LicenseSettings().tabItem { Label("Licence", systemImage: "key") }.tag("licence")
         }
+        // every tab gets the whole window and scrolls inside it: a long tab (Billing & Dashboard) must not push the window or the tab bar out of shape
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(16)
         .navigationTitle("Settings")
     }
@@ -445,6 +447,7 @@ func fyLabelFor(_ start: Int) -> String { "\(start)-" + String(String(start + 1)
             NumberingSections()
         }
         .groupedForm()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 

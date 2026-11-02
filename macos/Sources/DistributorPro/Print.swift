@@ -142,14 +142,25 @@ func bankLineText(_ pairs: [(String, String)], size: CGFloat, serif: Bool = fals
 func bankTabRows(_ co: JSON) -> [(String, String)] { bankLines(co).flatMap { $0 }.map { ($0.0.isEmpty ? "Address" : $0.0, $0.1) } }
 /// Height of that block: a small heading and one line per row.
 func bankTabHeight(_ co: JSON, _ fs: CGFloat) -> CGFloat { let n = bankTabRows(co).count; return n == 0 ? 0 : CGFloat((n + 1) / 2) * 7.6 * fs }
-/// Height the left side of the totals band already needs without the bank block (GST table, balance, amount in words).
-func leftOther(_ co: JSON, _ inv: JSON, _ f: CGFloat) -> CGFloat {
+/// Height of the left side of the totals band above "Amount in words": GST table and balance line.
+func leftTop(_ co: JSON, _ inv: JSON, _ f: CGFloat) -> CGFloat {
     func on(_ k: String) -> Bool { co.str(k).isEmpty || co.str(k) != "0" }
     var left: CGFloat = 8
     if on("print_gst_table") { left += CGFloat(max(1, inv.list("gst_summary").count) + 1) * 8.6 * f + 3 }
     if co.str("print_balance") == "1" && inv.has("party_prev_balance") { left += 9 * f }
-    left += max(on("print_words") ? 7 * f + 2 * 9.2 * f : 0, bankTabHeight(co, f))   // the bank block shares the height of "Amount in words"
     return left
+}
+/// Height the left side of the band needs in all: the bank block shares the height of "Amount in words".
+func leftOther(_ co: JSON, _ inv: JSON, _ f: CGFloat) -> CGFloat {
+    let words: CGFloat = co.str("print_words") != "0" ? 7 * f + 2 * 9.2 * f : 0
+    return leftTop(co, inv, f) + max(words, bankTabHeight(co, f))
+}
+/// Rows per column of the bank block: one column when every row fits the free height of the band (above and beside "Amount in words"), else two.
+func bankTabPer(_ co: JSON, _ inv: JSON, _ g: Spec) -> Int {
+    let n = bankTabRows(co).count
+    if n == 0 { return 0 }
+    let fit = Int((g.totals - leftTop(co, inv, g.fs) - 2) / (7.6 * g.fs))
+    return n <= fit ? n : (n + 1) / 2
 }
 /// True when the bank block fits in the totals band of this page design (otherwise the bank lines stay in the footer).
 func bankTabFits(_ co: JSON, _ inv: JSON, _ g: Spec) -> Bool { bankTabHeight(co, g.fs) > 0 && leftOther(co, inv, g.fs) + 2 <= g.totals + 0.5 }
@@ -452,7 +463,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                 if on("print_words") || bankTab {
                     // the bank details sit beside "Amount in words" (the words take the left 42%), so they need no extra height
                     let leftW = g.w - 186 * g.cw - 12
-                    HStack(alignment: .top, spacing: 0) {
+                    HStack(alignment: .bottom, spacing: 0) {
                         if on("print_words") {
                             VStack(alignment: .leading, spacing: 1.5) {
                                 t("Amount in words", 6, bold: true).foregroundStyle(muted)
@@ -477,18 +488,19 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
     /// The bank details sit in the totals band, left of the totals, on the last page when they fit there.
     private var bankTab: Bool { page == pages - 1 && bankTabFits(co, inv, g) }
 
-    /// The bank details as a small table in two columns: labels in one column, a tab, the values in the next, lined up.
+    /// The bank details as a small table: one column when every row fits the free height of the band (above and beside "Amount in
+    /// words"), else two; labels, a tab, then the values, lined up, behind a fine divider.
     private var bankTabBlock: some View {
         let rows = bankTabRows(co)
-        let per = max(1, (rows.count + 1) / 2)
-        let cols: [[(String, String)]] = [Array(rows.prefix(per)), Array(rows.dropFirst(per))]
+        let per = max(1, bankTabPer(co, inv, g))
+        let cols = stride(from: 0, to: rows.count, by: per).map { Array(rows[$0..<min($0 + per, rows.count)]) }
         return HStack(alignment: .top, spacing: 8) {
-            ForEach(0..<2, id: \.self) { c in
+            ForEach(0..<cols.count, id: \.self) { c in
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(cols[c].enumerated()), id: \.offset) { _, r in
-                        HStack(alignment: .firstTextBaseline, spacing: 3) {
-                            t(r.0 + ":", 6.5, bold: true).lineLimit(1).minimumScaleFactor(0.7).frame(width: 34 * g.cw, alignment: .leading)
-                            t(r.1, 7, weight: .semibold).lineLimit(1).minimumScaleFactor(0.55)
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            t(r.0 + ":", 6.5, bold: true).lineLimit(1).minimumScaleFactor(0.8).frame(width: 36 * g.cw, alignment: .leading)
+                            t(r.1, 7.5, weight: .semibold).lineLimit(1).minimumScaleFactor(0.8)
                         }
                         .frame(height: 7.6 * g.fs, alignment: .leading)
                     }
@@ -496,8 +508,8 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
-        .padding(.leading, 5)
-        .overlay(alignment: .leading) { Rectangle().fill(muted).frame(width: 0.4) }
+        .padding(.leading, 6)
+        .overlay(alignment: .leading) { Rectangle().fill(muted).frame(width: 0.5) }
     }
 
     /// Bank details, one per line with the labels lined up (BANK NAME:, ACCOUNT NUMBER: …).

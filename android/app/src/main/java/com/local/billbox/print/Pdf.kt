@@ -128,14 +128,25 @@ fun bankLine(pen: Pen, pairs: List<Pair<String, String>>, x: Float, top: Float, 
 fun bankTabRows(co: J): List<Pair<String, String>> = bankLines(co).flatten().map { (k, v) -> (if (k.isEmpty()) "Address" else k) to v }
 /** Height of that block: the rows are split over two columns, so at most three lines: it sits beside "Amount in words", which is as tall. */
 fun bankTabHeight(co: J, fs: Float): Float = bankTabRows(co).let { if (it.isEmpty()) 0f else ((it.size + 1) / 2) * 7.6f * fs }
-/** Height the left side of the totals band already needs without the bank block (GST table, balance, amount in words). */
-fun leftOther(co: J, inv: J, f: Float): Float {
+/** Height of the left side of the totals band above "Amount in words": GST table and balance line. */
+fun leftTop(co: J, inv: J, f: Float): Float {
     fun on(k: String) = co.str(k).isEmpty() || co.str(k) != "0"
     var left = 8f
     if (on("print_gst_table")) left += (maxOf(1, inv.list("gst_summary").size) + 1) * 8.5f * f + 1
     if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) left += 10f * f
-    left += maxOf(if (on("print_words")) 8f * f + 18f * f else 0f, bankTabHeight(co, f))   // the bank block shares the height of "Amount in words"
     return left
+}
+/** Height the left side of the band needs in all: the bank block shares the height of "Amount in words". */
+fun leftOther(co: J, inv: J, f: Float): Float {
+    val words = if (co.str("print_words") != "0") 8f * f + 18f * f else 0f
+    return leftTop(co, inv, f) + maxOf(words, bankTabHeight(co, f))
+}
+/** Rows per column of the bank block: one column when every row fits the free height of the band (above and beside "Amount in words"), else two. */
+fun bankTabPer(co: J, inv: J, g: Spec): Int {
+    val n = bankTabRows(co).size
+    if (n == 0) return 0
+    val fit = ((g.totals - leftTop(co, inv, g.fs) - 2) / (7.6f * g.fs)).toInt()
+    return if (n <= fit) n else (n + 1) / 2
 }
 /** True when the bank block fits in the totals band of this page design (otherwise the bank lines stay in the footer). */
 fun bankTabFits(co: J, inv: J, g: Spec): Boolean = bankTabHeight(co, g.fs) > 0f && leftOther(co, inv, g.fs) + 2 <= g.totals + 0.5f
@@ -411,15 +422,16 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
             pen.para(inv.str("amount_words"), lx, wy + 8f * fs, ww, 7.5f * fs, 2, 600)
         }
         if (bankTab) {
-            // the bank details beside "Amount in words", in no extra height: two columns (labels, a tab, values), lined up
-            val rows = bankTabRows(co); val per = (rows.size + 1) / 2; val lh = 7.6f * fs
-            val bx = lx + leftW * 0.44f; val bw = leftW * 0.56f; val labW = 34f * g.cw
-            val colX = floatArrayOf(bx, bx + bw * 0.46f); val colW = floatArrayOf(bw * 0.46f, bw * 0.54f)
-            pen.vLine(bx - 4f, wy, wy + per * lh, 0.4f, MUTED)
+            // the bank details beside "Amount in words", using the free height of the band too: one column when all rows fit, else
+            // two; labels, a tab, then the values, lined up, behind a fine divider
+            val rows = bankTabRows(co); val per = bankTabPer(co, inv, g); val cols = (rows.size + per - 1) / per; val lh = 7.6f * fs
+            val bx = lx + leftW * 0.46f; val cwid = leftW * 0.54f / cols; val labW = 36f * g.cw
+            val top = maxOf(ly + 2, minOf(wy, y + g.totals - 4 - per * lh))
+            pen.vLine(bx - 6f, top, top + per * lh, 0.5f, MUTED)
             rows.forEachIndexed { i, (k, v) ->
-                val c = i / per; val ry = wy + (i % per) * lh
-                pen.text("$k:", colX[c] + (if (c == 1) 4f else 0f), ry, labW, lh, 6.5f * fs, 700, minScale = 0.7f)
-                pen.text(v, colX[c] + (if (c == 1) 4f else 0f) + labW + 3f, ry, colW[c] - labW - 10f, lh, 7f * fs, 600, minScale = 0.55f)
+                val c = i / per; val cx = bx + c * cwid; val ry = top + (i % per) * lh
+                pen.text("$k:", cx, ry, labW, lh, 6.5f * fs, 700, minScale = 0.8f)
+                pen.text(v, cx + labW + 3f, ry, cwid - labW - 9f, lh, 7.5f * fs, 600, minScale = 0.8f)
             }
         }
         val rx = x + w - rightW

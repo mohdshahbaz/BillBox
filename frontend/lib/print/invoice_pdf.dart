@@ -226,33 +226,34 @@ List<List<String>> _bankRows(Json co) {
   ].where((r) => r[1].isNotEmpty).toList();
 }
 
-/// The bank details as a small table beside "Amount in words", in two columns (labels, a tab, values, lined up), so they
-/// need no extra height: at most three lines.
-pw.Widget _bankTab(Json co) {
+/// The bank details as a small table beside "Amount in words" that also uses the free height of the band: one column when
+/// every row fits [fit] lines, else two. Labels, a tab, then the values, lined up, behind a fine divider.
+pw.Widget _bankTab(Json co, int fit) {
   const lh = 7.2;
   final rows = _bankRows(co);
   if (rows.isEmpty) return pw.SizedBox();
-  final per = ((rows.length + 1) / 2).ceil();
+  final per = rows.length <= fit ? rows.length : ((rows.length + 1) / 2).ceil();
   pw.Widget col(List<List<String>> rs) => pw.Expanded(
         child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           for (final r in rs)
             pw.SizedBox(
               height: lh,
               child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.SizedBox(width: 32, child: pw.Text('${r[0]}:', style: _s(6, bold: true), maxLines: 1)),
+                pw.SizedBox(width: 34, child: pw.Text('${r[0]}:', style: _s(6, bold: true), maxLines: 1)),
                 pw.SizedBox(width: 3),
-                pw.Expanded(child: pw.Text(r[1], style: _s(6.5), maxLines: 1)),
+                pw.Expanded(child: pw.Text(r[1], style: _s(7), maxLines: 1)),
               ]),
             ),
         ]),
       );
   return pw.Container(
-    padding: const pw.EdgeInsets.only(left: 5),
-    decoration: const pw.BoxDecoration(border: pw.Border(left: pw.BorderSide(width: .4, color: PdfColors.grey600))),
+    padding: const pw.EdgeInsets.only(left: 6),
+    decoration: const pw.BoxDecoration(border: pw.Border(left: pw.BorderSide(width: .5, color: PdfColors.grey600))),
     child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-      col(rows.take(per).toList()),
-      pw.SizedBox(width: 6),
-      col(rows.skip(per).toList()),
+      for (var i = 0; i < rows.length; i += per) ...[
+        if (i > 0) pw.SizedBox(width: 6),
+        col(rows.skip(i).take(per).toList()),
+      ],
     ]),
   );
 }
@@ -280,6 +281,8 @@ pw.Widget _totals(Json inv, Json co) {
         ]),
       );
   final due = _n(inv['total']) - _n(inv['paid']);
+  // lines of the left column still free once the GST rows have their height (the bank rows may use all of it)
+  final bankFit = ((Geo.totals - 3 - 9.0 * (1 + g.length) - 3 - 2) / 7.2).floor();
   return pw.SizedBox(
     height: Geo.totals,
     child: pw.Container(
@@ -292,9 +295,9 @@ pw.Widget _totals(Json inv, Json co) {
             for (final x in g) srow(['${_n(x['rate'])}%', _m(x['taxable']), intra ? _m(x['cgst']) : _m(x['igst']), if (intra) _m(x['sgst'])]),
             pw.SizedBox(height: 3),
             // "Amount in words" on the left, the bank details beside it (no extra height)
-            pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
               pw.Expanded(flex: 42, child: pw.Text('Amount in words: ${inv['amount_words']}', style: _s(6.5), maxLines: 3)),
-              if (_bankRows(co).isNotEmpty) ...[pw.SizedBox(width: 6), pw.Expanded(flex: 58, child: _bankTab(co))],
+              if (_bankRows(co).isNotEmpty) ...[pw.SizedBox(width: 6), pw.Expanded(flex: 58, child: _bankTab(co, bankFit))],
             ]),
           ]),
         ),
