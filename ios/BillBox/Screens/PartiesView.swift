@@ -337,7 +337,9 @@ extension PartiesView {
                     GridColumn("Credit", id: "credit", min: 80, ideal: 100, align: .trailing) { (r: JSON) in Text(r.num("credit") > 0 ? Fmt.money(r, "credit") : "").mono() }
                     GridColumn("Balance", id: "balance", min: 100, ideal: 120, align: .trailing) { (r: JSON) in Text(balanceText(r.num("balance"))).mono().fw(.semibold) }
                 }
-                Text("Dr = they owe you. Cr = you owe them. \(Tap a receipt, payment or opening line to delete it.)").font(.caption).foregroundStyle(.secondary)
+                Text("Dr = they owe you. Cr = you owe them. (Tap a receipt, payment or opening line to delete it.)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .task { if year.isEmpty { year = initialYear.isEmpty ? app.fyLabel : initialYear }; await load() }
