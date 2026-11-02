@@ -1,7 +1,6 @@
 import SwiftUI
 import UIKit
 import WebKit
-import Photos
 
 /// Sends bills through WhatsApp Web inside the app (decision D1: the Mac's method, foreground only).
 /// WhatsApp Web is linked once by scanning its QR code (Settings > WhatsApp > Connect). For each bill the page opens the chat with
@@ -580,77 +579,28 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
 }
 
 /// The live WhatsApp Web page in a sheet (Connect / Show page).
-// MARK: linking on this iPhone with the QR code
+// MARK: linking on this iPhone in one tap
 
 extension WhatsAppWeb {
-    /// The QR code on the login page as an image (nil while the page shows none).
-    func qrImage() async -> UIImage? {
-        let r = await run("const c = document.querySelector('canvas[aria-label]') || document.querySelector('canvas'); if (!c) return ''; try { return c.toDataURL('image/png'); } catch (e) { return ''; }")
-        let head = "data:image/png;base64,"
-        guard r.hasPrefix(head), let d = Data(base64Encoded: String(r.dropFirst(head.count))) else { return nil }
-        return UIImage(data: d)
-    }
-
-    /// The QR code enlarged on a white background with a quiet border, so WhatsApp reads it from a photo.
-    private func readable(_ qr: UIImage) -> UIImage {
-        let pad: CGFloat = 60, side = max(qr.size.width, qr.size.height) * 3 + pad * 2
-        let f = UIGraphicsImageRendererFormat(); f.scale = 1
-        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: f).image { ctx in
-            UIColor.white.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: side, height: side))
-            ctx.cgContext.interpolationQuality = .none
-            qr.draw(in: CGRect(x: pad, y: pad, width: side - 2 * pad, height: side - 2 * pad))
-        }
-    }
-
-    /// Saves the QR code now showing on the login page to Photos.
-    func saveQRToPhotos() async -> Bool {
-        guard let qr = await qrImage() else { return false }
-        let img = readable(qr)
-        return await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
-            PHPhotoLibrary.shared().performChanges({ PHAssetChangeRequest.creationRequestForAsset(from: img) }) { ok, _ in c.resume(returning: ok) }
-        }
-    }
-
     func endKeepAlive() {
         guard bgTask != .invalid else { return }
         UIApplication.shared.endBackgroundTask(bgTask)
         bgTask = .invalid
     }
 
-    /// One tap when WhatsApp is on this same iPhone: loads the login page, saves its QR code to Photos, opens WhatsApp, and waits
-    /// for the link by itself (the page hides when it is linked). In WhatsApp: Settings › Linked devices › Link a device, then
-    /// pick the newest saved picture with the photo button on the scanner. WhatsApp changes its QR code every few seconds, so a
-    /// fresh picture is saved a few times while BillBox waits in the background.
-    func linkOnThisPhone() async {
-        _ = ensure()
-        showing = false
-        watcher?.cancel()
-        status = "Getting the QR code…"
-        await load("https://web.whatsapp.com/")
-        var saved = false
-        for _ in 0..<40 {
-            let s = await pageState()
-            if s == "chats" || s == "composer" { connected = true; status = "Already connected"; return }
-            if s == "qr", await saveQRToPhotos() { saved = true; break }
-            await pause(ms: 500)
-        }
-        guard saved else {
-            status = "BillBox could not get the QR code, or Photos access was refused. Use Link with phone number below, or allow BillBox to add photos in Settings."
-            return
-        }
-        status = "QR code saved to Photos. In WhatsApp: Settings › Linked devices › Link a device, tap the photo button and pick the newest picture. If your WhatsApp has no photo button, use Link with phone number."
+    /// One tap when WhatsApp is on this same iPhone (a QR code on its own screen can't be scanned, and WhatsApp has no photo
+    /// button on the Link a device scanner): asks WhatsApp Web for the link code for this number, copies the code, and opens
+    /// WhatsApp. There: Settings › Linked devices › Link a device › Link with phone number instead, paste (or type) the
+    /// code. BillBox connects by itself when WhatsApp accepts it. iOS does not let one app type into another, so pasting the
+    /// code is the one step left.
+    func linkInOneTap(_ number: String, countryCode: String) async {
+        await linkWithPhone(number, countryCode: countryCode)
+        guard !linkCode.isEmpty else { return }   // linkWithPhone has put the reason in `status`
+        UIPasteboard.general.string = linkCode.replacingOccurrences(of: "-", with: "")
+        status = "Code \(linkCode) is copied. In WhatsApp: Settings › Linked devices › Link a device › Link with phone number instead, then paste or type it."
         endKeepAlive()
         bgTask = UIApplication.shared.beginBackgroundTask(withName: "whatsapp-link") { [weak self] in Task { @MainActor in self?.endKeepAlive() } }
         if let u = URL(string: "whatsapp://") { await UIApplication.shared.open(u) }
-        watchLink()
-        Task { [weak self] in
-            // WhatsApp renews its QR code every few seconds: keep the newest picture in Photos for about a minute
-            for _ in 0..<4 {
-                await pause(ms: 15_000)
-                guard let self, !Task.isCancelled, !self.connected else { return }
-                if await self.pageState() == "qr" { _ = await self.saveQRToPhotos() }
-            }
-        }
     }
 }
 

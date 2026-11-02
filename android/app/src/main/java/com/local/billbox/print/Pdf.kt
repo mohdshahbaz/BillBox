@@ -78,9 +78,7 @@ data class Spec(val w: Float, val h: Float, val m: Float, val rowH: Float, val t
         if (abs(inv.num("round_off")) > 0) n += 1
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) n += 1
         val right = 4 + n * 9f * f + 4 + 19f * f
-        var left = leftOther(co, inv, f)
-        val bankH = bankTabHeight(co, f)
-        if (bankH > 0f && left + bankH + 2 <= totals) left += bankH   // the bank block rides in this room when it fits
+        val left = leftOther(co, inv, f)
         return copy(totals = minOf(totals, ceil(maxOf(right, left) + 2)))
     }
     fun withBankBlock(co: J): Spec {
@@ -128,19 +126,19 @@ fun bankLine(pen: Pen, pairs: List<Pair<String, String>>, x: Float, top: Float, 
 
 /** The bank details as (label, value) rows for the aligned block above "Amount in words": Bank, A/c name, A/c no., IFSC, Branch, Address. */
 fun bankTabRows(co: J): List<Pair<String, String>> = bankLines(co).flatten().map { (k, v) -> (if (k.isEmpty()) "Address" else k) to v }
-/** Height of that block: a small heading and one line per row. */
-fun bankTabHeight(co: J, fs: Float): Float = bankTabRows(co).let { if (it.isEmpty()) 0f else (it.size + 1) * 7.6f * fs + 3f }
+/** Height of that block: the rows are split over two columns, so at most three lines: it sits beside "Amount in words", which is as tall. */
+fun bankTabHeight(co: J, fs: Float): Float = bankTabRows(co).let { if (it.isEmpty()) 0f else ((it.size + 1) / 2) * 7.6f * fs }
 /** Height the left side of the totals band already needs without the bank block (GST table, balance, amount in words). */
 fun leftOther(co: J, inv: J, f: Float): Float {
     fun on(k: String) = co.str(k).isEmpty() || co.str(k) != "0"
     var left = 8f
     if (on("print_gst_table")) left += (maxOf(1, inv.list("gst_summary").size) + 1) * 8.5f * f + 1
     if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) left += 10f * f
-    if (on("print_words")) left += 8f * f + 18f * f
+    left += maxOf(if (on("print_words")) 8f * f + 18f * f else 0f, bankTabHeight(co, f))   // the bank block shares the height of "Amount in words"
     return left
 }
 /** True when the bank block fits in the totals band of this page design (otherwise the bank lines stay in the footer). */
-fun bankTabFits(co: J, inv: J, g: Spec): Boolean { val h = bankTabHeight(co, g.fs); return h > 0f && leftOther(co, inv, g.fs) + h + 2 <= g.totals + 0.5f }
+fun bankTabFits(co: J, inv: J, g: Spec): Boolean = bankTabHeight(co, g.fs) > 0f && leftOther(co, inv, g.fs) + 2 <= g.totals + 0.5f
 
 /** Splits n item rows into pages (always at least one page). */
 fun paginate(n: Int, g: Spec): List<IntRange> {
@@ -397,17 +395,6 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
                 ly += rowH
             }
         }
-        if (bankTab) {
-            // the bank details as a small table: labels in one column, a tab, the values in the next, lined up under each other
-            val lh = 7.6f * fs; val labW = 38f * g.cw
-            var by = ly + (if (on("print_gst_table")) 3f else 0f)
-            pen.text("BANK DETAILS", lx, by, 120f, lh, 6f * fs, 700, color = MUTED, minScale = 1f); by += lh
-            for ((k, v) in bankTabRows(co)) {
-                pen.text("$k:", lx, by, labW, lh, 6.5f * fs, 700, minScale = 0.7f)
-                pen.text(v, lx + labW + 4f, by, w - rightW - 12 - labW - 4f, lh, 7f * fs, 600, minScale = 0.6f)
-                by += lh
-            }
-        }
         val wordsTop = y + g.totals - 4 - 8f * fs - 18f * fs
         if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) {
             val by = if (on("print_words")) wordsTop - 10f * fs else y + g.totals - 14f * fs
@@ -415,10 +402,25 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
                 lx, maxOf(ly + 1, by), w - 186 * g.cw - 12, 9f * fs, 6.5f * fs, 600, minScale = 0.6f)
             ly = maxOf(ly + 1, by) + 9f * fs
         }
+        val leftW = w - rightW - 12
+        val wy = maxOf(ly + 2, wordsTop)
         if (on("print_words")) {
-            val wy = maxOf(ly + 2, wordsTop)
-            pen.text("Amount in words", lx, wy, w - rightW - 12, 8f * fs, 6 * fs, 700, color = MUTED)
-            pen.para(inv.str("amount_words"), lx, wy + 8f * fs, w - rightW - 12, 7.5f * fs, 2, 600)
+            // with the bank details beside it, the words take the left 42% of the band
+            val ww = if (bankTab) leftW * 0.42f else leftW
+            pen.text("Amount in words", lx, wy, ww, 8f * fs, 6 * fs, 700, color = MUTED)
+            pen.para(inv.str("amount_words"), lx, wy + 8f * fs, ww, 7.5f * fs, 2, 600)
+        }
+        if (bankTab) {
+            // the bank details beside "Amount in words", in no extra height: two columns (labels, a tab, values), lined up
+            val rows = bankTabRows(co); val per = (rows.size + 1) / 2; val lh = 7.6f * fs
+            val bx = lx + leftW * 0.44f; val bw = leftW * 0.56f; val labW = 34f * g.cw
+            val colX = floatArrayOf(bx, bx + bw * 0.46f); val colW = floatArrayOf(bw * 0.46f, bw * 0.54f)
+            pen.vLine(bx - 4f, wy, wy + per * lh, 0.4f, MUTED)
+            rows.forEachIndexed { i, (k, v) ->
+                val c = i / per; val ry = wy + (i % per) * lh
+                pen.text("$k:", colX[c] + (if (c == 1) 4f else 0f), ry, labW, lh, 6.5f * fs, 700, minScale = 0.7f)
+                pen.text(v, colX[c] + (if (c == 1) 4f else 0f) + labW + 3f, ry, colW[c] - labW - 10f, lh, 7f * fs, 600, minScale = 0.55f)
+            }
         }
         val rx = x + w - rightW
         var ry = y + 4
