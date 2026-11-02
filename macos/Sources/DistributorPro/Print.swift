@@ -57,8 +57,10 @@ struct Spec {
     let cw: CGFloat
 
     var headFirst: CGFloat { strip + sellerBand + buyerBand + 0.6 }
-    /// height inside the margins, less the ruled lines between the header, table and totals
-    var inner: CGFloat { h - 2 * m - 2.4 }
+    /// height inside the margins, less the ruled lines between the header, table, totals and footer
+    var inner: CGFloat { h - 2 * m - 3.6 }
+    /// width inside the margins: the one width every block of the bill (header, table, totals, footer) is held to
+    var contentW: CGFloat { w - 2 * m }
     var size: CGSize { CGSize(width: w, height: h) }
     func cap(first: Bool, last: Bool) -> Int {
         Int(((inner - (first ? headFirst : headNext) - tableHead - foot - (last ? totals : 0)) / rowH).rounded(.down))
@@ -97,7 +99,7 @@ struct Spec {
                     strip: strip, sellerBand: sellerBand, buyerBand: buyerBand, headNext: headNext, fs: fs, cw: cw)
     }
 
-    static let half = Spec(w: 595.276, h: 420.945, m: 20, rowH: 12, tableHead: 15, foot: 26, totals: 91,
+    static let half = Spec(w: 595.276, h: 420.945, m: 24, rowH: 12, tableHead: 15, foot: 26, totals: 91,
                            strip: 15, sellerBand: 56, buyerBand: 0, headNext: 18, fs: 1, cw: 1)
     static let full = Spec(w: 595.276, h: 841.89, m: 34, rowH: 16, tableHead: 20, foot: 32, totals: 112,
                            strip: 19, sellerBand: 68, buyerBand: 0, headNext: 24, fs: 1.15, cw: 1.0)
@@ -279,32 +281,36 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
 
     var body: some View {
         let lines = inv.list("lines")
+        let W = g.contentW
+        // One ruled box, exactly as wide as the page inside its margins: header, item table, totals and the footer
+        // (terms, bank, signature) all sit inside the same border, so the margins are equal on all four sides.
         VStack(spacing: 0) {
+            if first { firstHeader } else { nextHeader }
+            hRule(frameLine)
+            // the item table: shaded heading row, light rule under every item, column lines down to the bottom
             VStack(spacing: 0) {
-                if first { firstHeader } else { nextHeader }
-                hRule(frameLine)
-                // the item table: shaded heading row, light rule under every item, column lines down to the bottom
-                VStack(spacing: 0) {
-                    rowView(headingsFor, g, height: g.tableHead, bold: true, cols: cols).background(shade)
-                    ForEach(Array(rows), id: \.self) { i in
-                        let l = lines[i]
-                        rowView(["\(i + 1)", Fmt.cut(co.str("print_caps") == "1" ? l.str("item_name").uppercased() : l.str("item_name"), g.fs > 1 ? 52 : 56), l.str("hsn"),
-                                 qtyText(l, pieces: co.str("print_qty") == "pcs"),
-                                 l.num("mrp") > 0 ? Fmt.qty(l.num("mrp")) : "", Fmt.amount(l.num("rate")),
-                                 l.num("disc_pct") > 0 ? Fmt.qty(l.num("disc_pct")) : "", Fmt.amount(l.num("taxable")),
-                                 Fmt.qty(l.num("gst_rate")), Fmt.amount(l.num("amount"))], g, height: g.rowH, cols: cols)
-                    }
-                    rowView(Array(repeating: "", count: 10), g, height: nil, cols: cols)
+                rowView(headingsFor, g, height: g.tableHead, bold: true, cols: cols).background(shade)
+                ForEach(Array(rows), id: \.self) { i in
+                    let l = lines[i]
+                    rowView(["\(i + 1)", Fmt.cut(co.str("print_caps") == "1" ? l.str("item_name").uppercased() : l.str("item_name"), g.fs > 1 ? 52 : 56), l.str("hsn"),
+                             qtyText(l, pieces: co.str("print_qty") == "pcs"),
+                             l.num("mrp") > 0 ? Fmt.qty(l.num("mrp")) : "", Fmt.amount(l.num("rate")),
+                             l.num("disc_pct") > 0 ? Fmt.qty(l.num("disc_pct")) : "", Fmt.amount(l.num("taxable")),
+                             Fmt.qty(l.num("gst_rate")), Fmt.amount(l.num("amount"))], g, height: g.rowH, cols: cols)
                 }
-                .frame(height: tableHeight, alignment: .top)
-                .overlay(gridLines(rowCount: rows.count))
-                if last { hRule(frameLine); totalsBlock }
+                rowView(Array(repeating: "", count: 10), g, height: nil, cols: cols)
             }
-            .overlay(Rectangle().stroke(ink, lineWidth: frameLine))
+            .frame(width: W, height: tableHeight, alignment: .top)
+            .overlay(gridLines(rowCount: rows.count))
+            if last { hRule(frameLine); totalsBlock.frame(width: W).clipped() }
+            hRule(frameLine)
             footer
         }
+        .frame(width: W, height: g.inner + 3.6, alignment: .top)
+        .clipped()
+        .overlay(Rectangle().stroke(ink, lineWidth: frameLine))
         .padding(g.m)
-        .frame(width: g.w, height: g.h, alignment: .top)
+        .frame(width: g.w, height: g.h, alignment: .topLeading)
         .background(Color.white)
         .foregroundStyle(ink)
         .environment(\.colorScheme, .light)
@@ -462,7 +468,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                 }
                 if on("print_words") || bankTab {
                     // the bank details sit beside "Amount in words" (the words take the left 42%), so they need no extra height
-                    let leftW = g.w - 186 * g.cw - 12
+                    let leftW = g.contentW - 186 * g.cw - 12   // inside the margins and the 6 pt padding each side
                     HStack(alignment: .bottom, spacing: 0) {
                         if on("print_words") {
                             VStack(alignment: .leading, spacing: 1.5) {
@@ -588,7 +594,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
     private var footer: some View {
         let bank: [[(String, String)]] = bankTab ? [] : bankLines(co)
         // fixed shares of the width, so long bank lines can never push the terms or the signature off the page
-        let W = g.w - 2 * g.m - 4
+        let W = g.contentW - 12
         let sigW: CGFloat = bank.isEmpty ? (W - 16) / 3 : 130 * g.cw
         let leftW: CGFloat = bank.isEmpty ? (W - 16) / 3 : (W - sigW - 16) * 0.40
         let midW: CGFloat = W - sigW - leftW - 16
@@ -627,8 +633,9 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             }
             .frame(width: sigW, alignment: .trailing)
         }
-        .padding(.horizontal, 2).padding(.top, 3)
-        .frame(height: g.foot, alignment: .top)
+        .padding(.horizontal, 6).padding(.top, 3).padding(.bottom, 2)
+        .frame(width: g.contentW, height: g.foot, alignment: .top)
+        .clipped()
     }
 }
 

@@ -24,6 +24,26 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## v15.9.2 — Bill print stays inside its margins, faster WhatsApp Web sending
+
+- **Print layout (iPhone and Mac, BillBox clean design)**: the bill's frame was wider than the page's printable width, so the border
+  ran to the paper edge and the table and header were pushed in by 20 pt on each side. Cause: the totals row (with the bank-details
+  table) was sized from the full page width, not the width inside the margins. Now every block is held to one width (page minus
+  margins), the half-sheet margin is 24 pt (about 8.5 mm) on all four sides, and the terms / bank / signature footer sits inside the
+  same border instead of hanging below it. A half sheet holds about one item row fewer because of the larger margin.
+- **WhatsApp Web sending (iPhone and Mac)** does less waiting per bill:
+  - the wait for the chat box now runs inside the page (it looks every 60 ms) instead of the app asking every 300 ms; the same for the
+    attachment preview (every 40 ms instead of 250 ms);
+  - the 300 ms pauses after typing the caption are gone (it waits only until the text is there), the second "confirm" wait after a
+    successful click is skipped (it tested the same thing), and the pause after the chat opens is 100 ms instead of 200 ms;
+  - "is the right chat already open?" is one call instead of two;
+  - the next bill no longer waits for the previous upload to finish unless it has to reload the page (a different customer).
+  - **Last result** (Settings > WhatsApp) now ends with the time of each step, for example
+    `check 12ms · settle 0ms · load 2310ms · chat 180ms · stage 25ms · attach-paste 90ms · send 150ms · total 2790ms`,
+    so the slow step on a given device or network can be read instead of guessed.
+  - Android is unchanged: it hands the bill to the WhatsApp app with the customer's chat already chosen, and the one tap left (Send)
+    belongs to WhatsApp.
+
 ## v15.9.1 — Half-sheet bills print whole
 
 - Half-sheet bills (A4 cut in two / A5) are sent to the printer as portrait pages with the bill turned onto them, on

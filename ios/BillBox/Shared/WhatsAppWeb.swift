@@ -278,6 +278,23 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
 
     struct SendError: LocalizedError { let message: String; var errorDescription: String? { message } }
 
+    /// Times every step of one send (open chat, stage bill, attach, press Send), so the real cost of each tap and wait on this
+    /// device can be read from "Last result" in Settings > WhatsApp instead of guessed. Example: open 1850ms · attach 140ms · send 210ms.
+    struct StepTrace {
+        private let start = Date()
+        private var last = Date()
+        private var steps: [(String, Int)] = []
+        mutating func mark(_ name: String) {
+            let now = Date()
+            steps.append((name, Int(now.timeIntervalSince(last) * 1000)))
+            last = now
+        }
+        var summary: String { steps.map { "\($0.0) \($0.1)ms" }.joined(separator: " · ") + " · total \(Int(Date().timeIntervalSince(start) * 1000))ms" }
+    }
+
+    /// The previous bill's upload, still finishing in the page. Only a page reload would cut it off, so only a reload waits for it.
+    private var settling: Task<Void, Never>?
+
     /// Queues one bill. Bills are sent one after another, never at the same time.
     func send(pdf: @escaping @MainActor () -> Data?, fileName: String, phone: String, caption: String) async throws {
         let prev = chain
@@ -285,7 +302,8 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
             await prev?.value
             do { try await self.sendNow(makePdf: pdf, fileName: fileName, phone: phone, caption: caption); return nil } catch { return error }
         }
-        chain = Task { _ = await job.value; _ = await self.run(Self.js(Self.settleScript)) }
+        chain = Task { _ = await job.value }
+        settling = Task { _ = await job.value; _ = await self.run(Self.js(Self.settleScript)) }
         if let e = await job.value { throw e }
     }
 
@@ -309,16 +327,30 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     private func sendNow(makePdf: @escaping @MainActor () -> Data?, fileName: String, phone: String, caption: String) async throws {
         _ = ensure()
         status = "Sending…"
+        var trace = StepTrace()
         // the bill is drawn while WhatsApp Web opens the chat, instead of before
         let pdfJob = Task { @MainActor in makePdf() }
         let reuse: Bool
-        if let o = openChat, o.phone == phone, await pageState() == "composer", await chatHeading() == o.heading { reuse = true } else { reuse = false }
-        if !reuse { await load("https://web.whatsapp.com/send?phone=\(phone)") }
+        // one call: is the chat box up, and whose chat is it (was two calls)
+        let now = await run(Self.js(Self.chatNowScript))
+        if let o = openChat, o.phone == phone, now == "composer|" + o.heading { reuse = true } else { reuse = false }
+        trace.mark("check")
+        if !reuse {
+            // a reload would cut off the previous bill's upload: wait for it to leave first (only here, not for every bill)
+            await settling?.value
+            trace.mark("settle")
+            await load("https://web.whatsapp.com/send?phone=\(phone)")
+            trace.mark("load")
+        }
 
         var state = "loading"
         var shownLogin = false
-        for i in 0..<600 {
-            state = await pageState()
+        let waitStart = Date()
+        while true {
+            // the waiting happens inside the page (it looks every 60 ms and answers the moment the chat box is there),
+            // instead of this app asking every 300 ms
+            state = await run(Self.js(Self.waitComposerScript), ["ms": 2500])
+            if state.hasPrefix("js-error") { state = "loading"; await pause(ms: 150) }   // the page was reloading under us
             if state == "composer" { break }
             if state == "invalid" { status = connected ? "Connected" : status; throw SendError(message: "\(phone) is not on WhatsApp.") }
             if state == "qr" && !shownLogin {
@@ -327,8 +359,10 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
                 status = "Scan the QR code to link WhatsApp"
                 showing = true
             }
-            if i >= 130 && state == "loading" { break }
-            await pause(ms: 300)
+            let waited = Date().timeIntervalSince(waitStart)
+            if state == "loading" && waited > 39 { break }
+            if waited > 180 { break }
+            if state == "qr" || state == "code" { await pause(ms: 300) }   // waiting for the person to link: do not spin
         }
         guard state == "composer" else {
             status = "Not connected"
@@ -336,7 +370,8 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         }
         if shownLogin { showing = false }
         connected = true
-        if !reuse { await pause(ms: 200) }
+        trace.mark("chat")
+        if !reuse { await pause(ms: 100) }   // the chat box has just been mounted: a moment for its paste handler (was 200 ms)
 
         guard await ensureComposer(phone: phone) else {
             status = "Connected"
@@ -346,6 +381,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         openChat = (phone, await chatHeading())
         let args: [String: Any] = ["b64": pdf.base64EncodedString(), "name": fileName + ".pdf"]
         let prepared = await run(Self.js(Self.prepareScript), args)
+        trace.mark("stage")
         guard prepared == "ready" else { lastResult = prepared; throw SendError(message: "WhatsApp Web did not accept the bill (\(prepared)).") }
 
         var tried: [String] = []
@@ -359,7 +395,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
             _ = await run(Self.js(Self.attachScript), ["method": method])
             let ok = await previewOpen(seconds: method == "input" ? 8 : 5)
             tried.append("\(method):\(ok ? "yes" : "no")")
-            if ok { opened = true; UserDefaults.standard.set(method, forKey: "wa_attach_first"); break }
+            if ok { opened = true; UserDefaults.standard.set(method, forKey: "wa_attach_first"); trace.mark("attach-\(method)"); break }
             await closePreviewIfAny()
         }
         guard opened else {
@@ -372,8 +408,10 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         var result = await run(Self.js(Self.finishScript), ["caption": caption])
         let sentNote = result.hasPrefix("clicked") ? String(result.dropFirst("clicked".count)) : ""
         if result.hasPrefix("clicked") { result = "clicked" }
-        result = await run(Self.js(Self.confirmScript), ["name": fileName + ".pdf"])
-        lastResult = "\(result) [\(tried.joined(separator: ", "))] \(sentNote)"
+        // "clicked" already means a new outgoing message appeared or the preview closed, the very test the confirm step makes: no second wait
+        if result == "clicked" { result = "sent" } else { result = await run(Self.js(Self.confirmScript), ["name": fileName + ".pdf"]) }
+        trace.mark("send")
+        lastResult = "\(result) [\(tried.joined(separator: ", "))] \(sentNote) ⏱ \(trace.summary)"
         status = "Connected"
         if result == "sent", !caption.isEmpty, sentNote.contains("no-caption") {
             _ = await run(Self.js(Self.sendTextScript), ["caption": caption])
@@ -403,11 +441,8 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     private func previewOpen(seconds: Int) async -> Bool {
-        for _ in 0..<(seconds * 4) {
-            if await run(Self.js("return previewOpen() ? 'y' : 'n';")) == "y" { return true }
-            await pause(ms: 250)
-        }
-        return false
+        // waits inside the page (looks every 40 ms) and answers as soon as the preview with its Send button is there
+        await run(Self.js(Self.waitPreviewScript), ["ms": seconds * 1000]) == "y"
     }
 
     private func closePreviewIfAny() async {
@@ -458,7 +493,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     /// Helpers every script starts with. WhatsApp changes its markup now and then, so each lookup tries several selectors.
     private static let prelude = #"""
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const wait = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const v = fn(); if (v) return v; await sleep(250); } return null; };
+    const wait = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const v = fn(); if (v) return v; await sleep(50); } return null; };
     const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
     const press = (e) => { for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) e.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window })); };
     const composerEl = () => document.querySelector('footer div[contenteditable="true"]');
@@ -477,6 +512,37 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     const captionEl = () => editables().filter((e) => !base.ed.has(e) && vis(e)).pop() || null;
     const previewOpen = () => sendEl() || captionEl();
     const outCount = () => document.querySelectorAll('[data-icon^="msg-"], .message-out, [data-id^="true_"]').length;
+    """#
+
+    /// Is the chat box up, and whose chat is it? One answer: "composer|Heading" or "none".
+    private static let chatNowScript = #"""
+    if (!composerEl()) return 'none';
+    const h = document.querySelector('#main header span[dir="auto"]') || document.querySelector('#main header');
+    return 'composer|' + (h ? (h.innerText || '').split('\n')[0].trim() : '');
+    """#
+
+    /// Waits INSIDE the page for the chat box (or an answer that needs the person: not on WhatsApp, QR code, link code).
+    /// Same checks as pageState(); returns loading / chats if `ms` runs out first.
+    private static let waitComposerScript = #"""
+    const q = (s) => document.querySelector(s);
+    const st = () => {
+      if (q('footer div[contenteditable="true"]')) return 'composer';
+      const d = q('div[role="dialog"]');
+      if (d && /invalid|isn.t on WhatsApp|not on WhatsApp/i.test(d.innerText || '')) return 'invalid';
+      if (q('[data-link-code]')) return 'code';
+      if (q('canvas[aria-label]') || q('div[data-ref]') || q('[data-testid="qrcode"]')) return 'qr';
+      if (q('#pane-side') || q('[data-icon="chats"]')) return 'chats';
+      return 'loading';
+    };
+    const t0 = Date.now();
+    let s = st();
+    while ((s === 'loading' || s === 'chats') && Date.now() - t0 < ms) { await sleep(60); s = st(); }
+    return s;
+    """#
+
+    /// Waits INSIDE the page for the attachment preview (the Send button or the caption box).
+    private static let waitPreviewScript = #"""
+    return (await wait(() => previewOpen(), ms)) ? 'y' : 'n';
     """#
 
     private static let attachScript = #"""
@@ -513,11 +579,12 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     if (caption && cap) {
       cap.focus();
       document.execCommand('insertText', false, caption);
-      await sleep(300);
-      if (!(cap.innerText || cap.textContent || '').includes(caption.slice(0, 8))) {
+      const has = () => (cap.innerText || cap.textContent || '').includes(caption.slice(0, 8));
+      await wait(has, 600);
+      if (!has()) {
         const dt = new DataTransfer(); dt.setData('text/plain', caption);
         cap.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-        await sleep(300);
+        await wait(has, 600);
       }
       note = (cap.innerText || cap.textContent || '').includes(caption.slice(0, 8)) ? '' : ':no-caption';
     } else if (caption) note = ':no-caption-box';

@@ -4,6 +4,12 @@ const fs = require('fs'), path = require('path'), assert = require('assert');
 const src = fs.readFileSync(path.join(__dirname, '../../macos/Sources/DistributorPro/WhatsAppWeb.swift'), 'utf8');
 const grab = (name) => { const m = src.match(new RegExp('static let ' + name + ' = #"""\\n([\\s\\S]*?)\\n\\s*"""#')); assert.ok(m, name + ' not found'); return m[1]; };
 const prelude = grab('prelude'), prepare = grab('prepareScript'), attach = grab('attachScript'), finish = grab('finishScript'), confirm = grab('confirmScript'), diagnose = grab('diagnose');
+const waitComposer = grab('waitComposerScript'), waitPreview = grab('waitPreviewScript'), chatNow = grab('chatNowScript');
+// the iPhone file must carry the same scripts as the Mac file the tests read
+const iosSrc = fs.readFileSync(path.join(__dirname, '../../ios/BillBox/Shared/WhatsAppWeb.swift'), 'utf8');
+for (const name of ['prelude', 'prepareScript', 'attachScript', 'finishScript', 'confirmScript', 'waitComposerScript', 'waitPreviewScript', 'chatNowScript']) {
+  const m = iosSrc.match(new RegExp('static let ' + name + ' = #"""\\n([\\s\\S]*?)\\n\\s*"""#')); assert.ok(m && m[1] === grab(name), 'iPhone script differs from the Mac: ' + name);
+}
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 let n = 0;
 const ok = async (name, fn) => { try { await fn(); n++; console.log('  ok  ', name); } catch (e) { console.log('  FAIL', name, '\n', e.stack); process.exitCode = 1; } };
@@ -12,7 +18,9 @@ const ok = async (name, fn) => { try { await fn(); n++; console.log('  ok  ', na
 // Like the real one it has an always-present search box (a contenteditable OUTSIDE the chat footer) and an always-present plain "Send" label,
 // plus the chat box. Attaching a file mounts the preview: a caption box and the real send button.
 function makePage(opts) {
-  const st = { preview: false, out: 0, pending: 0, attachVia: null, caption: '', ...opts };
+  const t0 = Date.now();
+  const st = { preview: false, out: 0, pending: 0, attachVia: null, caption: '', composerAt: 0, qr: false, ...opts };
+  const composerUp = () => Date.now() - t0 >= st.composerAt;
   const el = (kind, extra = {}) => ({
     kind, text: '', closest(sel) { return sel.includes('footer') && kind === 'composer' ? this : (sel.includes('button') ? this : null); },
     getBoundingClientRect: () => ({ width: 10, height: 10 }), focus() { st.focused = kind; },
@@ -36,7 +44,8 @@ function makePage(opts) {
     querySelector(sel) { return this.querySelectorAll(sel)[0] || null; },
     querySelectorAll(sel) {
       const r = [];
-      if (/^footer div\[contenteditable/.test(sel)) r.push(composer);
+      if (/^footer div\[contenteditable/.test(sel) && composerUp()) r.push(composer);
+      if (st.qr && /canvas\[aria-label\]/.test(sel)) r.push({});
       if (/contenteditable="true"\], \[contenteditable=""\]/.test(sel)) { r.push(search, composer); if (st.preview) r.push(cap); }
       if (/aria-label\^="Send"/.test(sel)) { r.push(decoy); if (st.preview) r.push(sendEl); }   // the plain "Send" never goes away; "Send 1 selected" only with the preview
       if (/data-icon\^="msg-"/.test(sel)) for (let i = 0; i < st.out; i++) r.push({});
@@ -91,6 +100,44 @@ function makePage(opts) {
     assert.strictEqual(await run(finish, { caption: '' }), 'preview-stayed');
     assert.strictEqual(await run(confirm, { name: 'BillBox-test.pdf' }), 'preview-stayed');
     assert.strictEqual(st.out, 0);
+  });
+
+  // ---- speed: the waiting happens inside the page and answers as soon as the thing is there ----
+  const timed = async (fn) => { const t = Date.now(); const v = await fn(); return [v, Date.now() - t]; };
+  await ok('waitComposer answers as soon as the chat box mounts (no 300 ms app-side polling)', async () => {
+    const { run } = makePage({ composerAt: 200 });
+    const [v, ms] = await timed(() => run(waitComposer, { ms: 2500 }));
+    assert.strictEqual(v, 'composer'); assert.ok(ms >= 150 && ms < 450, 'took ' + ms + ' ms');
+  });
+  await ok('waitComposer gives up with loading when the chat never opens, so the app can decide', async () => {
+    const { run } = makePage({ composerAt: 99999 });
+    const [v, ms] = await timed(() => run(waitComposer, { ms: 300 }));
+    assert.strictEqual(v, 'loading'); assert.ok(ms >= 280 && ms < 700, 'took ' + ms + ' ms');
+  });
+  await ok('waitComposer returns at once when the QR code shows (the person has to act)', async () => {
+    const { run } = makePage({ composerAt: 99999, qr: true });
+    const [v, ms] = await timed(() => run(waitComposer, { ms: 2500 }));
+    assert.strictEqual(v, 'qr'); assert.ok(ms < 150, 'took ' + ms + ' ms');
+  });
+  await ok('chatNow reports the chat box and heading in one answer, or none', async () => {
+    assert.strictEqual(await makePage({}).run(chatNow), 'composer|');
+    assert.strictEqual(await makePage({ composerAt: 99999 }).run(chatNow), 'none');
+  });
+  await ok('waitPreview returns y the moment the preview opens, n when it never does', async () => {
+    const a = makePage({ attachVia: 'paste', mouseWorks: true });
+    await a.prep(); await a.run(attach, { method: 'paste' });
+    const [y, ms] = await timed(() => a.run(waitPreview, { ms: 3000 }));
+    assert.strictEqual(y, 'y'); assert.ok(ms < 150, 'took ' + ms + ' ms');
+    const b = makePage({ attachVia: 'none' });
+    await b.prep();
+    const [no, ms2] = await timed(() => b.run(waitPreview, { ms: 300 }));
+    assert.strictEqual(no, 'n'); assert.ok(ms2 >= 280 && ms2 < 700, 'took ' + ms2 + ' ms');
+  });
+  await ok('typing the caption and pressing Send takes well under a second (no fixed sleeps)', async () => {
+    const { st, run, prep } = makePage({ attachVia: 'paste', mouseWorks: true });
+    await prep(); await run(attach, { method: 'paste' });
+    const [v, ms] = await timed(() => run(finish, { caption: 'Hello Shahbaz, your bill is attached' }));
+    assert.strictEqual(v, 'clicked'); assert.strictEqual(st.out, 1); assert.ok(ms < 250, 'took ' + ms + ' ms');
   });
   console.log(`\n${n} WhatsApp script checks passed`);
 })();
