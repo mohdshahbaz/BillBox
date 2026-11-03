@@ -38,8 +38,9 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
 
     // MARK: web view
 
-    /// A current iPhone Safari (mobile site): the page is loaded exactly as Safari on this iPhone would load it.
-    static let userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1"
+    /// A current desktop Safari: WhatsApp Web refuses to link browsers it thinks are out of date, and serves its desktop page
+    /// (with the QR code and "Log in with phone number") only to a desktop browser.
+    static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15"
 
     func ensure() -> WKWebView {
         if let web { return web }
@@ -47,8 +48,12 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         cfg.websiteDataStore = .default()          // keeps the WhatsApp login between launches
         let awake = WKUserScript(source: Self.stayAwake, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         cfg.userContentController.addUserScript(awake)
-        cfg.defaultWebpagePreferences.preferredContentMode = .mobile
-        let w = WKWebView(frame: UIScreen.main.bounds, configuration: cfg)
+        // WhatsApp Web sends phones to a "download the app" page (no QR code, no phone-number login): ask for the desktop
+        // site and look like a Mac to its checks (platform, touch points), not only by the browser name
+        cfg.defaultWebpagePreferences.preferredContentMode = .desktop
+        cfg.userContentController.addUserScript(WKUserScript(source: Self.desktop, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        let w = WKWebView(frame: CGRect(x: 0, y: 0, width: 1000, height: 720), configuration: cfg)
+        // WhatsApp Web serves its desktop page only to a desktop browser
         w.customUserAgent = Self.userAgent
         w.navigationDelegate = self
         web = w
@@ -63,7 +68,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         guard let window = scenes.flatMap({ $0.windows }).first(where: { $0.isKeyWindow }) ?? scenes.first?.windows.first else { return }
         w.removeFromSuperview()
         w.transform = .identity
-        w.frame = UIScreen.main.bounds
+        w.frame = CGRect(x: 0, y: 0, width: 1000, height: 720)
         w.alpha = 0.01
         w.isUserInteractionEnabled = false
         window.insertSubview(w, at: 0)
@@ -486,6 +491,18 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     """#
 
     /// Keeps the page from noticing that its window is parked.
+    /// A Mac to WhatsApp Web's device checks.
+    private static let desktop = #"""
+    try {
+      const def = (o, k, v) => { try { Object.defineProperty(o, k, { get: () => v, configurable: true }); } catch (e) {} };
+      def(Navigator.prototype, 'platform', 'MacIntel');
+      def(Navigator.prototype, 'maxTouchPoints', 0);
+      def(Navigator.prototype, 'vendor', 'Apple Computer, Inc.');
+      try { delete window.ontouchstart; } catch (e) {}
+      def(window, 'ontouchstart', undefined);
+    } catch (e) {}
+    """#
+
     private static let stayAwake = #"""
     try {
       Object.defineProperty(document, 'hidden', { get: () => false });
@@ -692,14 +709,22 @@ extension WhatsAppWeb {
         }
     }
 
-    /// Fills the sheet with the page (mobile layout, no scaling).
+    /// Holds the page at a desktop size (1000 points wide) and shrinks it to the sheet: on a phone-width page WhatsApp Web
+    /// rearranges itself and hides the QR code and "Log in with phone number".
+    /// Width the desktop page is laid out at before being scaled to the sheet (smaller = bigger text; WhatsApp Web hides the QR code below ~800).
+    static let pageWidth: CGFloat = 900
+
     final class FitBox: UIView {
         weak var page: WKWebView?
         override func layoutSubviews() {
             super.layoutSubviews()
             guard let w = page, bounds.width > 0 else { return }
+            let pw = WhatsAppWeb.pageWidth
+            let k = min(1, bounds.width / pw)
             w.transform = .identity
-            w.frame = bounds
+            w.frame = CGRect(x: 0, y: 0, width: pw, height: max(600, bounds.height / k))
+            w.transform = CGAffineTransform(scaleX: k, y: k)
+            w.frame.origin = .zero
         }
     }
 
