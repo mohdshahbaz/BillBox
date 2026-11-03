@@ -146,6 +146,22 @@ fun AddStockForm(item: J, onDismiss: () -> Unit, done: suspend () -> Unit) {
 }
 
 @Composable
+fun SetStockForm(item: J, onDismiss: () -> Unit, done: suspend () -> Unit) {
+    val app = LocalApp.current
+    var qty by remember { mutableStateOf("") }
+    val n = qty.trim().toIntOrNull()
+    FormDialog("Set stock · ${item.str("name")}", onDismiss, canSave = n != null, onSave = {
+        Api.obj("POST", "/items/${item.id}/set-stock", body = mapOf("qty" to n))
+        app.notify("Stock of ${item.str("name")} set to $n pcs.")
+        done()
+    }) {
+        Hint("Now ${item.str("stock")} pcs")
+        Field("New stock (total pieces)", qty, { qty = it }, kb = Kb.Signed, placeholder = item.str("stock"))
+        Hint("Total pieces, not boxes. Zero and negative numbers are allowed.")
+    }
+}
+
+@Composable
 fun SchemeForm(item: J, onDismiss: () -> Unit) {
     val app = LocalApp.current
     var type by remember { mutableStateOf("FREE_QTY") }

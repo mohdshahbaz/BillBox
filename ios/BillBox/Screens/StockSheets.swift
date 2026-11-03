@@ -400,3 +400,23 @@ import SwiftUI
         }
     }
 }
+
+@MainActor struct SetStockSheet: View {
+    @EnvironmentObject private var app: AppModel
+    let item: JSON
+    let done: () async -> Void
+    @State private var qty = ""
+
+    var body: some View {
+        FormSheet(title: "Set stock · \(item.str("name"))", canSave: Int(qty.trimmingCharacters(in: .whitespaces)) != nil, onSave: {
+            guard let n = Int(qty.trimmingCharacters(in: .whitespaces)) else { return }
+            _ = try await API.obj("POST", "/items/\(item.id)/set-stock", body: ["qty": n])
+            app.notify("Stock of \(item.str("name")) set to \(n) pcs.")
+            await done()
+        }) {
+            Text("Now \(item.str("stock")) pcs").foregroundStyle(.secondary)
+            Field("New stock (total pieces)", text: $qty, prompt: Text(item.str("stock"))).keyboardType(.numbersAndPunctuation)
+            Text("Total pieces, not boxes. Zero and negative numbers are allowed.").font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+}

@@ -323,6 +323,21 @@ router.post('/batches', h((req, res) => {
   res.status(201).json({ ok: true });
 }));
 
+// ---------- set stock (stocktake correction: total pieces, may be zero or negative) ----------
+router.post('/items/:id/set-stock', h((req, res) => {
+  const it = db.prepare('SELECT id FROM items WHERE id=?').get(req.params.id);
+  if (!it) throw new HttpError(404, 'Item not found');
+  const target = Number(req.body && req.body.qty);
+  if (!Number.isInteger(target)) throw new HttpError(400, 'Enter the stock as a whole number of pieces');
+  const cur = db.prepare('SELECT COALESCE(SUM(qty),0) n FROM batches WHERE item_id=?').get(it.id).n;
+  const diff = target - cur;
+  if (diff !== 0) db.prepare(
+    `INSERT INTO batches(item_id,batch_no,exp_date,qty) VALUES(?,?,?,?)
+     ON CONFLICT(item_id,batch_no) DO UPDATE SET qty = qty + excluded.qty`
+  ).run(it.id, 'ADJUST', '2099-12-31', diff);
+  res.json({ ok: true, previous: cur, stock: target });
+}));
+
 // ---------- schemes ----------
 router.get('/schemes', h((req, res) => {
   res.json(db.prepare('SELECT s.*, i.name item_name FROM schemes s JOIN items i ON i.id=s.item_id WHERE s.active=1').all());

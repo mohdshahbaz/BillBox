@@ -15,6 +15,7 @@ import AppKit
     @State private var editing: JSON?
     @State private var creating = false
     @State private var stockFor: JSON?
+    @State private var setStockFor: JSON?
     @State private var schemeFor: JSON?
     @State private var showBulk = false
     @State private var showCategory = false
@@ -90,6 +91,7 @@ import AppKit
     @ViewBuilder private func itemMenu(_ it: JSON) -> some View {
         Button("Edit…") { editing = it }
         Button("Add stock…") { stockFor = it }
+        Button("Set stock qty…") { setStockFor = it }
         Button("Add scheme…") { schemeFor = it }
         Divider()
         Button("Delete…", role: .destructive) { deleteTarget = it }
@@ -144,6 +146,7 @@ import AppKit
         .sheet(isPresented: $creating) { ItemSheet(item: nil, cats: cats) { await load() } }
         .sheet(item: $editing) { it in ItemSheet(item: it, cats: cats) { await load() } }
         .sheet(item: $stockFor) { it in AddStockSheet(item: it) { await load() } }
+        .sheet(item: $setStockFor) { it in SetStockSheet(item: it) { await load() } }
         .sheet(item: $schemeFor) { it in SchemeSheet(item: it) }
         .sheet(isPresented: $showBulk) { BulkPriceSheet(cats: cats, initialCat: catId) { await load() } }
         .sheet(isPresented: $showCategory) { CategorySheet { await load() } }
@@ -640,6 +643,26 @@ import AppKit
                     }
                 }
             }
+        }
+    }
+}
+
+@MainActor struct SetStockSheet: View {
+    @EnvironmentObject private var app: AppModel
+    let item: JSON
+    let done: () async -> Void
+    @State private var qty = ""
+
+    var body: some View {
+        FormSheet(title: "Set stock · \(item.str("name"))", canSave: Int(qty.trimmingCharacters(in: .whitespaces)) != nil, onSave: {
+            guard let n = Int(qty.trimmingCharacters(in: .whitespaces)) else { return }
+            _ = try await API.obj("POST", "/items/\(item.id)/set-stock", body: ["qty": n])
+            app.notify("Stock of \(item.str("name")) set to \(n) pcs.")
+            await done()
+        }) {
+            Text("Now \(item.str("stock")) pcs").foregroundStyle(.secondary)
+            TextField("New stock (total pieces)", text: $qty, prompt: Text(item.str("stock")))
+            Text("Total pieces, not boxes. Zero and negative numbers are allowed.").font(.footnote).foregroundStyle(.secondary)
         }
     }
 }

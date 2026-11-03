@@ -73,6 +73,7 @@ fun StockScreen() {
     var editing by remember { mutableStateOf<J?>(null) }
     var creating by remember { mutableStateOf(false) }
     var stockFor by remember { mutableStateOf<J?>(null) }
+    var setStockFor by remember { mutableStateOf<J?>(null) }
     var schemeFor by remember { mutableStateOf<J?>(null) }
     var sheet by remember { mutableStateOf("") }   // bulk, category, online, tidy, merge
     var mrpReport by remember { mutableStateOf<J?>(null) }
@@ -148,6 +149,7 @@ fun StockScreen() {
                     menu = { it -> listOfNotNull(
                         RowAction("Edit…", Icons.Default.Edit) { editing = it },
                         RowAction("Add stock…", Icons.Default.AddBox) { stockFor = it },
+                        RowAction("Set stock qty…", Icons.Default.Edit) { setStockFor = it },
                         RowAction("Add scheme…", Icons.Default.Redeem) { schemeFor = it },
                         RowAction("Delete…", Icons.Default.Delete, true) { deleteTarget = it },
                         if (selection.size > 1 && it.id in selection) RowAction("Merge ${selection.size} selected…", Icons.AutoMirrored.Filled.CallMerge) { sheet = "merge" } else null,
@@ -179,6 +181,7 @@ fun StockScreen() {
     if (creating) ItemForm(null, cats, { creating = false }) { load() }
     editing?.let { ItemForm(it, cats, { editing = null }) { load() } }
     stockFor?.let { AddStockForm(it, { stockFor = null }) { load() } }
+    setStockFor?.let { SetStockForm(it, { setStockFor = null }) { load() } }
     schemeFor?.let { SchemeForm(it) { schemeFor = null } }
     when (sheet) {
         "bulk" -> BulkPriceForm(cats, catId, { sheet = "" }) { load() }

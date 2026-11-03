@@ -15,6 +15,7 @@ import SwiftUI
     @State private var editing: JSON?
     @State private var creating = false
     @State private var stockFor: JSON?
+    @State private var setStockFor: JSON?
     @State private var schemeFor: JSON?
     @State private var showBulk = false
     @State private var showCategory = false
@@ -77,6 +78,7 @@ import SwiftUI
     @ViewBuilder private func itemMenu(_ it: JSON) -> some View {
         Button { editing = it } label: { Label("Edit…", systemImage: "pencil") }
         Button { stockFor = it } label: { Label("Add stock…", systemImage: "plus.square") }
+        Button { setStockFor = it } label: { Label("Set stock qty…", systemImage: "square.and.pencil") }
         Button { schemeFor = it } label: { Label("Add scheme…", systemImage: "gift") }
         Divider()
         Button(role: .destructive) { deleteTarget = it } label: { Label("Delete…", systemImage: "trash") }
@@ -133,6 +135,7 @@ import SwiftUI
         .sheet(isPresented: $creating) { ItemSheet(item: nil, cats: cats) { await load() } }
         .sheet(item: $editing) { it in ItemSheet(item: it, cats: cats) { await load() } }
         .sheet(item: $stockFor) { it in AddStockSheet(item: it) { await load() } }
+        .sheet(item: $setStockFor) { it in SetStockSheet(item: it) { await load() } }
         .sheet(item: $schemeFor) { it in SchemeSheet(item: it) }
         .sheet(isPresented: $showBulk) { BulkPriceSheet(cats: cats, initialCat: catId) { await load() } }
         .sheet(isPresented: $showCategory) { CategorySheet { await load() } }
