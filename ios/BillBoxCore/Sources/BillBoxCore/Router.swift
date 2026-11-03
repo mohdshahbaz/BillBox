@@ -163,6 +163,7 @@ public final class Router {
         case ("POST", 3, "items") where s[1] == "online" && s[2] == "extract": return ok(try ItemTools.extractList(db, b))
         case ("POST", 3, "items") where s[1] == "online" && s[2] == "search": return ok(try await WebList.search(b))
         case ("POST", 3, "items") where s[1] == "online" && s[2] == "fetch": return ok(try await WebList.fetchList(db, b))
+        case ("POST", 3, "items") where s[2] == "set-stock": return ok(try setStock(db, s[1], b))
         case ("POST", 2, "items") where s[1] == "bulk-add": return .json(201, try ItemTools.bulkAdd(db, b))
         case ("POST", 2, "items") where s[1] == "bulk-prices-by-mrp": return ok(try bulkPricesByMRP(db, b))
         case ("GET", 2, "items") where s[1] == "mrp-groups": return ok(try mrpGroups(db, q))
