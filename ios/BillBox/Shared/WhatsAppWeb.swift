@@ -11,6 +11,8 @@ import WebKit
 final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     static let shared = WhatsAppWeb()
 
+    static let pageWidth: CGFloat = 900
+
     @Published var connected = false
     @Published var status = "Not connected yet"
     @Published var lastResult = ""
