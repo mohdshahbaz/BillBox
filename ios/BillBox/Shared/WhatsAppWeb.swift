@@ -392,7 +392,9 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
 
         var state = "loading"
         var shownLogin = false
-        let waitStart = Date()
+        var waitStart = Date()
+        var chatListSince: Date?      // when the page first showed only the chat list (the chat for this number never opened)
+        var retriedOpen = false
         while true {
             // the waiting happens inside the page (it looks every 60 ms and answers the moment the chat box is there),
             // instead of this app asking every 300 ms
@@ -406,6 +408,17 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
                 status = "Scan the QR code to link WhatsApp"
                 showing = true
             }
+            if state == "chats" {
+                // linked, but the page sits on the chat list instead of opening this number's chat: try once more, then say so
+                if chatListSince == nil { chatListSince = Date() }
+                if Date().timeIntervalSince(chatListSince!) > 20 {
+                    if retriedOpen { break }
+                    retriedOpen = true
+                    chatListSince = nil
+                    await load("https://web.whatsapp.com/send?phone=\(phone)")
+                    waitStart = Date()
+                }
+            } else { chatListSince = nil }
             let waited = Date().timeIntervalSince(waitStart)
             if state == "loading" && waited > 39 { break }
             if waited > 180 { break }
@@ -413,7 +426,9 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         }
         guard state == "composer" else {
             status = "Not connected"
-            throw SendError(message: state == "qr" ? "WhatsApp is not linked. Scan the QR code in Settings > WhatsApp." : "WhatsApp Web did not open the chat in time.")
+            throw SendError(message: state == "qr" ? "WhatsApp is not linked. Scan the QR code in Settings > WhatsApp."
+                : state == "chats" ? "WhatsApp Web stayed on the chat list and did not open the chat for \(phone). Check that the party's number includes the country code (e.g. 91…)."
+                : "WhatsApp Web did not open the chat in time.")
         }
         if shownLogin { showing = false }
         connected = true

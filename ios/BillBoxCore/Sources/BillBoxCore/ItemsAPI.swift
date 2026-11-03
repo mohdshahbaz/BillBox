@@ -326,7 +326,9 @@ extension Router {
     /// Stocktake correction: sets an item's total pieces (zero or negative allowed) by adjusting an ADJUST batch.
     func setStock(_ db: Database, _ id: String, _ b: Row) throws -> Any {
         guard let it = try db.prepare("SELECT id FROM items WHERE id=?").get(id) else { throw HttpError(404, "Item not found") }
-        guard let target = Int(JS.string(b["qty"] ?? nil).trimmingCharacters(in: .whitespaces)) else { throw HttpError(400, "Enter the stock as a whole number of pieces") }
+        let t = JS.parseInt(b["qty"] ?? nil)
+        guard !t.isNaN, t == t.rounded() else { throw HttpError(400, "Enter the stock as a whole number of pieces") }
+        let target = Int(t)
         let cur = try db.prepare("SELECT COALESCE(SUM(qty),0) n FROM batches WHERE item_id=?").get(it.v("id"))!.n("n")
         let diff = Double(target) - cur
         if diff != 0 {
