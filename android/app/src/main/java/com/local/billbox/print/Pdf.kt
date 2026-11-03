@@ -124,10 +124,12 @@ fun bankLine(pen: Pen, pairs: List<Pair<String, String>>, x: Float, top: Float, 
     for ((t, wt) in parts) { if (cx >= x + w) break; cx += pen.text(t, cx, top, x + w - cx, h, size * k, wt, minScale = 1f) }
 }
 
+/** Settings › Printing › Bank details size: text size and the share of the band's left side the block gets (the words take the rest). */
+fun bankSize(co: J): Pair<Float, Float> = when (co.str("print_bank_size")) { "s" -> 0.9f to 0.56f; "l" -> 1.15f to 0.66f; "xl" -> 1.3f to 0.70f; else -> 1f to 0.62f }
 /** The bank details as (label, value) rows for the aligned block above "Amount in words": Bank, A/c name, A/c no., IFSC, Branch, Address. */
 fun bankTabRows(co: J): List<Pair<String, String>> = bankLines(co).flatten().map { (k, v) -> (if (k.isEmpty()) "Address" else k) to v }
 /** Height of that block: the rows are split over two columns, so at most three lines: it sits beside "Amount in words", which is as tall. */
-fun bankTabHeight(co: J, fs: Float): Float = bankTabRows(co).let { if (it.isEmpty()) 0f else ((it.size + 1) / 2) * 7.6f * fs }
+fun bankTabHeight(co: J, fs: Float): Float = bankTabRows(co).let { if (it.isEmpty()) 0f else ((it.size + 1) / 2) * 7.6f * fs * bankSize(co).first }
 /** Height of the left side of the totals band above "Amount in words": GST table and balance line. */
 fun leftTop(co: J, inv: J, f: Float): Float {
     fun on(k: String) = co.str(k).isEmpty() || co.str(k) != "0"
@@ -145,7 +147,7 @@ fun leftOther(co: J, inv: J, f: Float): Float {
 fun bankTabPer(co: J, inv: J, g: Spec): Int {
     val n = bankTabRows(co).size
     if (n == 0) return 0
-    val fit = ((g.totals - leftTop(co, inv, g.fs) - 2) / (7.6f * g.fs)).toInt()
+    val fit = ((g.totals - leftTop(co, inv, g.fs) - 2) / (7.6f * g.fs * bankSize(co).first)).toInt()
     return if (n <= fit) n else (n + 1) / 2
 }
 /** True when the bank block fits in the totals band of this page design (otherwise the bank lines stay in the footer). */
@@ -416,22 +418,26 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         val leftW = w - rightW - 12
         val wy = maxOf(ly + 2, wordsTop)
         if (on("print_words")) {
-            // with the bank details beside it, the words take the left 42% of the band
-            val ww = if (bankTab) leftW * 0.42f else leftW
+            // with the bank details beside it, the words take what the bank block leaves (Settings › Printing › Bank details size)
+            val ww = if (bankTab) leftW * (1f - bankSize(co).second - 0.02f) else leftW
             pen.text("Amount in words", lx, wy, ww, 8f * fs, 6 * fs, 700, color = MUTED)
-            pen.para(inv.str("amount_words"), lx, wy + 8f * fs, ww, 7.5f * fs, 2, 600)
+            // a narrower column: the words shrink (down to 65%) to stay on two lines instead of being cut off
+            val wt = pen.width(inv.str("amount_words"), 7.5f * fs, 600)
+            val wsz = if (wt > ww * 1.85f) maxOf(7.5f * fs * 0.65f, 7.5f * fs * ww * 1.85f / wt) else 7.5f * fs
+            pen.para(inv.str("amount_words"), lx, wy + 8f * fs, ww, wsz, 2, 600)
         }
         if (bankTab) {
             // the bank details beside "Amount in words", using the free height of the band too: one column when all rows fit, else
             // two; labels, a tab, then the values, lined up, behind a fine divider
-            val rows = bankTabRows(co); val per = bankTabPer(co, inv, g); val cols = (rows.size + per - 1) / per; val lh = 7.6f * fs
-            val bx = lx + leftW * 0.46f; val cwid = leftW * 0.54f / cols; val labW = 36f * g.cw
+            val rows = bankTabRows(co); val per = bankTabPer(co, inv, g); val cols = (rows.size + per - 1) / per
+            val bs = bankSize(co); val sc = bs.first; val lh = 7.6f * fs * sc
+            val bx = lx + leftW * (1f - bs.second); val cwid = leftW * bs.second / cols; val labW = 36f * g.cw * sc
             val top = maxOf(ly + 2, minOf(wy, y + g.totals - 4 - per * lh))
             pen.vLine(bx - 6f, top, top + per * lh, 0.5f, MUTED)
             rows.forEachIndexed { i, (k, v) ->
                 val c = i / per; val cx = bx + c * cwid; val ry = top + (i % per) * lh
-                pen.text("$k:", cx, ry, labW, lh, 6.5f * fs, 700, minScale = 0.8f)
-                pen.text(v, cx + labW + 3f, ry, cwid - labW - 9f, lh, 7.5f * fs, 600, minScale = 0.8f)
+                pen.text("$k:", cx, ry, labW, lh, 6.5f * fs * sc, 700, minScale = 0.8f)
+                pen.text(v, cx + labW + 3f, ry, cwid - labW - 9f, lh, 7.5f * fs * sc, 600, minScale = 0.8f)
             }
         }
         val rx = x + w - rightW

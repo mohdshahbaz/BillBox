@@ -25,16 +25,16 @@ function makePage(opts) {
     kind, text: '', closest(sel) { return sel.includes('footer') && kind === 'composer' ? this : (sel.includes('button') ? this : null); },
     getBoundingClientRect: () => ({ width: 10, height: 10 }), focus() { st.focused = kind; },
     getAttribute: (a) => (a === 'aria-label' ? (kind === 'send' ? 'Send 1 selected' : kind === 'decoy' ? 'Send' : 'x') : null),
-    dispatchEvent(ev) { return handle(kind, ev); }, click() { if (kind === 'send' && st.clickWorks) send(); },
+    dispatchEvent(ev) { return handle(kind, ev); }, click() { if (kind === 'send') { st.clicks = (st.clicks || 0) + 1; if (st.clickWorks) send(); } },
     get innerText() { return this.text; }, ...extra,
   });
   const decoy = el('decoy'), sendEl = el('send'), composer = el('composer'), cap = el('caption'), search = el('search'), input = el('input', { accept: '*', files: null });
   const send = () => { if (!st.preview) return; st.preview = false; st.out++; st.pending = 1; st.sentCaption = cap.text; setTimeout(() => { st.pending = 0; }, 300); };
   function handle(kind, ev) {
-    if (ev.type === 'paste' && st.attachVia === 'paste' && kind === 'composer') st.preview = true;
+    if (ev.type === 'paste' && st.attachVia === 'paste' && kind === 'composer') { if (st.previewDelay) setTimeout(() => { st.preview = true; }, st.previewDelay); else st.preview = true; }
     if (ev.type === 'drop' && st.attachVia === 'drop') st.preview = true;
     if (ev.type === 'change' && kind === 'input' && st.attachVia === 'input') st.preview = true;
-    if (ev.type === 'click' && kind === 'send' && st.mouseWorks) send();
+    if (ev.type === 'click' && kind === 'send') { st.clicks = (st.clicks || 0) + 1; if (st.mouseWorks) { if (st.sendDelay) setTimeout(send, st.sendDelay); else send(); } }
     if (ev.type === 'keydown' && ev.key === 'Enter' && kind === 'caption' && st.enterWorks) send();
     return true;
   }
@@ -138,6 +138,32 @@ function makePage(opts) {
     await prep(); await run(attach, { method: 'paste' });
     const [v, ms] = await timed(() => run(finish, { caption: 'Hello Shahbaz, your bill is attached' }));
     assert.strictEqual(v, 'clicked'); assert.strictEqual(st.out, 1); assert.ok(ms < 250, 'took ' + ms + ' ms');
+  });
+
+  // ---- slow phone / slow WhatsApp: the cases where giving up early re-attaches or sends the bill twice ----
+  await ok('a preview that draws after 4 s (slow phone) is still found within the 5 s the app waits', async () => {
+    const { st, run, prep } = makePage({ attachVia: 'paste', previewDelay: 4000 });
+    await prep(); await run(attach, { method: 'paste' });
+    const [v, ms] = await timed(() => run(waitPreview, { ms: 5000 }));
+    assert.strictEqual(v, 'y'); assert.ok(ms >= 3800 && ms < 5000, 'took ' + ms + ' ms');
+  });
+  await ok('a slow Send (the bill appears 2.5 s after the click) is pressed once, not twice', async () => {
+    const { st, run, prep } = makePage({ attachVia: 'paste', mouseWorks: true, sendDelay: 2500 });
+    await prep(); await run(attach, { method: 'paste' });
+    st.preview = true;
+    assert.strictEqual(await run(finish, { caption: '' }), 'clicked');
+    assert.strictEqual(st.clicks, 1, 'Send was clicked ' + st.clicks + ' times');
+    assert.strictEqual(st.out, 1);
+  });
+  await ok('the app waits long enough for a slow preview and cannot hang on one stuck step (both Swift files)', async () => {
+    for (const [name, text] of [['Mac', src], ['iPhone', iosSrc]]) {
+      const m = text.match(/previewOpen\(seconds: method == "input" \? (\d+) : (\d+)\)/); assert.ok(m, name + ': preview wait not found');
+      assert.ok(+m[1] >= 8 && +m[2] >= 5, name + ': preview wait too short (' + m[1] + '/' + m[2] + ' s)');
+      assert.ok(/abortAt = Date\(\)\.addingTimeInterval\(\d+\)/.test(text) && /if overtime \{ break \}/.test(text), name + ': no time limit on attaching');
+      assert.ok(/waitSettled\(maxSeconds: \d+\)/.test(text), name + ': the wait for the previous bill is not capped');
+      assert.ok(/if status == "Sending…" \{ status = /.test(text), name + ': status can stay on Sending…');
+      assert.ok(/The bill is attached in the chat\. (Tap|Click) the green Send icon/.test(text), name + ': no tap-Send fallback');
+    }
   });
   console.log(`\n${n} WhatsApp script checks passed`);
 })();

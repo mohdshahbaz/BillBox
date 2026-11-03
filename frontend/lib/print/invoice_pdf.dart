@@ -226,10 +226,25 @@ List<List<String>> _bankRows(Json co) {
   ].where((r) => r[1].isNotEmpty).toList();
 }
 
+/// Settings "print_bank_size": text size and how the band's left side is shared between "Amount in words" (flex) and the bank block.
+({double scale, int words, int bank}) _bankSize(Json co) {
+  switch ('${co['print_bank_size'] ?? ''}') {
+    case 's':
+      return (scale: 0.9, words: 44, bank: 56);
+    case 'l':
+      return (scale: 1.15, words: 34, bank: 66);
+    case 'xl':
+      return (scale: 1.3, words: 30, bank: 70);
+    default:
+      return (scale: 1.0, words: 38, bank: 62);
+  }
+}
+
 /// The bank details as a small table beside "Amount in words" that also uses the free height of the band: one column when
 /// every row fits [fit] lines, else two. Labels, a tab, then the values, lined up, behind a fine divider.
 pw.Widget _bankTab(Json co, int fit) {
-  const lh = 7.2;
+  final sc = _bankSize(co).scale;
+  final lh = 7.2 * sc;
   final rows = _bankRows(co);
   if (rows.isEmpty) return pw.SizedBox();
   final per = rows.length <= fit ? rows.length : ((rows.length + 1) / 2).ceil();
@@ -239,9 +254,9 @@ pw.Widget _bankTab(Json co, int fit) {
             pw.SizedBox(
               height: lh,
               child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.SizedBox(width: 34, child: pw.Text('${r[0]}:', style: _s(6, bold: true), maxLines: 1)),
+                pw.SizedBox(width: 34 * sc, child: pw.Text('${r[0]}:', style: _s(6 * sc, bold: true), maxLines: 1)),
                 pw.SizedBox(width: 3),
-                pw.Expanded(child: pw.Text(r[1], style: _s(7), maxLines: 1)),
+                pw.Expanded(child: pw.Text(r[1], style: _s(7 * sc), maxLines: 1)),
               ]),
             ),
         ]),
@@ -282,7 +297,7 @@ pw.Widget _totals(Json inv, Json co) {
       );
   final due = _n(inv['total']) - _n(inv['paid']);
   // lines of the left column still free once the GST rows have their height (the bank rows may use all of it)
-  final bankFit = ((Geo.totals - 3 - 9.0 * (1 + g.length) - 3 - 2) / 7.2).floor();
+  final bankFit = ((Geo.totals - 3 - 9.0 * (1 + g.length) - 3 - 2) / (7.2 * _bankSize(co).scale)).floor();
   return pw.SizedBox(
     height: Geo.totals,
     child: pw.Container(
@@ -296,8 +311,8 @@ pw.Widget _totals(Json inv, Json co) {
             pw.SizedBox(height: 3),
             // "Amount in words" on the left, the bank details beside it (no extra height)
             pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-              pw.Expanded(flex: 42, child: pw.Text('Amount in words: ${inv['amount_words']}', style: _s(6.5), maxLines: 3)),
-              if (_bankRows(co).isNotEmpty) ...[pw.SizedBox(width: 6), pw.Expanded(flex: 58, child: _bankTab(co, bankFit))],
+              pw.Expanded(flex: _bankRows(co).isEmpty ? 100 : _bankSize(co).words, child: pw.Text('Amount in words: ${inv['amount_words']}', style: _s(6.5), maxLines: 3)),
+              if (_bankRows(co).isNotEmpty) ...[pw.SizedBox(width: 6), pw.Expanded(flex: _bankSize(co).bank, child: _bankTab(co, bankFit))],
             ]),
           ]),
         ),

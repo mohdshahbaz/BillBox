@@ -140,10 +140,20 @@ func bankLineText(_ pairs: [(String, String)], size: CGFloat, serif: Bool = fals
     return t
 }
 
+/// Settings › Printing › Bank details size: how big the bank block prints beside "Amount in words" - the text size and the share of the
+/// band's left side the block gets (the words take the rest, so a bigger block means a narrower "Amount in words").
+func bankSize(_ co: JSON) -> (scale: CGFloat, width: CGFloat) {
+    switch co.str("print_bank_size") {
+    case "s": return (0.9, 0.56)
+    case "l": return (1.15, 0.66)
+    case "xl": return (1.3, 0.70)
+    default: return (1.0, 0.62)
+    }
+}
 /// The bank details as (label, value) rows for the aligned block above "Amount in words": Bank, A/c name, A/c no., IFSC, Branch, Address.
 func bankTabRows(_ co: JSON) -> [(String, String)] { bankLines(co).flatMap { $0 }.map { ($0.0.isEmpty ? "Address" : $0.0, $0.1) } }
 /// Height of that block: a small heading and one line per row.
-func bankTabHeight(_ co: JSON, _ fs: CGFloat) -> CGFloat { let n = bankTabRows(co).count; return n == 0 ? 0 : CGFloat((n + 1) / 2) * 7.6 * fs }
+func bankTabHeight(_ co: JSON, _ fs: CGFloat) -> CGFloat { let n = bankTabRows(co).count; return n == 0 ? 0 : CGFloat((n + 1) / 2) * 7.6 * fs * bankSize(co).scale }
 /// Height of the left side of the totals band above "Amount in words": GST table and balance line.
 func leftTop(_ co: JSON, _ inv: JSON, _ f: CGFloat) -> CGFloat {
     func on(_ k: String) -> Bool { co.str(k).isEmpty || co.str(k) != "0" }
@@ -161,7 +171,7 @@ func leftOther(_ co: JSON, _ inv: JSON, _ f: CGFloat) -> CGFloat {
 func bankTabPer(_ co: JSON, _ inv: JSON, _ g: Spec) -> Int {
     let n = bankTabRows(co).count
     if n == 0 { return 0 }
-    let fit = Int((g.totals - leftTop(co, inv, g.fs) - 2) / (7.6 * g.fs))
+    let fit = Int((g.totals - leftTop(co, inv, g.fs) - 2) / (7.6 * g.fs * bankSize(co).scale))
     return n <= fit ? n : (n + 1) / 2
 }
 /// True when the bank block fits in the totals band of this page design (otherwise the bank lines stay in the footer).
@@ -473,11 +483,12 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                         if on("print_words") {
                             VStack(alignment: .leading, spacing: 1.5) {
                                 t("Amount in words", 6, bold: true).foregroundStyle(muted)
-                                t(inv.str("amount_words"), 7.5, weight: .semibold).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                                t(inv.str("amount_words"), 7.5, weight: .semibold).lineLimit(2).minimumScaleFactor(0.65).fixedSize(horizontal: false, vertical: true)
                             }
-                            .frame(width: bankTab ? leftW * 0.42 : nil, alignment: .topLeading)
+                            .frame(width: bankTab ? leftW * (1 - bankSize(co).width - 0.02) : nil, alignment: .topLeading)
                         }
-                        if bankTab { bankTabBlock.frame(width: leftW * 0.56, alignment: .topLeading).padding(.leading, leftW * 0.02) }
+                        // the bank details start right after the words (Settings › Printing › Bank details size sets how much room they get)
+                        if bankTab { bankTabBlock.frame(width: leftW * bankSize(co).width, alignment: .topLeading).padding(.leading, leftW * 0.02) }
                     }
                 }
             }
@@ -499,16 +510,17 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
     private var bankTabBlock: some View {
         let rows = bankTabRows(co)
         let per = max(1, bankTabPer(co, inv, g))
+        let sc = bankSize(co).scale
         let cols = stride(from: 0, to: rows.count, by: per).map { Array(rows[$0..<min($0 + per, rows.count)]) }
         return HStack(alignment: .top, spacing: 8) {
             ForEach(0..<cols.count, id: \.self) { c in
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(cols[c].enumerated()), id: \.offset) { _, r in
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            t(r.0 + ":", 6.5, bold: true).lineLimit(1).minimumScaleFactor(0.8).frame(width: 36 * g.cw, alignment: .leading)
-                            t(r.1, 7.5, weight: .semibold).lineLimit(1).minimumScaleFactor(0.8)
+                            t(r.0 + ":", 6.5 * sc, bold: true).lineLimit(1).minimumScaleFactor(0.8).frame(width: 36 * g.cw * sc, alignment: .leading)
+                            t(r.1, 7.5 * sc, weight: .semibold).lineLimit(1).minimumScaleFactor(0.8)
                         }
-                        .frame(height: 7.6 * g.fs, alignment: .leading)
+                        .frame(height: 7.6 * g.fs * sc, alignment: .leading)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)

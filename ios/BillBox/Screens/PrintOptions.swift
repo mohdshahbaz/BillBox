@@ -93,11 +93,14 @@ import SwiftUI
         Section {
             Toggle("Print the bank details", isOn: flag("print_bank_block", true))
             Toggle("Compact totals (more item rows on each page)", isOn: flag("print_compact", true))
+            Picker("Bank details size", selection: choice("print_bank_size", "m")) {
+                Text("Small").tag("s"); Text("Normal").tag("m"); Text("Large").tag("l"); Text("Extra large").tag("xl")
+            }
             ForEach(bankFields, id: \.key) { f in
                 SettingTextField(title: f.title, key: f.key, placeholder: f.key == "bank_address" ? "Branch address" : "", maxLength: f.key == "bank_address" ? 200 : 60)
             }
         } header: { Text("Bank details") } footer: {
-            Text("Printed in three short lines (Bank · A/c name / A/c no. · IFSC / Branch · address) where the bill has room anyway: in the footer. Empty ones are left out. Compact totals: the totals and GST table take only the height they need, the Marg style shows only the bill's GST classes (unless “all” is chosen) and its bank details move to the footer, so more item rows fit on each page.")
+            Text("Printed in three short lines (Bank · A/c name / A/c no. · IFSC / Branch · address) where the bill has room anyway: in the footer. Empty ones are left out. Bank details size: the details print right beside “Amount in words”; a bigger size gives them more width and larger text (and “Amount in words” less width). Compact totals: the totals and GST table take only the height they need, the Marg style shows only the bill's GST classes (unless “all” is chosen) and its bank details move to the footer, so more item rows fit on each page.")
         }
     }
 }

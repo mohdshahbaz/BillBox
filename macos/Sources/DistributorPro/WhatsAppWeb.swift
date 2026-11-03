@@ -320,6 +320,17 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
     /// The previous bill's upload, still finishing in the page. Only a page reload would cut it off, so only a reload waits for it.
     private var settling: Task<Void, Never>?
 
+    /// Waits for the previous bill's upload to leave, but never longer than `maxSeconds` (a phone that is offline would hold every later bill for 45 s).
+    private func waitSettled(maxSeconds: Int) async {
+        guard let s = settling else { return }
+        await withTaskGroup(of: Void.self) { g in
+            g.addTask { await s.value }
+            g.addTask { await pause(ms: maxSeconds * 1000) }
+            _ = await g.next()
+            g.cancelAll()
+        }
+    }
+
     /// Queues one bill. Bills are sent one after another, never at the same time. Returns when WhatsApp has taken it (or failed).
     func send(pdf: @escaping @MainActor () -> Data?, fileName: String, phone: String, caption: String) async throws {
         let prev = chain
@@ -365,7 +376,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
         trace.mark("check")
         if !reuse {
             // a reload would cut off the previous bill's upload: wait for it to leave first (only here, not for every bill)
-            await settling?.value
+            await waitSettled(maxSeconds: 15)
             trace.mark("settle")
             await load("https://web.whatsapp.com/send?phone=\(phone)")
             trace.mark("load")
@@ -399,7 +410,6 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
         }
         if shownLogin { hidePanel() }
         connected = true
-        abortAt = Date().addingTimeInterval(50)
         trace.mark("chat")
         if !reuse { await pause(ms: 100) }   // the chat box has just been mounted: a moment for its paste handler (was 200 ms)
 
@@ -415,6 +425,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
         guard prepared == "ready" else { lastResult = prepared; throw SendError(message: "WhatsApp Web did not accept the bill (\(prepared)).") }
 
         // Try each way of attaching the PDF until WhatsApp shows its preview with a Send button.
+        abortAt = Date().addingTimeInterval(45)   // attaching and sending must be done by then: a stuck step can never hold up every bill after it
         var tried: [String] = []
         var opened = false
         if await run(Self.js("return previewOpen() ? 'y' : 'n';")) == "y" { await closePreviewIfAny() }   // start from a clean chat
@@ -424,7 +435,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
                 _ = await run(Self.js(Self.prepareScript), args)   // again, in case the page reloaded and forgot the file
             }
             _ = await run(Self.js(Self.attachScript), ["method": method])
-            let ok = await previewOpen(seconds: method == "input" ? 6 : 3)
+            let ok = await previewOpen(seconds: method == "input" ? 8 : 5)
             tried.append("\(method):\(ok ? "yes" : "no")")
             if ok { opened = true; UserDefaults.standard.set(method, forKey: "wa_attach_first"); trace.mark("attach-\(method)"); break }
             await closePreviewIfAny()
@@ -531,11 +542,11 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
     /// This waits for the chat box to be back, and reopens the chat link once if the page stays on the logo.
     private func ensureComposer(phone: String) async -> Bool {
         var reloaded = false
-        for i in 0..<60 {
+        for i in 0..<224 {
             let st = await pageState()
             if st == "composer" { return true }
             if st == "invalid" { return false }
-            if i == 28 && !reloaded {
+            if i == 64 && !reloaded {
                 reloaded = true
                 await load("https://web.whatsapp.com/send?phone=\(phone)")
             }
@@ -725,14 +736,14 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
     if (!cands.length && !cap) return 'no-send-button';
     for (const b of cands) {
       press(b);
-      if (await wait(changed, 2000)) break;
+      if (await wait(changed, 3000)) break;
       b.click();
-      if (await wait(changed, 1500)) break;
+      if (await wait(changed, 2000)) break;
     }
     if (!changed() && cap) {
       cap.focus();
       for (const t of ['keydown', 'keypress', 'keyup']) cap.dispatchEvent(new KeyboardEvent(t, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
-      await wait(changed, 2000);
+      await wait(changed, 3000);
     }
     return changed() ? 'clicked' + note : 'preview-stayed';
     """#
