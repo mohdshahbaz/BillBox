@@ -104,12 +104,31 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         }
     }
 
+    /// Resumes a continuation once, whichever of two racers (the work or its timer) finishes first.
+    private final class Once<T> {
+        private var c: CheckedContinuation<T, Never>?
+        init(_ c: CheckedContinuation<T, Never>) { self.c = c }
+        func finish(_ v: T) { c?.resume(returning: v); c = nil }
+    }
+
+    /// Runs `work`, but gives up and returns `fallback` after `seconds`: a page call that never answers (the page reloaded under it,
+    /// iOS paused it) must not freeze every bill behind it. `work` is left to finish or fail on its own.
+    private func limited<T>(seconds: Int, fallback: T, _ work: @escaping @MainActor () async -> T) async -> T {
+        await withCheckedContinuation { (c: CheckedContinuation<T, Never>) in
+            let once = Once(c)
+            Task { @MainActor in once.finish(await work()) }
+            Task { @MainActor in await pause(ms: seconds * 1000); once.finish(fallback) }
+        }
+    }
+
     private func run(_ body: String, _ args: [String: Any] = [:]) async -> String {
         guard let w = web else { return "" }
-        do {
-            let r = try await w.callAsyncJavaScript(body, arguments: args, in: nil, contentWorld: .page)
-            return (r as? String) ?? "\(r ?? "")"
-        } catch { return "js-error: \(error.localizedDescription)" }
+        return await limited(seconds: 25, fallback: "js-error: the WhatsApp page did not answer in 25 s") {
+            do {
+                let r = try await w.callAsyncJavaScript(body, arguments: args, in: nil, contentWorld: .page)
+                return (r as? String) ?? "\(r ?? "")"
+            } catch { return "js-error: \(error.localizedDescription)" }
+        }
     }
 
     /// The open chat's heading (the customer's name or number).
@@ -318,9 +337,19 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
             await prev?.value
             do { try await self.sendNow(makePdf: pdf, fileName: fileName, phone: phone, caption: caption); return nil } catch { return error }
         }
-        chain = Task { _ = await job.value }
+        let limit = 150   // seconds for one bill, including waiting for the bill before it
+        chain = Task { _ = await self.limited(seconds: limit, fallback: nil) { await job.value } }
         settling = Task { _ = await job.value; _ = await self.run(Self.js(Self.settleScript)) }
-        let failure = await job.value
+        let timeout = SendError(message: "WhatsApp did not finish sending in \(limit) s, so it was stopped. Check the chat before sending again; if it keeps happening, reconnect in Settings > WhatsApp.")
+        let failure: Error? = await limited(seconds: limit, fallback: timeout) { await job.value }
+        if let f = failure as? SendError, f.message == timeout.message {
+            // the stuck bill must not hold up the next ones: forget it, drop the open chat and stop the page's loading
+            chain = nil
+            openChat = nil
+            web?.stopLoading()
+            loadDone?.resume(); loadDone = nil
+            lastResult = "timeout after \(limit) s"
+        }
         if status == "Sending…" { status = connected ? "Connected" : "Not connected" }   // never stay stuck on "Sending…"
         if let e = failure { throw e }
     }
