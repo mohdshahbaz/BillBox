@@ -27,7 +27,7 @@ import SwiftUI
     @State private var confirmBulkDelete = false
     @State private var confirmZeroStockDelete = false
 
-    private var zeroStockItems: [JSON] { items.filter { $0.num("stock") == 0 } }
+    private var zeroStockItems: [JSON] { items.filter { $0.num("stock") <= 0 } }
     private func stockText(_ it: JSON) -> String { Fmt.boxPcs(it.int("stock"), it.int("pcs_per_box")) }
 
     var body: some View { dialogs(chrome(content)) }
@@ -118,7 +118,7 @@ import SwiftUI
                     Divider()
                     Button("New category…") { showCategory = true }
                     Divider()
-                    Button("Delete items with 0 stock…", role: .destructive) { confirmZeroStockDelete = true }.disabled(zeroStockItems.isEmpty)
+                    Button("Delete items with zero/negative stock…", role: .destructive) { confirmZeroStockDelete = true }.disabled(zeroStockItems.isEmpty)
                 } label: { Label("More", systemImage: "ellipsis.circle") }
             }
             ToolbarItem(placement: .bottomBar) {
@@ -154,7 +154,7 @@ import SwiftUI
         } message: {
             Text("Items that were ever bought or sold are archived instead, so history stays intact. An item still in stock is skipped.")
         }
-        .confirmationDialog("Delete \(zeroStockItems.count) item\(zeroStockItems.count == 1 ? "" : "s") with 0 stock?", isPresented: $confirmZeroStockDelete, titleVisibility: .visible) {
+        .confirmationDialog("Delete \(zeroStockItems.count) item\(zeroStockItems.count == 1 ? "" : "s") with zero or negative stock?", isPresented: $confirmZeroStockDelete, titleVisibility: .visible) {
             Button("Delete \(zeroStockItems.count)", role: .destructive) { Task { await bulkDeleteZeroStock() } }
         } message: {
             Text("Items that were ever bought or sold are archived instead, so history stays intact.")

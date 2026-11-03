@@ -83,7 +83,7 @@ fun StockScreen() {
     var catMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
     val debounce = rememberDebouncer()
-    val zero = items.filter { it.num("stock") == 0.0 }
+    val zero = items.filter { it.num("stock") <= 0.0 }
 
     suspend fun load() {
         app.guarded {
@@ -127,7 +127,7 @@ fun StockScreen() {
                     item("Tidy names & merge duplicates…") { sheet = "tidy" },
                     item("Merge selected items…", selection.size >= 2) { sheet = "merge" },
                     item("New category…") { sheet = "category" },
-                    item("Delete items with 0 stock…", zero.isNotEmpty(), true) { confirmZero = true },
+                    item("Delete items with zero/negative stock…", zero.isNotEmpty(), true) { confirmZero = true },
                 ).forEachIndexed { i, (m, run) ->
                     if (i == 3 || i == 6 || i == 7) HorizontalDivider()
                     DropdownMenuItem(text = { Text(m.first, color = if (m.third) MaterialTheme.colorScheme.error else Color.Unspecified) }, enabled = m.second, onClick = { moreMenu = false; run() })
@@ -197,7 +197,7 @@ fun StockScreen() {
     if (confirmBulk) Confirm("Delete ${selection.size} selected item${if (selection.size == 1) "" else "s"}?", "Items that were ever bought or sold are archived instead, so history stays intact. An item still in stock is skipped.", "Delete ${selection.size}", {
         app.launch { busy = true; bulkDelete(selection.toList(), { m, e -> app.notify(m, e) }) { outcome(it) }; selection.clear(); selecting = false; busy = false; load() }
     }, { confirmBulk = false }, destructive = true)
-    if (confirmZero) Confirm("Delete ${zero.size} item${if (zero.size == 1) "" else "s"} with 0 stock?", "Items that were ever bought or sold are archived instead, so history stays intact.", "Delete ${zero.size}", {
+    if (confirmZero) Confirm("Delete ${zero.size} item${if (zero.size == 1) "" else "s"} with zero or negative stock?", "Items that were ever bought or sold are archived instead, so history stays intact.", "Delete ${zero.size}", {
         app.launch { busy = true; bulkDelete(zero.map { it.id }, { m, e -> app.notify(m, e) }) { outcome(it) }; selection.clear(); busy = false; load() }
     }, { confirmZero = false }, destructive = true)
 }
