@@ -94,6 +94,7 @@ fun StockScreen() {
         loading = false
     }
     LaunchedEffect(catId) { load() }
+    LaunchedEffect(app.dataVersion) { if (app.dataVersion > 0) load() }
 
     suspend fun delete(it: J, force: Boolean) {
         try {

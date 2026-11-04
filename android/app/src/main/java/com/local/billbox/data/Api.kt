@@ -12,6 +12,8 @@ object Api {
     @Volatile var fy: String? = null
     /** Called after a change that can alter items, prices, stock or parties (the billing screen reloads its lists then). */
     @Volatile var onItemsChanged: (() -> Unit)? = null
+    /** Called after any successful change, so list screens reload themselves (also the hook for changes arriving from other devices). */
+    @Volatile var onDataChanged: (() -> Unit)? = null
 
     private val watched = listOf("/items", "/batches", "/purchases", "/schemes", "/debit-notes", "/import", "/backup", "/categories", "/parties", "/companies")
 
@@ -31,6 +33,7 @@ object Api {
             throw ApiError(msg, status, if (o.has("code") && !o.isNull("code")) o.optString("code") else null)
         }
         if (method != "GET" && !path.contains("/preview") && !path.startsWith("/items/online") && watched.any { path.startsWith(it) }) onItemsChanged?.invoke()
+        if (method != "GET" && !path.contains("/preview") && !path.startsWith("/items/online")) onDataChanged?.invoke()
         return r
     }
 

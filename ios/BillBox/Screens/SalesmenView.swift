@@ -33,6 +33,7 @@ import SwiftUI
             }
         }
         .task { await load() }
+        .onChange(of: app.dataVersion) { _ in Task { await load() } }
         .onChange(of: sel) { _ in Task { await loadSelected() } }
         .onChange(of: day) { _ in Task { await loadSelected() } }
         .sheet(isPresented: $newSalesman) { SalesmanSheet { await load() } }

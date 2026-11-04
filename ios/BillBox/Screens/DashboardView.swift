@@ -69,6 +69,7 @@ struct DashSnap {
             }
         }
         .sheet(isPresented: $photoPayments) { PaymentPhotoSheet { await load() } }
+        .onChange(of: app.dataVersion) { _ in Task { await load() } }
         .task(id: cacheKey) {
             if let p = ["today", "month", "year"].first(where: { $0 == app.settings.str("dash_period") }) { period = p }
             snap = Self.cache[cacheKey]

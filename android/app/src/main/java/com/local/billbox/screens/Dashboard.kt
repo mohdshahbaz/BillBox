@@ -101,6 +101,7 @@ fun DashboardScreen() {
     val hidden = app.dashboardHidden
     suspend fun load() { app.guarded { d = Api.get("/reports/dashboard") } }
     LaunchedEffect(Unit) { load() }
+    LaunchedEffect(app.dataVersion) { if (app.dataVersion > 0) load() }
     fun go(p: Page) { app.section = p }
 
     ScreenScaffold("Dashboard", actions = { IconButton(onClick = { app.launch { load() } }) { Icon(Icons.Default.Refresh, "Refresh") } }) { mod ->

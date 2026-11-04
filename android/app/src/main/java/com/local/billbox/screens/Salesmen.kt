@@ -78,6 +78,7 @@ fun SalesmenScreen() {
 
     suspend fun load() { app.guarded { people = Api.list("/salesmen"); if (sel == null) sel = people.firstOrNull()?.id } }
     LaunchedEffect(Unit) { load() }
+    LaunchedEffect(app.dataVersion) { if (app.dataVersion > 0) load() }
     LaunchedEffect(sel, day) {
         val s = sel ?: run { perf = null; beat = null; return@LaunchedEffect }
         app.guarded { perf = Api.get("/salesmen/$s/performance"); beat = Api.get("/salesmen/$s/beat", mapOf("day" to day)) }

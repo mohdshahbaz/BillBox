@@ -79,8 +79,11 @@ enum API {
 
     /// Called after a successful change that can alter items, prices or stock, so the billing screen reloads its item list.
     static var onItemsChanged: (() -> Void)?
+    /// Called after any successful change, so list screens reload themselves (also the hook for changes arriving from other devices).
+    static var onDataChanged: (() -> Void)?
     static func noteChange(_ method: String, _ path: String) {
         guard method != "GET", !path.contains("/preview"), !path.hasPrefix("/items/online") else { return }
+        onDataChanged?()
         let watched = ["/items", "/batches", "/purchases", "/schemes", "/debit-notes", "/debit_notes", "/marg", "/import", "/backup", "/categories", "/parties", "/companies"]
         if watched.contains(where: { path.hasPrefix($0) }) { onItemsChanged?() }
     }

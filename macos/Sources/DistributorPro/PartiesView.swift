@@ -90,6 +90,7 @@ let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
             }
         }
         .task { await load() }
+        .onChange(of: app.dataVersion) { _ in Task { await load() } }
     }
 
     @ViewBuilder private func dialogs<V: View>(_ v: V) -> some View {

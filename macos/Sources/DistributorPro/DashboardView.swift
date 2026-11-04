@@ -51,6 +51,7 @@ import SwiftUI
             ToolbarItem { Button { Task { await load() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }.keyboardShortcut("r", modifiers: .command) }
         }
         .sheet(isPresented: $photoPayments) { PaymentPhotoSheet { await load() } }
+        .onChange(of: app.dataVersion) { _ in Task { await load() } }
         .task {
             if let p = ["today", "month", "year"].first(where: { $0 == app.settings.str("dash_period") }) { period = p }
             await load()

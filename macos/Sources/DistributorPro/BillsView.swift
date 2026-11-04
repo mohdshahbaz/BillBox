@@ -34,6 +34,7 @@ import AppKit
         .onChange(of: to) { _ in Task { await load() } }
         .onChange(of: unpaid) { _ in Task { await load() } }
         .onChange(of: unprinted) { _ in Task { await load() } }
+        .onChange(of: app.dataVersion) { _ in Task { await load() } }
         .task {
             if from.isEmpty {
                 from = app.isCurrentFY ? app.monthStartInFY : app.fyFrom

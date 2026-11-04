@@ -148,6 +148,7 @@ fun BillsScreen() {
         if (app.openUnprinted) { app.openUnprinted = false; from = app.fyFrom; to = app.dateInFY; unprinted = true }
     }
     LaunchedEffect(type, from, to, unpaid, unprinted) { load() }
+    LaunchedEffect(app.dataVersion) { if (app.dataVersion > 0) load() }
 
     // sale bills to print: the selected ones, or with "Not printed" on and nothing selected, every bill listed; oldest first
     val printIds = run {

@@ -90,6 +90,7 @@ import SwiftUI
             }
         }
         .task { await load() }
+        .onChange(of: app.dataVersion) { _ in Task { await load() } }
     }
 
     @ViewBuilder private func dialogs<V: View>(_ v: V) -> some View {

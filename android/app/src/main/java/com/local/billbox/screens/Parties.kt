@@ -130,6 +130,7 @@ fun PartiesScreen() {
         loading = false
     }
     LaunchedEffect(kind) { selection.clear(); load() }
+    LaunchedEffect(app.dataVersion) { if (app.dataVersion > 0) load() }
 
     ScreenScaffold("Parties", fab = {
         ExtendedFloatingActionButton(modifier = Modifier.padding(bottom = 32.dp), onClick = { creating = true }, icon = { Icon(Icons.Default.PersonAdd, null) }, text = { Text(if (supplier) "New supplier" else "New customer") })

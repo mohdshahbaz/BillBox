@@ -77,6 +77,7 @@ import SwiftUI
             }
         }
         .task { await load() }
+        .onChange(of: app.dataVersion) { _ in Task { await load() } }
     }
 
     private func load() async {

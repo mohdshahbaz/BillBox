@@ -79,6 +79,9 @@ final class AppModel: ObservableObject {
     @Published var openUnprinted = false
     /// Goes up whenever items, prices or stock change anywhere (the billing screen reloads its item list then).
     @Published var itemsVersion = 0
+    /// Bumped (after a short pause, so a burst of writes reloads once) whenever data changed; list screens reload on it.
+    @Published var dataVersion = 0
+    private var dataBump: Task<Void, Never>?
     var lowStockQty: Double { settings.has("low_stock_qty") ? settings.num("low_stock_qty") : 10 }
 
     var fyInfo: JSON? { fyYears.first { $0.str("label") == fy } ?? fyYears.first { $0.bool("current") } }
@@ -99,6 +102,10 @@ final class AppModel: ObservableObject {
         // Settings › Billing & Dashboard › Open BillBox on
         if let p = Page(rawValue: UserDefaults.standard.string(forKey: "startPage") ?? ""), !ready { section = p }
         API.onItemsChanged = { [weak self] in Task { @MainActor in self?.itemsVersion += 1 } }
+        API.onDataChanged = { [weak self] in Task { @MainActor in
+            self?.dataBump?.cancel()
+            self?.dataBump = Task { try? await Task.sleep(nanoseconds: 300_000_000); if !Task.isCancelled { self?.dataVersion += 1 } }
+        } }
         do {
             try await reloadCompanies(pick: true)
             startError = nil

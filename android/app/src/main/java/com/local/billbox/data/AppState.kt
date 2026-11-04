@@ -43,6 +43,9 @@ class AppState(private val context: Context) {
     var printJob by mutableStateOf<PrintJob?>(null)
     var openUnprinted by mutableStateOf(false)
     var itemsVersion by mutableIntStateOf(0)
+    /** Bumped (after a short pause, so a burst of writes reloads once) whenever data changed; list screens reload on it. */
+    var dataVersion by mutableIntStateOf(0)
+    private var dataBump: kotlinx.coroutines.Job? = null
 
     // Financial year (1 April – 31 March): every list, report and the dashboard show only the selected year.
     var fy by mutableStateOf("")
@@ -78,6 +81,7 @@ class AppState(private val context: Context) {
 
     suspend fun start() {
         Api.onItemsChanged = { scope.launch { itemsVersion++ } }
+        Api.onDataChanged = { scope.launch { dataBump?.cancel(); dataBump = scope.launch { kotlinx.coroutines.delay(300); dataVersion++ } } }
         try {
             reloadCompanies(pick = true)
             startError = null
