@@ -209,3 +209,22 @@ jobs:
           prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
           files: dist/*
           fail_on_unmatched_files: true
+      - name: Clear past admin builds and release branches
+        # an admin (test) build replaces the earlier ones: their releases and tags go; and every release/<version> branch
+        # (used to start a release when tags cannot be pushed) is removed once its release is out
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          EDITION: ${{ needs.version.outputs.edition }}
+        run: |
+          if [ "$EDITION" = admin ]; then
+            gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' | grep -- '-admin' | grep -vx "$TAG" | while read -r t; do
+              gh release delete "$t" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag && echo "removed $t"
+            done
+          fi
+          git ls-remote --heads origin 'release/*' | awk '{print $2}' | sed 's#refs/heads/##' | while read -r b; do
+            [ "$b" = "$GITHUB_REF_NAME" ] && continue
+            git push origin --delete "$b" && echo "removed branch $b" || true
+          done
+          [[ "$GITHUB_REF_NAME" == release/* ]] && git push origin --delete "$GITHUB_REF_NAME" || true
+          git push origin --delete selftest 2>/dev/null || true
