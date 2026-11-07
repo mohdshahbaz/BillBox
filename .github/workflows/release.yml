@@ -29,6 +29,10 @@ on:
         description: 'Mark a public build as a pre-release (admin builds always are)'
         type: boolean
         default: false
+      clear_old:
+        description: 'Delete the past builds (keeps the new one and the website''s public download). Off: every past build stays'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -229,22 +233,27 @@ jobs:
           prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
           files: dist/*
           fail_on_unmatched_files: true
-      - name: Clear past builds and release branches
-        # only the new build is kept, plus the newest public (non pre-release) build, which the website's download
-        # buttons point at; every other release and its tag goes. Every release/<version> branch (used to start a
-        # release when tags cannot be pushed) is removed once its release is out
+      - name: Clear past builds (only when asked) and release branches
+        # past builds stay on GitHub. Run workflow › "Delete the past builds" removes them all except the new build and
+        # the newest public (non pre-release) build, which the website's download buttons point at. Every
+        # release/<version> branch (used to start a release when tags cannot be pushed) is removed once its release is out
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.version.outputs.tag }}
+          CLEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.clear_old && 'yes' || 'no' }}
         run: |
-          KEEP_PUBLIC="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --exclude-pre-releases --exclude-drafts --json tagName,isLatest,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | .[0].tagName // ""')"
-          echo "keeping $TAG and the website's public build ${KEEP_PUBLIC:-none}"
-          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' | while read -r t; do
-            [ "$t" = "$TAG" ] && continue
-            [ -n "$KEEP_PUBLIC" ] && [ "$t" = "$KEEP_PUBLIC" ] && continue
-            gh release delete "$t" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag && echo "removed $t" || echo "::warning::could not remove $t"
-          done
+          if [ "$CLEAR" = yes ]; then
+            KEEP_PUBLIC="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --exclude-pre-releases --exclude-drafts --json tagName,isLatest,createdAt \
+              --jq 'sort_by(.createdAt) | reverse | .[0].tagName // ""')"
+            echo "keeping $TAG and the website's public build ${KEEP_PUBLIC:-none}"
+            gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' | while read -r t; do
+              [ "$t" = "$TAG" ] && continue
+              [ -n "$KEEP_PUBLIC" ] && [ "$t" = "$KEEP_PUBLIC" ] && continue
+              gh release delete "$t" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag && echo "removed $t" || echo "::warning::could not remove $t"
+            done
+          else
+            echo "past builds kept"
+          fi
           git ls-remote --heads origin 'release/*' | awk '{print $2}' | sed 's#refs/heads/##' | while read -r b; do
             [ "$b" = "$GITHUB_REF_NAME" ] && continue
             git push origin --delete "$b" && echo "removed branch $b" || true
