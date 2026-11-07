@@ -69,6 +69,7 @@ import SwiftUI
                     }
                 }
                 .navigationTitle("More")
+                .navigationBarTitleDisplayMode(.inline)   // like Settings: the list starts below the bar with the same gap
                 .companyYearToolbar()
                 .navigationDestination(for: MoreRoute.self) { r in
                     switch r {

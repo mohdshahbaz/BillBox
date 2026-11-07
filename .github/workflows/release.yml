@@ -1,7 +1,8 @@
 # Builds BillBox for Android, the Mac and the iPhone and publishes them as a GitHub release.
 #
-#   git tag v15.2.0 && git push origin v15.2.0
-#   or: Actions › Release › Run workflow › choose admin or public (the version can be left empty: next number)
+#   git tag v15.2.0 && git push origin v15.2.0        → v15.2.0 (public) and v15.2.0-admin (admin), both published
+#   or: Actions › Release › Run workflow › both / public / admin (the version can be left empty: next number)
+#   a version ending in -admin (v15.2.0-admin) makes only the admin build
 #
 # Android is signed with your release key when these repository secrets exist (android/tools/make_keystore.sh makes them):
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
@@ -17,10 +18,10 @@ on:
   workflow_dispatch:
     inputs:
       edition:
-        description: 'Which build: public (website, live licences) or admin (your test build: test licences, Razorpay test mode)'
+        description: 'Which builds: both, public (website, live licences) or admin (your test build: test licences, Razorpay test mode)'
         type: choice
-        options: [admin, public]
-        default: admin
+        options: [both, public, admin]
+        default: both
       version:
         description: 'Version, e.g. 16.2.4 (leave empty: the next number after the newest release)'
         required: false
@@ -42,14 +43,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  version:
+  plan:
     runs-on: ubuntu-24.04
     outputs:
-      version: ${{ steps.v.outputs.version }}
       code: ${{ steps.v.outputs.code }}
-      tag: ${{ steps.v.outputs.tag }}
-      prerelease: ${{ steps.v.outputs.prerelease }}
-      edition: ${{ steps.v.outputs.edition }}
+      builds: ${{ steps.v.outputs.builds }}
+      tags: ${{ steps.v.outputs.tags }}
     steps:
       - id: v
         env:
@@ -67,187 +66,61 @@ jobs:
               IFS=. read -r A B C <<<"${LAST:-0.0.0}"; INPUT="$A.$B.$(( ${C:-0} + 1 ))"
             fi
             [ "$EDITION_IN" = admin ] && INPUT="$INPUT-admin"
-            echo "Chosen: $INPUT"
           fi
           RAW="${INPUT:-${GITHUB_REF_NAME}}"; RAW="${RAW#release/}"; V="${RAW#v}"
           [[ "$V" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::Version '$RAW' must look like 15.2.0 (or 15.2.0-beta1)"; exit 1; }
           BASE="${V%%-*}"; IFS=. read -r MA MI PA <<<"$BASE"; PA="${PA:-0}"
-          echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "code=$(( MA * 10000 + MI * 100 + PA ))" >> "$GITHUB_OUTPUT"
-          echo "tag=v$V" >> "$GITHUB_OUTPUT"
-          if [[ "$V" == *-* || "$PRE" == "true" ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
-          # a version ending in -admin (v15.8.0-admin) is the owner's test build: test licences, Razorpay test mode
-          if [[ "$V" == *-admin* ]]; then echo "edition=admin" >> "$GITHUB_OUTPUT"; else echo "edition=public" >> "$GITHUB_OUTPUT"; fi
-          echo "Releasing $V (code $(( MA * 10000 + MI * 100 + PA )))"
-
-  android:
-    needs: version
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 17
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-      - uses: gradle/actions/setup-gradle@v5
-
-      - name: Engine bundle from backend/src
-        working-directory: android/engine
-        run: rm -rf node_modules && npm install --no-audit --no-fund && node build.mjs
-
-      - name: Release key
-        id: key
-        working-directory: android
-        env:
-          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          if [ -n "$KS" ]; then
-            echo "$KS" | base64 -d > billbox-release.jks
-            printf 'storeFile=billbox-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$KS_PASS" "$KEY_ALIAS" "$KEY_PASS" > keystore.properties
-            echo "signed=true" >> "$GITHUB_OUTPUT"
+          # which builds: a plain version (15.2.0) → public 15.2.0 and admin 15.2.0-admin; 15.2.0-admin → admin only;
+          # another suffix (15.2.0-beta1) → that public pre-release only; Run workflow can ask for one edition
+          PUB=false; [[ "$V" == *-* || "$PRE" == "true" ]] && PUB=true
+          if [[ "$V" == *-admin* ]]; then
+            B='[{"edition":"admin","version":"'"$V"'","tag":"v'"$V"'","prerelease":true}]'
+          elif [[ "$V" == *-* || "$EDITION_IN" == public ]]; then
+            B='[{"edition":"public","version":"'"$V"'","tag":"v'"$V"'","prerelease":'"$PUB"'}]'
           else
-            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the APK is signed with a throw-away key, so it cannot update an earlier install. Run android/tools/make_keystore.sh and add the secrets."
-            echo "signed=false" >> "$GITHUB_OUTPUT"
+            B='[{"edition":"public","version":"'"$V"'","tag":"v'"$V"'","prerelease":'"$PUB"'},{"edition":"admin","version":"'"$V"'-admin","tag":"v'"$V"'-admin","prerelease":true}]'
           fi
+          echo "builds=$B" >> "$GITHUB_OUTPUT"
+          echo "tags=$(jq -r 'map(.tag) | join(" ")' <<<"$B")" >> "$GITHUB_OUTPUT"
+          echo "Releasing: $(jq -r 'map(.tag) | join(", ")' <<<"$B") (build $(( MA * 10000 + MI * 100 + PA )))"
 
-      - name: Build (release)
-        working-directory: android
-        run: |
-          sed -i -E 's/const val NAME = "[a-z]+"/const val NAME = "${{ needs.version.outputs.edition }}"/' app/src/main/java/com/local/billbox/engine/Edition.kt
-          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
-          ./gradlew --no-daemon :app:assembleRelease -PbillboxVersionName=${{ needs.version.outputs.version }} -PbillboxVersionCode=${{ needs.version.outputs.code }}
-          mkdir -p ../dist
-          cp app/build/outputs/apk/release/app-release.apk ../dist/BillBox-android-${{ needs.version.outputs.version }}.apk
-          rm -f billbox-release.jks keystore.properties
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: android
-          path: dist/*.apk
-
-  mac:
-    needs: version
-    runs-on: macos-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build BillBox.app (Apple silicon and Intel)
-        working-directory: macos
-        env:
-          ARCH: universal
-          EDITION: ${{ needs.version.outputs.edition }}
-          VERSION: ${{ needs.version.outputs.version }}
-          BUILD_NUMBER: ${{ needs.version.outputs.code }}
-        run: |
-          xcodebuild -version
-          set -o pipefail
-          ./build_app.sh 2>&1 | tee build.log || {
-            # show the compiler's errors on the run's summary page
-            grep -E "error:|Error:" build.log | sort -u | head -20 | sed 's/^/::error::/'
-            exit 1; }
-          mkdir -p ../dist
-          OUT=../dist/BillBox-mac-${{ needs.version.outputs.version }}.dmg ./build_dmg.sh
-          ditto -c -k --sequesterRsrc --keepParent BillBox.app ../dist/BillBox-mac-${{ needs.version.outputs.version }}.zip
-      - uses: actions/upload-artifact@v6
-        with:
-          name: mac
-          path: |
-            dist/*.dmg
-            dist/*.zip
-
-  ios:
-    needs: version
-    runs-on: macos-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build BillBox.ipa (unsigned)
-        working-directory: ios
-        run: |
-          set -o pipefail
-          xcodebuild -version
-          mkdir -p build
-          plutil -replace BillBoxEdition -string "${{ needs.version.outputs.edition }}" BillBox/Info.plist
-          xcodebuild archive -project BillBox.xcodeproj -scheme BillBox -configuration Release -destination "generic/platform=iOS" \
-            -archivePath build/BillBox.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            MARKETING_VERSION=${{ needs.version.outputs.version }} CURRENT_PROJECT_VERSION=${{ needs.version.outputs.code }} > build/archive.log 2>&1 || { grep -E "error:" build/archive.log | sort -u | head -20 | sed 's/^/::error::/'; tail -60 build/archive.log; exit 1; }
-          test -d build/BillBox.xcarchive/Products/Applications/BillBox.app
-          mkdir -p build/ipa/Payload ../dist
-          cp -R build/BillBox.xcarchive/Products/Applications/BillBox.app build/ipa/Payload/
-          (cd build/ipa && zip -qry ../../../dist/BillBox-iphone-${{ needs.version.outputs.version }}-unsigned.ipa Payload)
-      - uses: actions/upload-artifact@v6
-        with:
-          name: ios
-          path: dist/*.ipa
-
-  desktop:
-    needs: version
-    uses: ./.github/workflows/desktop.yml
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.builds) }}
+    name: ${{ matrix.edition }} ${{ matrix.version }}
+    uses: ./.github/workflows/release-build.yml
     with:
-      version: ${{ needs.version.outputs.version }}
-      edition: ${{ needs.version.outputs.edition }}
+      version: ${{ matrix.version }}
+      code: ${{ needs.plan.outputs.code }}
+      tag: ${{ matrix.tag }}
+      edition: ${{ matrix.edition }}
+      prerelease: ${{ matrix.prerelease }}
+    secrets: inherit
 
-  publish:
-    needs: [version, android, mac, ios, desktop]
+  tidy:
+    needs: [plan, build]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v7
-        with:
-          path: dist
-          merge-multiple: true
-      - name: Notes
-        run: |
-          V=${{ needs.version.outputs.version }}
-          cat > notes.md <<NOTES
-          ## Install
-
-          **Android (12 and newer)** — download \`BillBox-android-$V.apk\` on the phone and open it (allow "Install unknown apps" for your browser or Files app once). It updates an earlier BillBox from these releases and keeps its books.
-
-          **Mac** — download \`BillBox-mac-$V.dmg\`, open it and drag **BillBox** onto Applications (\`BillBox-mac-$V.zip\` is the same app as a zip). The first time: right-click › Open (on macOS 15: System Settings › Privacy & Security › Open Anyway). If macOS says it is damaged, run \`xattr -dr com.apple.quarantine /Applications/BillBox.app\` in Terminal once. Your books stay in ~/Library/Application Support/DistributorPro.
-
-          **Windows 10 / 11** — download \`BillBox-windows-$V-setup.exe\` and run it (if SmartScreen warns: More info › Run anyway). \`BillBox-windows-$V-x64.zip\` is the same app without an installer. Your books stay in %APPDATA%\\BillBox.
-
-          **Linux (Ubuntu 22.04+, Debian 12+, Mint 21+)** — \`sudo apt install ./BillBox-linux-$V-amd64.deb\`, or unpack \`BillBox-linux-$V-x64.tar.gz\` anywhere and run \`BillBox/install.sh\` once for the menu entry. Your books stay in ~/.local/share/BillBox.
-
-          **iPhone** — \`BillBox-iphone-$V-unsigned.ipa\` is not signed: install it with Sideloadly or AltStore, which sign it with your Apple ID (or run \`cd ios && ./build.sh device\` on your Mac).
-
-          Back up first (Settings › Backup › Back up now) before installing a new version.
-          NOTES
-          sed -i 's/^          //' notes.md
-          ls -la dist
-      - uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ needs.version.outputs.tag }}
-          name: BillBox ${{ needs.version.outputs.version }}${{ needs.version.outputs.edition == 'admin' && ' (admin test build — test licences only)' || '' }}
-          target_commitish: ${{ github.sha }}
-          body_path: notes.md
-          generate_release_notes: true
-          prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
-          files: dist/*
-          fail_on_unmatched_files: true
       - name: Clear past builds (only when asked) and release branches
-        # past builds stay on GitHub. Run workflow › "Delete the past builds" removes them all except the new build and
+        # past builds stay on GitHub. Run workflow › "Delete the past builds" removes them all except the new builds and
         # the newest public (non pre-release) build, which the website's download buttons point at. Every
         # release/<version> branch (used to start a release when tags cannot be pushed) is removed once its release is out
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.version.outputs.tag }}
+          TAGS: ${{ needs.plan.outputs.tags }}
           CLEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.clear_old && 'yes' || 'no' }}
         run: |
           if [ "$CLEAR" = yes ]; then
             KEEP_PUBLIC="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --exclude-pre-releases --exclude-drafts --json tagName,isLatest,createdAt \
               --jq 'sort_by(.createdAt) | reverse | .[0].tagName // ""')"
-            echo "keeping $TAG and the website's public build ${KEEP_PUBLIC:-none}"
+            echo "keeping $TAGS and the website's public build ${KEEP_PUBLIC:-none}"
             gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName --jq '.[].tagName' | while read -r t; do
-              [ "$t" = "$TAG" ] && continue
+              [[ " $TAGS " == *" $t "* ]] && continue
               [ -n "$KEEP_PUBLIC" ] && [ "$t" = "$KEEP_PUBLIC" ] && continue
               gh release delete "$t" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag && echo "removed $t" || echo "::warning::could not remove $t"
             done

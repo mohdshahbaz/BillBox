@@ -1,0 +1,168 @@
+# One edition of a BillBox release (called by release.yml, once for the public build and once for the admin build):
+# Android, Mac, iPhone, Windows and Linux, published as the GitHub release <tag>.
+name: Release build
+
+on:
+  workflow_call:
+    inputs:
+      version: { type: string, required: true }      # 16.3.0 or 16.3.0-admin
+      code: { type: string, required: true }         # Android/iPhone build number
+      tag: { type: string, required: true }          # v16.3.0
+      edition: { type: string, required: true }      # public | admin
+      prerelease: { type: boolean, required: true }
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Engine bundle from backend/src
+        working-directory: android/engine
+        run: rm -rf node_modules && npm install --no-audit --no-fund && node build.mjs
+
+      - name: Release key
+        id: key
+        working-directory: android
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > billbox-release.jks
+            printf 'storeFile=billbox-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$KS_PASS" "$KEY_ALIAS" "$KEY_PASS" > keystore.properties
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the APK is signed with a throw-away key, so it cannot update an earlier install. Run android/tools/make_keystore.sh and add the secrets."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build (release)
+        working-directory: android
+        run: |
+          sed -i -E 's/const val NAME = "[a-z]+"/const val NAME = "${{ inputs.edition }}"/' app/src/main/java/com/local/billbox/engine/Edition.kt
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+          ./gradlew --no-daemon :app:assembleRelease -PbillboxVersionName=${{ inputs.version }} -PbillboxVersionCode=${{ inputs.code }}
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release.apk ../dist/BillBox-android-${{ inputs.version }}.apk
+          rm -f billbox-release.jks keystore.properties
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: android-${{ inputs.version }}
+          path: dist/*.apk
+
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build BillBox.app (Apple silicon and Intel)
+        working-directory: macos
+        env:
+          ARCH: universal
+          EDITION: ${{ inputs.edition }}
+          VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ inputs.code }}
+        run: |
+          xcodebuild -version
+          set -o pipefail
+          ./build_app.sh 2>&1 | tee build.log || {
+            # show the compiler's errors on the run's summary page
+            grep -E "error:|Error:" build.log | sort -u | head -20 | sed 's/^/::error::/'
+            exit 1; }
+          mkdir -p ../dist
+          OUT=../dist/BillBox-mac-${{ inputs.version }}.dmg ./build_dmg.sh
+          ditto -c -k --sequesterRsrc --keepParent BillBox.app ../dist/BillBox-mac-${{ inputs.version }}.zip
+      - uses: actions/upload-artifact@v6
+        with:
+          name: mac-${{ inputs.version }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build BillBox.ipa (unsigned)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -version
+          mkdir -p build
+          plutil -replace BillBoxEdition -string "${{ inputs.edition }}" BillBox/Info.plist
+          xcodebuild archive -project BillBox.xcodeproj -scheme BillBox -configuration Release -destination "generic/platform=iOS" \
+            -archivePath build/BillBox.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION=${{ inputs.version }} CURRENT_PROJECT_VERSION=${{ inputs.code }} > build/archive.log 2>&1 || { grep -E "error:" build/archive.log | sort -u | head -20 | sed 's/^/::error::/'; tail -60 build/archive.log; exit 1; }
+          test -d build/BillBox.xcarchive/Products/Applications/BillBox.app
+          mkdir -p build/ipa/Payload ../dist
+          cp -R build/BillBox.xcarchive/Products/Applications/BillBox.app build/ipa/Payload/
+          (cd build/ipa && zip -qry ../../../dist/BillBox-iphone-${{ inputs.version }}-unsigned.ipa Payload)
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ios-${{ inputs.version }}
+          path: dist/*.ipa
+
+  desktop:
+    uses: ./.github/workflows/desktop.yml
+    with:
+      version: ${{ inputs.version }}
+      edition: ${{ inputs.edition }}
+    secrets: inherit
+
+  publish:
+    needs: [android, mac, ios, desktop]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          pattern: '*-${{ inputs.version }}'
+          merge-multiple: true
+      - name: Notes
+        run: |
+          V=${{ inputs.version }}
+          cat > notes.md <<NOTES
+          ## Install
+
+          **Android (12 and newer)** — download \`BillBox-android-$V.apk\` on the phone and open it (allow "Install unknown apps" for your browser or Files app once). It updates an earlier BillBox from these releases and keeps its books.
+
+          **Mac** — download \`BillBox-mac-$V.dmg\`, open it and drag **BillBox** onto Applications (\`BillBox-mac-$V.zip\` is the same app as a zip). The first time: right-click › Open (on macOS 15: System Settings › Privacy & Security › Open Anyway). If macOS says it is damaged, run \`xattr -dr com.apple.quarantine /Applications/BillBox.app\` in Terminal once. Your books stay in ~/Library/Application Support/DistributorPro.
+
+          **Windows 10 / 11** — download \`BillBox-windows-$V-setup.exe\` and run it (if SmartScreen warns: More info › Run anyway). \`BillBox-windows-$V-x64.zip\` is the same app without an installer. Your books stay in %APPDATA%\\BillBox.
+
+          **Linux (Ubuntu 22.04+, Debian 12+, Mint 21+)** — \`sudo apt install ./BillBox-linux-$V-amd64.deb\`, or unpack \`BillBox-linux-$V-x64.tar.gz\` anywhere and run \`BillBox/install.sh\` once for the menu entry. Your books stay in ~/.local/share/BillBox.
+
+          **iPhone** — \`BillBox-iphone-$V-unsigned.ipa\` is not signed: install it with Sideloadly or AltStore, which sign it with your Apple ID (or run \`cd ios && ./build.sh device\` on your Mac).
+
+          Back up first (Settings › Backup › Back up now) before installing a new version.
+          NOTES
+          sed -i 's/^          //' notes.md
+          ls -la dist
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: BillBox ${{ inputs.version }}${{ inputs.edition == 'admin' && ' (admin test build — test licences only)' || '' }}
+          target_commitish: ${{ github.sha }}
+          body_path: notes.md
+          generate_release_notes: true
+          prerelease: ${{ inputs.prerelease }}
+          files: dist/*
+          fail_on_unmatched_files: true

@@ -50,7 +50,7 @@ jobs:
           if pgrep -f "BillBox/engine/node" >/dev/null; then echo "::error::engine still running after the app closed"; exit 1; fi
       - uses: actions/upload-artifact@v6
         with:
-          name: linux
+          name: linux-${{ inputs.version || 'ci' }}
           path: dist/*
           retention-days: 14
 
@@ -89,6 +89,6 @@ jobs:
           if (Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like 'C:\run\*' }) { Write-Error "engine still running after the app closed"; exit 1 }
       - uses: actions/upload-artifact@v6
         with:
-          name: windows
+          name: windows-${{ inputs.version || 'ci' }}
           path: dist/*
           retention-days: 14
