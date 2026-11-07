@@ -115,6 +115,7 @@ final class AppModel: ObservableObject {
 
     private var syncLoop: Task<Void, Never>?
     private var syncVersion = -1
+    private var syncCompanies = 0
     /// Live sync (Settings › Sync): every 3 s the engine swaps changes with the other devices; when some arrived, every
     /// open screen reloads (dataVersion) and the billing lists too.
     func startSyncLoop() {
@@ -125,6 +126,14 @@ final class AppModel: ObservableObject {
                 guard let r = try? await API.obj("GET", "/sync/tick"), r.bool("on") else { continue }
                 let v = r.int("version")
                 guard let self else { return }
+                // a copy merged into another one: the company list changes, and the open company moves to the kept copy
+                let c = r.int("companies")
+                if c != self.syncCompanies {
+                    self.syncCompanies = c
+                    try? await self.reloadCompanies()
+                    if let id = self.companyId, let to = r.obj("moved").raw[String(id)] as? Int { await self.switchCompany(to) }
+                    else if let id = self.companyId, let to = (r.obj("moved").raw[String(id)] as? NSNumber)?.intValue { await self.switchCompany(to) }
+                }
                 if self.syncVersion >= 0 && v != self.syncVersion {
                     API.onDataChanged?()
                     API.onItemsChanged?()

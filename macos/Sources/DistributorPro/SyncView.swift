@@ -80,7 +80,7 @@ import SwiftUI
                     DriveButton(loadedRemote ? "Look again" : "Show the companies in this account", "list.bullet", disabled: busy) { Task { await loadRemote() } }
                 } header: { Text("Companies in your sync account") } footer: {
                     Text(remote.contains { $0.bool("same_name") } && canMerge
-                         ? "\(companyName) is in the account twice: each device turned on sync for its own copy, so they do not see each other's bills. Merge puts this \(device)'s bills, parties and stock changes into the other copy and makes it the one used here (a backup is made first)."
+                         ? "\(companyName) is in the account twice: each device turned on sync for its own copy, so they do not see each other's bills. Merge brings that copy's bills, parties and stock changes into the open one (Open now), and the devices using that copy move to the open one by themselves. A backup is made first."
                          : "Bring here makes a new company on this \(device) that fills itself from your other devices.")
                 }
             }
@@ -92,11 +92,11 @@ import SwiftUI
             } header: { Text("One-time Firebase setup") }
         }
         .settingsForm()
-        .confirmationDialog("Merge \(companyName) into the other copy?", isPresented: Binding(get: { mergeKey != nil }, set: { if !$0 { mergeKey = nil } }), titleVisibility: .visible) {
+        .confirmationDialog("Bring that copy of \(companyName) into the open one?", isPresented: Binding(get: { mergeKey != nil }, set: { if !$0 { mergeKey = nil } }), titleVisibility: .visible) {
             Button("Merge") { if let k = mergeKey { Task { await merge(k) } } }
             Button("Cancel", role: .cancel) { mergeKey = nil }
         } message: {
-            Text("This \(device)'s bills, parties and stock changes since sync was turned on go into the other copy, which every device then shares. This \(device)'s copy is backed up first and kept hidden.")
+            Text("Its bills, parties and stock changes go into the open copy, which every device then shares; the devices on that copy move over by themselves. A backup is made first.")
         }
         .task(id: app.companyId) { await load() }
     }
@@ -138,7 +138,7 @@ import SwiftUI
             let r = try await API.obj("POST", "/sync/merge", body: ["key": key])
             try await app.reloadCompanies()
             await app.switchCompany(r.int("company_id"))
-            app.notify("Merged: \(r.int("merged")) changes from this \(device) went into the shared copy.")
+            app.notify("Merged: \(r.int("merged")) changes came into the open copy.")
             s = r
             await loadRemote()
         }

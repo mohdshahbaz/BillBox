@@ -47,6 +47,7 @@ class AppState extends ChangeNotifier {
   int dataVersion = 0;
   Timer? _sync;
   int _syncVersion = -1;
+  int _syncCompanies = 0;
   bool _syncBusy = false;
   /// Settings › Sync: every 3 s the engine swaps changes with the other devices (GET /sync/tick).
   void _startSync() {
@@ -57,6 +58,14 @@ class AppState extends ChangeNotifier {
         final r = await Api.get('/sync/tick') as Json;
         if (r['on'] == true) {
           final v = (r['version'] as num?)?.toInt() ?? 0;
+          // a copy merged into another one: the company list changes, and the open company moves to the kept copy
+          final cs = (r['companies'] as num?)?.toInt() ?? 0;
+          if (cs != _syncCompanies) {
+            _syncCompanies = cs;
+            await reloadCompanies();
+            final to = ((r['moved'] as Map?) ?? {})['$companyId'];
+            if (to is num) await switchCompany(to.toInt());
+          }
           if (_syncVersion >= 0 && v != _syncVersion) {
             await loadSettings();
             dataVersion++;

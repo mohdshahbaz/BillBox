@@ -39,7 +39,7 @@ const map = () => { try { return JSON.parse(getApp('sync_map') || '{}'); } catch
 const setMap = (m) => setApp('sync_map', JSON.stringify(m));
 const now = () => new Date().toISOString();
 const randomKey = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'; let k = 'b'; for (let i = 0; i < 15; i++) k += A[Math.floor(Math.random() * A.length)]; return k; };
-const state = { version: 0, lastSync: null, lastError: null, running: null, errors: 0, token: null, tokenExp: 0 };
+const state = { moved: {}, companies: 0, version: 0, lastSync: null, lastError: null, running: null, errors: 0, token: null, tokenExp: 0 };
 
 const offline = () => new HttpError(503, 'No internet: BillBox could not reach the sync server. Your books are safe here and sync again when the internet is back.');
 async function call(url, opts = {}) {
@@ -465,6 +465,9 @@ async function syncCompany(cid) {
   const key = map()[cid];
   const d = db.openCompany(cid);
   if (!key || !d) return 0;
+  // merged into another book on another device: move there
+  const into = await rtdb('GET', `books/${key}/info/merged_into`);
+  if (into && into !== key) return follow(cid, key, into);
   if (!d.idBase) attach(cid, d);
   const sl = Number(getApp('sync_slot'));
   await push(d, key, sl);
@@ -494,7 +497,7 @@ async function tick() {
   } finally { state.running = null; }
   return brief();
 }
-const brief = () => ({ on: !!getApp('sync_uid') && Object.keys(map()).length > 0, version: state.version, last_sync: state.lastSync, last_error: state.lastError });
+const brief = () => ({ on: !!getApp('sync_uid') && Object.keys(map()).length > 0, version: state.version, companies: state.companies, moved: state.moved, last_sync: state.lastSync, last_error: state.lastError });
 
 /** Sync this company: the first device sends all of its books, other devices then join them. */
 async function turnOn(cid) {
@@ -600,72 +603,57 @@ async function mySlots() {
 
 async function merge(cid, key) {
   const m = map();
-  const src = m[cid];
-  if (src && key && src !== key) {
-    const mine = await mySlots();
-    const others = async (k) => Object.values((await rtdb('GET', `books/${k}/log`)) || {}).some((e) => e && e.c && !mine.has(Number(e.s)));
-    // the open copy is the one the other devices use: the other copy (on this device, made here) goes into it instead
-    const there = Object.entries(m).find(([, v]) => v === key);
-    if (there && (await others(src)) && !(await others(key))) {
-      const r = await mergeInto(Number(there[0]), src);
-      return { ...r, ...status(cid), company_id: cid };
-    }
-  }
-  return mergeInto(cid, key);
-}
-
-async function mergeInto(cid, key) {
-  const m = map();
-  const src = m[cid];
-  if (!src) throw new HttpError(400, 'Turn on sync for this company first, or use Bring here.');
-  if (!key || src === key) throw new HttpError(400, 'Choose the other copy of this company.');
+  const tKey = m[cid];
+  if (!tKey) throw new HttpError(400, 'Turn on sync for this company first, or use Bring here.');
+  if (!key || key === tKey) throw new HttpError(400, 'Choose the other copy of this company.');
   const row = db.companyRow(cid);
-  const info = await rtdb('GET', `books/${key}/info`);
-  if (!info) throw new HttpError(404, 'That company is no longer in the sync account.');
-  await syncCompany(cid);                                   // this copy's last changes are in its book first
-  const srcInfo = (await rtdb('GET', `books/${src}/info`)) || {};
-  const log = (await rtdb('GET', `books/${src}/log`)) || {};
+  const srcInfo = await rtdb('GET', `books/${key}/info`);
+  if (!srcInfo) throw new HttpError(404, 'That company is no longer in the sync account.');
+  const srcCid = Number((Object.entries(m).find(([, v]) => v === key) || [])[0]) || null;
+  if (srcCid) await syncCompany(srcCid);                    // that copy's last changes here are in its book first
+  await syncCompany(cid);
+  const log = (await rtdb('GET', `books/${key}/log`)) || {};
   const keys = Object.keys(log).sort();
   const end = snapshotEnd(keys, log, srcInfo);
   const after = end ? keys.filter((k) => k > end) : [];
-  if (after.some((k) => log[k] && log[k].x)) throw new HttpError(409, 'A backup was restored on this copy after sync was turned on, so it cannot be merged. Use Bring here instead.');
-  // only a copy no other device writes to can be merged away: the other devices would keep syncing into it
-  const mine = await mySlots();
-  if (keys.some((k) => log[k] && log[k].c && !mine.has(Number(log[k].s)))) {
-    throw new HttpError(409, `This copy of ${row.name} is shared with your other devices, so it is the one to keep. Switch to the other ${row.name} on this device and tap Merge there.`);
-  }
+  if (after.some((k) => log[k] && log[k].x)) throw new HttpError(409, 'A backup was restored on that copy after sync was turned on, so it cannot be merged.');
   const entries = after.map((k) => log[k]).filter((e) => e && e.c);
   const snap = keys.filter((k) => !end || k <= end).map((k) => log[k]).filter((e) => e && e.c);
-
-  require('./backup').backupNow({ reason: 'before-merge' });
-  // the other copy may already be on this device (brought here earlier): merge into that company
-  const have = Object.entries(map()).find(([, v]) => v === key);
-  const tid = have ? Number(have[0]) : (await join(key)).company_id;
-  if (have) await syncCompany(tid);
-  const d = db.openCompany(tid);
+  const d = db.openCompany(cid);
   // both copies must have started from the same books (same items and parties under the same ids)
   const probe = [];
   for (const e of snap) for (const c of [].concat(e.c || [])) if (c && c.r && (c.t === 'items' || c.t === 'parties')) probe.push(c);
   if (probe.length) {
     const same = probe.filter((c) => { const x = d.prepare(`SELECT name FROM ${c.t} WHERE id=?`).get(c.k); return x && x.name === c.r.name; }).length;
     if (same / probe.length < 0.8) {
-      db.registry.prepare('UPDATE companies SET active=0 WHERE id=?').run(tid);
-      const mm = map(); delete mm[tid]; setMap(mm);
       throw new HttpError(409, `The two copies of ${row.name} did not start from the same books (different items and parties), so they cannot be merged. `
-        + 'Keep one: use Bring here on this device, or stop syncing it here.');
+        + 'Keep one: stop syncing the other one on the device that uses it.');
     }
   }
-  const sl = Number(getApp('sync_slot'));
+  require('./backup').backupNow({ reason: 'before-merge' });
+  replayInto(cid, d, entries);
+  // the devices still on that copy move to this one by themselves on their next sync (follow, below)
+  await rtdb('PUT', `books/${key}/info/merged_at`, keys[keys.length - 1] || '');
+  await rtdb('PUT', `books/${key}/info/merged_into`, tKey);
+  if (srcCid) moved(srcCid, cid);
+  try { await syncCompany(cid); } catch (e) { state.lastError = e.message; }
+  state.version++;
+  return { company_id: cid, merged: entries.length, ...status(cid) };
+}
+
+/** Book changes replayed on company tid: applied, bill numbers used twice settled, and sent out to the other devices. */
+function replayInto(tid, d, entries) {
   apply(tid, d, entries);
   db.withCompany(tid, () => d.transaction(() => {
-    // bills made here whose number the other copy had already used take this device's next number
+    // a bill whose number the other copy had already used takes the next number (its ledger lines follow)
     for (const [tbl, [col, series]] of Object.entries(NUMBERED)) {
-      for (const r of d.prepare(`SELECT id, date, ${col} AS no FROM ${tbl} WHERE ${col} LIKE '%~%' AND id > ? AND id < ?`).all(sl * RANGE, (sl + 1) * RANGE)) {
+      for (const r of d.prepare(`SELECT id, date, ${col} AS no FROM ${tbl} WHERE ${col} LIKE '%~%'`).all()) {
         const old = String(r.no).split('~')[0];
         const fresh = nextNo(series, r.date);
+        const lo = Math.floor(Number(r.id) / RANGE) * RANGE, hi = lo + RANGE;
         d.prepare(`UPDATE ${tbl} SET ${col}=? WHERE id=?`).run(fresh, r.id);
-        d.prepare('UPDATE ledger SET ref_no=?, narration=REPLACE(narration, ?, ?) WHERE ref_no=? AND id > ? AND id < ?').run(fresh, old, fresh, old, sl * RANGE, (sl + 1) * RANGE);
-        d.prepare("INSERT INTO sync_out(tbl,rid,op) SELECT 'ledger', id, 'u' FROM ledger WHERE ref_no=? AND id > ? AND id < ?").run(fresh, sl * RANGE, (sl + 1) * RANGE);
+        d.prepare('UPDATE ledger SET ref_no=?, narration=REPLACE(narration, ?, ?) WHERE ref_no=? AND id > ? AND id < ?').run(fresh, old, fresh, old, lo, hi);
+        d.prepare("INSERT INTO sync_out(tbl,rid,op) SELECT 'ledger', id, 'u' FROM ledger WHERE ref_no=? AND id > ? AND id < ?").run(fresh, lo, hi);
         d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'u')").run(tbl, r.id);
       }
     }
@@ -679,14 +667,39 @@ async function mergeInto(cid, key) {
     }
     for (const k of d.prepare('SELECT key FROM counters').all()) d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES('counters',?,'u')").run(k.key);
   })());
-  // the merged copy takes this company's place; the old copy stays (hidden) as a backup
-  db.registry.prepare('UPDATE companies SET name=? WHERE id=?').run(row.name, tid);
-  db.registry.prepare('UPDATE companies SET active=0 WHERE id=?').run(cid);
-  const mm = map(); delete mm[cid]; setMap(mm);
-  try { await rtdb('PUT', `books/${src}/info/merged_into`, key); } catch (e) { state.lastError = e.message; }
-  try { await syncCompany(tid); } catch (e) { state.lastError = e.message; }
+}
+
+/** Company `from` was merged into `to`: it is hidden (kept as a backup) and the apps switch to `to`. */
+function moved(from, to) {
+  const row = db.companyRow(from);
+  if (row) db.registry.prepare('UPDATE companies SET name=? WHERE id=?').run(row.name, to);
+  db.registry.prepare('UPDATE companies SET active=0 WHERE id=?').run(from);
+  const mm = map(); delete mm[from]; setMap(mm);
+  state.moved[from] = to;
+  state.companies++;
+}
+
+/**
+ * This company's book was merged into another one (on another device): this device moves there too. The other book
+ * comes here (or is here already), and what this device wrote into the old book after the merge is replayed on it.
+ */
+async function follow(cid, key, into) {
+  const d = db.openCompany(cid);
+  const sl = Number(getApp('sync_slot'));
+  await push(d, key, sl);
+  const at = await rtdb('GET', `books/${key}/info/merged_at`);
+  let tid = Number((Object.entries(map()).find(([, v]) => v === into) || [])[0]) || null;
+  if (!tid) tid = (await join(into)).company_id;
+  else await syncCompany(tid);
+  if (at) {
+    const mine = await mySlots();
+    const page = (await rtdb('GET', `books/${key}/log`, undefined, `&orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeURIComponent(JSON.stringify(at))}`)) || {};
+    const late = Object.keys(page).sort().filter((k) => k > at && page[k] && page[k].c && mine.has(Number(page[k].s))).map((k) => page[k]);
+    if (late.length) replayInto(tid, db.openCompany(tid), late);
+  }
+  moved(cid, tid);
   state.version++;
-  return { company_id: tid, merged: entries.length, ...status(tid) };
+  return 0;
 }
 
 /** Bring a synced company onto this device: a new, empty company that fills itself from the other devices' changes. */

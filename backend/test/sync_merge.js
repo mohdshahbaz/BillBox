@@ -20,14 +20,14 @@ const { server } = require('./fake_firebase');
   };
   const A = mk('A'), B = mk('B');
   await Promise.all([A.ready, B.ready]);
-  let cB = 1;
-  const q = (dev, sql, c) => dev.run(`return db.withCompany(${c || (dev === A ? 1 : cB)}, () => db.prepare(${JSON.stringify(sql)}).all())`);
+  let cB = 1, cA = 1;
+  const q = (dev, sql, c) => dev.run(`return db.withCompany(${c || (dev === A ? cA : cB)}, () => db.prepare(${JSON.stringify(sql)}).all())`);
   const tick = async () => { for (let i = 0; i < 3; i++) { await A.run('return S.tick()'); await B.run('return S.tick()'); } };
   let passed = 0;
   const ok = async (name, fn) => { await fn(); passed++; console.log('  ok  ', name); };
   try {
-    const name = await A.run("const n = 'AK Enterprises'; db.registry.prepare('UPDATE companies SET name=? WHERE id=1').run(n); return n");
-    await B.run(`db.registry.prepare('UPDATE companies SET name=? WHERE id=1').run(${JSON.stringify(name)})`);
+    const rename = (n) => `db.registry.prepare('UPDATE companies SET name=? WHERE id=1').run(${JSON.stringify(n)}); db.withCompany(1, () => db.prepare("UPDATE settings SET value=? WHERE key='company_name'").run(${JSON.stringify(n)}))`;
+    await A.run(rename('AK Enterprises')); await B.run(rename('AK Enterprises'));
     const [bt] = await q(A, 'SELECT id,item_id,qty FROM batches WHERE qty > 20 ORDER BY exp_date, id LIMIT 1');
 
     await ok('a second device cannot start another book of the same company', async () => {
@@ -48,10 +48,14 @@ const { server } = require('./fake_firebase');
       assert.ok(r.can_merge);
       assert.strictEqual(r.books.filter((b) => b.same_name).length, 1);
     });
-    await ok('merging on B: its bills and party join A\'s book, stock counts both, numbers differ', async () => {
+    await ok('merging on B (its copy open): A\'s bills come in, A moves to B\'s copy by itself, stock counts both, numbers differ', async () => {
       const r = await B.run('const l = await S.remote(1); return S.merge(1, l.books.find((b) => b.same_name).key)');
       cB = r.company_id;
-      assert.ok(r.on && cB !== 1 && r.merged > 0, JSON.stringify(r));
+      assert.ok(r.on && cB === 1 && r.merged > 0, JSON.stringify(r));
+      await tick();
+      const t = await A.run('return S.tick()');
+      cA = Number(t.moved[1]);
+      assert.ok(cA && cA !== 1, JSON.stringify(t));
       await tick();
       const [x] = await q(A, `SELECT qty FROM batches WHERE id=${bt.id}`);
       assert.strictEqual(x.qty, bt.qty - 5);
@@ -62,12 +66,14 @@ const { server } = require('./fake_firebase');
         assert.deepStrictEqual(await q(B, `SELECT * FROM ${t} ORDER BY 1`), await q(A, `SELECT * FROM ${t} ORDER BY 1`), t);
       }
     });
-    await ok('B now shows one AK Enterprises (the old copy is kept, hidden), and the account lists one book', async () => {
-      const list = await B.run('return db.registry.prepare("SELECT id,name FROM companies WHERE active=1").all()');
-      assert.deepStrictEqual(list.map((c) => c.name).sort(), ['AK Enterprises']);
+    await ok('each device shows one AK Enterprises (the old copy is kept, hidden), and the account lists one book', async () => {
+      for (const dev of [A, B]) {
+        const list = await dev.run('return db.registry.prepare("SELECT id,name FROM companies WHERE active=1").all()');
+        assert.deepStrictEqual(list.map((c) => c.name).sort(), ['AK Enterprises']);
+      }
       assert.strictEqual((await B.run(`return S.remote(${cB})`)).books.length, 1);
       // and they keep syncing
-      await A.run("db.withCompany(1, () => db.prepare(\"INSERT INTO categories(name) VALUES('After merge')\").run())");
+      await A.run(`db.withCompany(${cA}, () => db.prepare("INSERT INTO categories(name) VALUES('After merge')").run())`);
       await tick();
       assert.strictEqual((await q(B, "SELECT COUNT(*) n FROM categories WHERE name='After merge'"))[0].n, 1);
     });

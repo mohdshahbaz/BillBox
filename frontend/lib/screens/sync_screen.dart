@@ -62,13 +62,13 @@ class _SyncTabState extends State<SyncTab> {
     final yes = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text('Merge $name into the other copy?'),
-        content: const Text('This computer\'s bills, parties and stock changes since sync was turned on go into the other copy, which every device then shares. '
-            'This computer\'s copy is backed up first and kept hidden.'),
+        title: Text('Bring that copy of $name into the open one?'),
+        content: const Text('Its bills, parties and stock changes go into the open copy, which every device then shares; '
+            'the devices on that copy move over by themselves. A backup is made first.'),
         actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Merge'))],
       ),
     );
-    if (yes == true) await _run('/sync/merge', {'key': key}, 'Merged: this computer\'s changes went into the shared copy.');
+    if (yes == true) await _run('/sync/merge', {'key': key}, 'Merged: that copy\'s changes came into the open one.');
   }
 
   Widget _btn(String label, IconData icon, VoidCallback? f, {bool primary = false, bool danger = false}) {
@@ -149,7 +149,7 @@ class _SyncTabState extends State<SyncTab> {
               if (remote != null && remote!.isEmpty) const Text('No company is synced in this account yet.', style: muted),
               if (canMerge && (remote ?? []).any((b) => b['same_name'] == true))
                 Text('$name is in the account twice: each device turned on sync for its own copy, so they do not see each other\'s bills. '
-                    'Merge puts this computer\'s bills, parties and stock changes into the other copy and makes it the one used here (a backup is made first).', style: muted),
+                    'Merge brings that copy\'s bills, parties and stock changes into the open one (Open now), and the devices using that copy move to the open one by themselves. A backup is made first.', style: muted),
               const SizedBox(height: 8),
               _btn(remote == null ? 'Show the companies in this account' : 'Look again', Icons.list, _loadRemote),
             ]),

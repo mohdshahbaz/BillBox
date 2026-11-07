@@ -118,7 +118,7 @@ internal fun SyncPage() {
                 }
             }
             if (remote?.isEmpty() == true) Hint("No company is synced in this account yet.")
-            if (canMerge && remote?.any { it.bool("same_name") } == true) Hint("$name is in the account twice: each device turned on sync for its own copy, so they do not see each other's bills. Merge puts this phone's bills, parties and stock changes into the other copy and makes it the one used here (a backup is made first).")
+            if (canMerge && remote?.any { it.bool("same_name") } == true) Hint("$name is in the account twice: each device turned on sync for its own copy, so they do not see each other's bills. Merge brings that copy's bills, parties and stock changes into the open one (Open now), and the devices using that copy move to the open one by themselves. A backup is made first.")
             SyncBtn(if (remote == null) "Show the companies in this account" else "Look again", enabled = !busy) { app.launch { loadRemote() } }
         }
 
@@ -129,9 +129,9 @@ internal fun SyncPage() {
         Spacer(Modifier.height(80.dp))
     }
     mergeKey?.let { k ->
-        AlertDialog(onDismissRequest = { mergeKey = null }, title = { Text("Merge $name into the other copy?") },
-            text = { Text("This phone's bills, parties and stock changes since sync was turned on go into the other copy, which every device then shares. This phone's copy is backed up first and kept hidden.") },
-            confirmButton = { TextButton(onClick = { mergeKey = null; run("/sync/merge", mapOf("key" to k), "Merged: this phone's changes went into the shared copy.") }) { Text("Merge") } },
+        AlertDialog(onDismissRequest = { mergeKey = null }, title = { Text("Bring that copy of $name into the open one?") },
+            text = { Text("Its bills, parties and stock changes go into the open copy, which every device then shares; the devices on that copy move over by themselves. A backup is made first.") },
+            confirmButton = { TextButton(onClick = { mergeKey = null; run("/sync/merge", mapOf("key" to k), "Merged: that copy's changes came into the open one.") }) { Text("Merge") } },
             dismissButton = { TextButton(onClick = { mergeKey = null }) { Text("Cancel") } })
     }
 }
