@@ -72,6 +72,11 @@ jobs:
           BIN="$(cd ios/BillBoxCore && swift build --show-bin-path)/bbcheck"
           python3 ios/tests/parity/test_backup.py "$WORK" "$BIN"
 
+      - name: Live sync between the Mac engine and the iPhone engine (backend/test/sync_swift.js)
+        run: |
+          BIN="$(cd ios/BillBoxCore && swift build --show-bin-path)/bbcheck"
+          node --disable-warning=ExperimentalWarning backend/test/sync_swift.js "$BIN"
+
       - name: iPhone engine unit tests
         working-directory: ios/BillBoxCore
         run: swift test

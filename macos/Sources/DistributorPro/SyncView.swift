@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Settings › Sync: live sync of a company's books between this Mac, Android phones and Windows/Linux PCs through the
-/// BillBox Firebase database (backend services/sync.js). The app calls GET /sync/tick every few seconds (AppModel).
+/// Settings › Sync: live sync of a company's books between iPhone, Mac, Android phones and Windows/Linux PCs through the
+/// BillBox Firebase database (backend services/sync.js; iPhone: BillBoxCore Sync.swift). The app calls GET /sync/tick
+/// every few seconds (AppModel). Same file on iPhone and Mac.
 @MainActor struct SyncSettings: View {
     @EnvironmentObject private var app: AppModel
     @State private var s = JSON()
@@ -11,6 +12,11 @@ import SwiftUI
     @State private var remote: [JSON] = []
     @State private var loadedRemote = false
 
+    #if os(macOS)
+    private let device = "Mac"
+    #else
+    private let device = "iPhone"
+    #endif
     private var signedIn: Bool { s.bool("signed_in") }
     private var companyName: String { app.company?.str("name") ?? "this company" }
 
@@ -39,7 +45,7 @@ import SwiftUI
                 } else {
                     if s.bool("on") {
                         DriveButton(busy ? "Syncing…" : "Sync now", "arrow.clockwise.icloud", prominent: true, disabled: busy) { Task { await run("POST", "/sync/now") } }
-                        DriveButton("Stop syncing \(companyName) on this Mac", "icloud.slash", destructive: true, disabled: busy) { Task { await run("POST", "/sync/off") } }
+                        DriveButton("Stop syncing \(companyName) on this \(device)", "icloud.slash", destructive: true, disabled: busy) { Task { await run("POST", "/sync/off") } }
                     } else {
                         DriveButton(busy ? "Sending the books…" : "Turn on sync for \(companyName)", "icloud.and.arrow.up", prominent: true, disabled: busy) { Task { await run("POST", "/sync/on") } }
                     }
@@ -58,14 +64,14 @@ import SwiftUI
                                 if !b.str("fy").isEmpty { Text("Year \(b.str("fy"))").font(.caption).foregroundStyle(.secondary) }
                             }
                             Spacer()
-                            if b.bool("on_this_device") { Text("On this Mac").font(.caption).foregroundStyle(.secondary) }
+                            if b.bool("on_this_device") { Text("On this \(device)").font(.caption).foregroundStyle(.secondary) }
                             else { Button("Bring here") { Task { await join(b.str("key")) } }.disabled(busy) }
                         }
                     }
                     if loadedRemote && remote.isEmpty { Text("No company is synced in this account yet.").foregroundStyle(.secondary) }
                     DriveButton(loadedRemote ? "Look again" : "Show the companies in this account", "list.bullet", disabled: busy) { Task { await loadRemote() } }
                 } header: { Text("Companies in your sync account") } footer: {
-                    Text("Bring here makes a new company on this Mac that fills itself from your other devices.")
+                    Text("Bring here makes a new company on this \(device) that fills itself from your other devices.")
                 }
             }
 
@@ -114,7 +120,7 @@ import SwiftUI
         await app.guarded {
             let r = try await API.obj("POST", "/sync/join", body: ["key": key])
             try await app.reloadCompanies()
-            app.notify("The company is on this Mac now. Switch to it from the top of the sidebar.")
+            app.notify("The company is on this \(device) now. Switch to it from the company menu.")
             s = r
             await loadRemote()
         }

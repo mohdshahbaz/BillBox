@@ -251,6 +251,8 @@ public final class Backup {
         try fm.copyItem(atPath: src, toPath: tmp)
         for ext in ["-wal", "-shm"] { try? fm.removeItem(atPath: dest + ext) }
         if rename(tmp, dest) != 0 { throw HttpError(500, "Could not put the restored file in place.") }
+        // a synced company: the restored books replace the books on the other devices too (Sync.afterReplace)
+        engine.onReplace?(row.i("id"))
     }
 
     static func norm(_ n: Any?) -> String { rx("\\s+", "g").replace(JS.trim(JS.truthy(n) ? JS.string(unwrap(n)) : ""), " ").lowercased() }

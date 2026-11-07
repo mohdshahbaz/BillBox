@@ -26,9 +26,14 @@ public final class Router {
     /// Licence and subscription (License.swift); limits nothing unless `License.edition` is set by the app.
     public private(set) lazy var license = License(backup) { [unowned self] work in try await self.exclusive(work) }
 
+    /// Live sync between devices (Sync.swift); the app calls GET /sync/tick every few seconds.
+    public private(set) lazy var sync = Sync(engine, backup) { [unowned self] work in try await self.exclusive(work) }
+
     public init(engine: Engine) {
         self.engine = engine
         self.backup = Backup(engine)
+        engine.onOpen = { [unowned self] id, d in self.sync.attach(id, d) }
+        engine.onReplace = { [unowned self] id in self.sync.afterReplace(id) }
     }
 
     public convenience init(dataDir: String) throws { self.init(engine: try Engine(dataDir: dataDir)) }
@@ -51,6 +56,13 @@ public final class Router {
             // Google Drive: not queued (an upload can take a while); Drive takes its turn for each settings read and write
             return await answer {
                 guard let r = try await self.drive.route(method.uppercased(), seg, JSONNorm.row(body)) else { throw HttpError(404, "Not found") }
+                return r
+            }
+        }
+        if seg.first == "sync" {
+            // live sync: its network work runs outside the queue; its books work takes its turn in it
+            return await answer {
+                guard let r = try await self.sync.route(method.uppercased(), seg, JSONNorm.row(body), companyId) else { throw HttpError(404, "Not found") }
                 return r
             }
         }

@@ -22,7 +22,9 @@ class Database {
   nextId(t) {
     let n = this.idNext[t];
     if (n == null) {
-      const r = this.d.prepare(`SELECT MAX(id) AS m FROM ${t} WHERE id > ? AND id < ?`).get(this.idBase, this.idBase + ID_RANGE);
+      // ids folded into another row (sync_alias) are never handed out again
+      const r = this.d.prepare(`SELECT MAX(m) AS m FROM (SELECT MAX(id) AS m FROM ${t} WHERE id > ?1 AND id < ?2
+        UNION ALL SELECT MAX(from_id) FROM sync_alias WHERE tbl='${t}' AND from_id > ?1 AND from_id < ?2)`).get(this.idBase, this.idBase + ID_RANGE);
       n = r && r.m != null ? Number(r.m) + 1 : this.idBase + 1;
     }
     this.idNext[t] = n + 1;

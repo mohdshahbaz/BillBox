@@ -1,56 +1,8 @@
 // Live sync between two devices through a fake Firebase (auth + Realtime Database REST): node test/sync.js
-const os = require('os'), fs = require('fs'), path = require('path'), http = require('http'), assert = require('assert');
+const os = require('os'), fs = require('fs'), path = require('path'), assert = require('assert');
 const { fork, execFileSync } = require('child_process');
 
-// ---------- fake Firebase ----------
-const tree = {};
-const users = {};
-let pushN = 0, lastMs = 0;
-const PUSH = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
-function pushId() {
-  let ms = Math.max(Date.now(), lastMs); lastMs = ms; let s = '';
-  for (let i = 0; i < 8; i++) { s = PUSH[ms % 64] + s; ms = Math.floor(ms / 64); }
-  const n = String(pushN++).padStart(12, '0'); return s + n;
-}
-const at = (parts, make) => { let o = tree; for (const p of parts) { if (o[p] === undefined || o[p] === null || typeof o[p] !== 'object') { if (!make) return undefined; o[p] = {}; } o = o[p]; } return o; };
-const strip = (v) => {
-  if (v && typeof v === 'object' && v['.sv'] === 'timestamp') return Date.now();
-  if (Array.isArray(v)) return v.map(strip);
-  if (v && typeof v === 'object') { const o = {}; for (const [k, x] of Object.entries(v)) if (x !== null) o[k] = strip(x); return o; }
-  return v;
-};
-const server = http.createServer((req, res) => {
-  let body = '';
-  req.on('data', (c) => { body += c; });
-  req.on('end', () => {
-    const u = new URL(req.url, 'http://x');
-    const send = (st, o) => { res.writeHead(st, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
-    if (u.pathname.startsWith('/v1/accounts:')) {
-      const b = JSON.parse(body), kind = u.pathname.split(':')[1];
-      if (kind === 'signUp') { if (users[b.email]) return send(400, { error: { message: 'EMAIL_EXISTS' } }); users[b.email] = { pw: b.password, uid: 'U' + Object.keys(users).length }; }
-      const x = users[b.email];
-      if (!x || x.pw !== b.password) return send(400, { error: { message: 'INVALID_LOGIN_CREDENTIALS' } });
-      return send(200, { idToken: 'T:' + x.uid, refreshToken: 'R:' + x.uid, localId: x.uid, expiresIn: '3600' });
-    }
-    if (u.pathname === '/token') { const p = new URLSearchParams(body); const uid = p.get('refresh_token').slice(2); return send(200, { id_token: 'T:' + uid, refresh_token: 'R:' + uid, expires_in: '3600' }); }
-    const m = /^\/users\/([^/]+)\/(.*)\.json$/.exec(u.pathname);
-    if (!m) return send(404, { error: 'nope' });
-    if (u.searchParams.get('auth') !== 'T:' + m[1]) return send(401, { error: 'Permission denied' });
-    const parts = ['users', m[1], ...m[2].split('/')];
-    if (req.method === 'PUT') { const parent = at(parts.slice(0, -1), true); parent[parts[parts.length - 1]] = strip(JSON.parse(body)); return send(200, JSON.parse(body)); }
-    if (req.method === 'POST') { const o = at(parts, true); const k = pushId(); o[k] = strip(JSON.parse(body)); return send(200, { name: k }); }
-    let v = parts.reduce((o, p) => (o && typeof o === 'object' ? o[p] : undefined), tree);
-    if (v === undefined) return send(200, null);
-    if (u.searchParams.get('shallow') === 'true' && v && typeof v === 'object') return send(200, Object.fromEntries(Object.keys(v).map((k) => [k, true])));
-    if (u.searchParams.get('orderBy') === '"$key"') {
-      let keys = Object.keys(v).sort();
-      if (u.searchParams.has('startAt')) { const s = JSON.parse(u.searchParams.get('startAt')); keys = keys.filter((k) => k >= s); }
-      if (u.searchParams.has('limitToFirst')) keys = keys.slice(0, Number(u.searchParams.get('limitToFirst')));
-      v = Object.fromEntries(keys.map((k) => [k, v[k]]));
-    }
-    send(200, v);
-  });
-});
+const { server } = require('./fake_firebase');
 
 // ---------- two devices ----------
 function device(name, port) {
@@ -139,6 +91,41 @@ function device(name, port) {
     assert.ok(!nos.some((x) => x.includes('~')), nos.join(' '));
     const s = await A.run('return S.status(db.firstCompanyId())');
     assert.strictEqual(s.pending, 0); assert.strictEqual(s.errors, 0);
+  });
+  const cB = 'Object.keys(JSON.parse(db.registry.prepare("SELECT value FROM app_settings WHERE key=\'sync_map\'").get().value))[0]*1';
+  await ok('the same category and batch made on both devices at once become one (stock of both kept, bills follow)', async () => {
+    const [it] = await q(A, 'SELECT id FROM items ORDER BY id LIMIT 1');
+    const make = (dev, c, qty) => dev.run(`return db.withCompany(${c}, () => {
+      db.prepare("INSERT INTO categories(name) VALUES('Same')").run();
+      const b = Number(db.prepare("INSERT INTO batches(item_id,batch_no,exp_date,qty) VALUES(?,?,?,?)").run(${it.id}, 'B-SAME', new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), ${qty}).lastInsertRowid);
+      return b; })`);
+    const ba = await make(A, 'db.firstCompanyId()', 10), bb = await make(B, cB, 20);
+    // B sells 3 from its own copy before anything is synced
+    await B.run(`return db.withCompany(${cB}, () => billing.createInvoice({ pay_mode: 'CASH', lines: [{ item_id: ${it.id}, batch_id: ${bb}, qty: 3 }] }))`);
+    await both(); await both();
+    for (const dev of [A, B]) {
+      const bs = await q(dev, "SELECT id,qty FROM batches WHERE batch_no='B-SAME'");
+      assert.deepStrictEqual(bs, [{ id: ba, qty: 27 }], JSON.stringify(bs));
+      assert.strictEqual((await q(dev, "SELECT COUNT(*) n FROM categories WHERE name='Same'"))[0].n, 1);
+    }
+    assert.strictEqual((await q(A, `SELECT COUNT(*) n FROM invoice_lines WHERE batch_id=${ba}`))[0].n, 1, JSON.stringify(await q(A, 'SELECT id,batch_id,qty FROM invoice_lines ORDER BY id DESC LIMIT 2')) + JSON.stringify(await q(B, 'SELECT id,batch_id,qty FROM invoice_lines ORDER BY id DESC LIMIT 2')) + ba + ' ' + bb);
+    for (const t of ['batches', 'categories', 'invoice_lines', 'invoices']) assert.deepStrictEqual(await q(B, `SELECT * FROM ${t} ORDER BY 1`), await q(A, `SELECT * FROM ${t} ORDER BY 1`), t);
+  });
+  await ok('a backup restored (Replace) on one device replaces the books on the other too', async () => {
+    const folder = await A.run("return require('../src/services/backup').backupNow({ reason: 'manual' }).folder");
+    await A.run("db.withCompany(db.firstCompanyId(), () => db.prepare(\"INSERT INTO categories(name) VALUES('After backup')\").run())");
+    await both();
+    assert.strictEqual((await q(B, "SELECT COUNT(*) n FROM categories WHERE name='After backup'"))[0].n, 1);
+    await A.run(`return require('../src/services/backup').restore({ folder: ${JSON.stringify(folder)}, mode: 'replace' })`);
+    await both(); await both();
+    for (const dev of [A, B]) assert.strictEqual((await q(dev, "SELECT COUNT(*) n FROM categories WHERE name='After backup'"))[0].n, 0);
+    for (const t of ['items', 'batches', 'parties', 'invoices', 'invoice_lines', 'ledger', 'categories', 'settings', 'counters']) {
+      assert.deepStrictEqual(await q(B, `SELECT * FROM ${t} ORDER BY 1`), await q(A, `SELECT * FROM ${t} ORDER BY 1`), t);
+    }
+    // and syncing goes on as before
+    await A.run("db.withCompany(db.firstCompanyId(), () => db.prepare(\"INSERT INTO categories(name) VALUES('After restore')\").run())");
+    await both();
+    assert.strictEqual((await q(B, "SELECT COUNT(*) n FROM categories WHERE name='After restore'"))[0].n, 1);
   });
   await ok('turning sync off stops tracking and gives SQLite ids back', async () => {
     const s = await A.run("const c = db.firstCompanyId(); S.turnOff(c); return db.withCompany(c, () => Number(db.prepare(\"INSERT INTO categories(name) VALUES('local')\").run().lastInsertRowid))");

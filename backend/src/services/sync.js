@@ -25,7 +25,7 @@ const CONFIG = {
 };
 const RANGE = 10000000;
 const MAX_SLOT = 210;
-const LOCAL = new Set(['sync_out', 'sync_state', 'sync_seen']);
+const LOCAL = new Set(['sync_out', 'sync_state', 'sync_seen', 'sync_alias']);
 const CHUNK = 400; // changes per log entry
 
 // ---------- small helpers ----------
@@ -147,7 +147,11 @@ function tables(d) {
     const cols = d.prepare(`PRAGMA table_info(${name})`).all();
     const pk = cols.filter((c) => c.pk);
     if (pk.length !== 1) continue;
-    out.push({ name, pk: pk[0].name, intId: pk[0].name === 'id' && /INT/i.test(pk[0].type), cols: cols.map((c) => c.name) });
+    // UNIQUE column sets (a category name, a batch number of an item) and the columns that point at other tables
+    const uniq = d.prepare(`PRAGMA index_list(${name})`).all().filter((x) => x.unique && x.origin === 'u')
+      .map((x) => d.prepare(`PRAGMA index_info(${x.name})`).all().map((c) => c.name));
+    const fks = d.prepare(`PRAGMA foreign_key_list(${name})`).all().map((f) => ({ col: f.from, ref: f.table }));
+    out.push({ name, pk: pk[0].name, intId: pk[0].name === 'id' && /INT/i.test(pk[0].type), cols: cols.map((c) => c.name), uniq, fks });
   }
   return out;
 }
@@ -159,7 +163,8 @@ function attach(cid, d) {
   if (!key || !sl) { d.idBase = 0; return; }
   d.exec(`CREATE TABLE IF NOT EXISTS sync_out (seq INTEGER PRIMARY KEY, tbl TEXT NOT NULL, rid, op TEXT NOT NULL, dq REAL);
 CREATE TABLE IF NOT EXISTS sync_state (k TEXT PRIMARY KEY, v TEXT);
-CREATE TABLE IF NOT EXISTS sync_seen (k TEXT PRIMARY KEY, at INTEGER)`);
+CREATE TABLE IF NOT EXISTS sync_seen (k TEXT PRIMARY KEY, at INTEGER);
+CREATE TABLE IF NOT EXISTS sync_alias (tbl TEXT NOT NULL, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, PRIMARY KEY (tbl, from_id))`);
   const ts = tables(d);
   for (const { name } of d.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'bbsync_%'").all()) d.exec(`DROP TRIGGER IF EXISTS ${name}`);
   for (const t of ts) {
@@ -178,7 +183,7 @@ function detach(cid) {
   const d = db.openCompany(cid);
   if (!d) return;
   for (const { name } of d.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'bbsync_%'").all()) d.exec(`DROP TRIGGER IF EXISTS ${name}`);
-  d.exec('DROP TABLE IF EXISTS sync_out; DROP TABLE IF EXISTS sync_seen; DROP TABLE IF EXISTS sync_state');
+  d.exec('DROP TABLE IF EXISTS sync_out; DROP TABLE IF EXISTS sync_seen; DROP TABLE IF EXISTS sync_state; DROP TABLE IF EXISTS sync_alias');
   d.idBase = 0;
 }
 
@@ -236,11 +241,12 @@ function apply(cid, d, entries) {
     db.withCompany(cid, () => d.transaction(() => {
       const before = (d.prepare('SELECT MAX(seq) AS m FROM sync_out').get() || {}).m || 0;
       for (const e of entries) {
+        if (e.x) resetBooks(d, info);   // another device restored a backup over these books: start again from its copy
         for (const c of [].concat(e.c || []).filter(Boolean)) {
           const t = info[c.t];
           if (!t || (c.t === 'settings' && /^sync_/.test(String(c.k)))) continue;
           try {
-            d.transaction(() => applyOne(d, t, c, ctx))();
+            d.transaction(() => applyOne(d, t, c, ctx, info))();
             applied++;
           } catch (err) {
             failed++;
@@ -255,6 +261,31 @@ function apply(cid, d, entries) {
   } finally { d.pragma('foreign_keys = ON'); }
   state.errors += failed;
   return applied;
+}
+
+/** Empties every synced table (another device restored a backup: its full copy follows). */
+function resetBooks(d, info) {
+  for (const t of Object.values(info)) {
+    d.exec(`DELETE FROM ${t.name}`);
+  }
+  d.exec('DELETE FROM sync_out');
+  d.idNext = {};
+}
+
+/**
+ * A backup was restored over a synced company (Replace): its books go out whole, after a reset that empties the other
+ * devices' copies, and this device reads on from that point (not the changes made before the restore).
+ */
+function afterReplace(cid) {
+  const key = map()[cid];
+  if (!key) return;
+  const d = db.openCompany(cid);
+  if (!d) return;
+  attach(cid, d);
+  d.exec('DELETE FROM sync_out; DELETE FROM sync_seen');
+  for (const t of tables(d)) d.prepare(`INSERT INTO sync_out(tbl,rid,op) SELECT '${t.name}', ${t.pk}, 'i' FROM ${t.name}`).run();
+  d.prepare('DELETE FROM sync_state WHERE k=?').run('cursor');
+  putState(d, 'reset', '1');
 }
 
 // numbered documents: two devices that make a bill at the same moment (or offline) can pick the same number
@@ -287,12 +318,66 @@ function settleNumber(d, t, c, vals, ctx) {
   }
 }
 
-function applyOne(d, t, c, ctx) {
+// ---------- the same category or batch made on two devices at once ----------
+const aliasOf = (d, tbl, id) => { const r = d.prepare('SELECT to_id FROM sync_alias WHERE tbl=? AND from_id=?').get(tbl, id); return r ? r.to_id : null; };
+
+/** Row `loser` of t becomes `winner`: everything pointing at it follows, a batch's stock is added, later changes follow too. */
+function fold(d, t, info, loser, winner) {
+  for (const o of Object.values(info)) for (const f of o.fks) if (f.ref === t.name) d.prepare(`UPDATE ${o.name} SET ${f.col}=? WHERE ${f.col}=?`).run(winner, loser);
+  d.prepare('UPDATE sync_alias SET to_id=? WHERE tbl=? AND to_id=?').run(winner, t.name, loser);
+  d.prepare('INSERT OR REPLACE INTO sync_alias(tbl,from_id,to_id) VALUES(?,?,?)').run(t.name, loser, winner);
+}
+
+/**
+ * The incoming row has the same name / batch number as another row here: the two are one record. The older one (lower id)
+ * stays on every device; the other is folded into it (bills that use it follow; a batch's stock is added). Every device
+ * decides the same way, so the books stay alike without anything more being sent. true = done.
+ */
+function merged(d, t, c, vals, info) {
+  for (const cols of t.uniq) {
+    const here = d.prepare(`SELECT * FROM ${t.name} WHERE ${t.pk}=?`).get(c.k);
+    const v = cols.map((col) => (col in vals ? vals[col] : here ? here[col] : null));
+    if (v.some((x) => x == null)) continue;
+    const other = d.prepare(`SELECT * FROM ${t.name} WHERE ${cols.map((x) => `${x}=?`).join(' AND ')} AND ${t.pk}<>?`).get(...v, c.k);
+    if (!other) continue;
+    const stock = t.name === 'batches';
+    if (Number(other[t.pk]) < Number(c.k)) {
+      // the incoming row is the newer copy: its stock goes to the older one
+      const add = here ? Number(here.qty || 0) + Number(c.q || 0) : Number(vals.qty || 0);
+      if (stock && add) d.prepare('UPDATE batches SET qty = qty + ? WHERE id=?').run(add, other[t.pk]);
+      fold(d, t, info, c.k, other[t.pk]);   // (rows that arrived before it may already point at it)
+      if (here) d.prepare(`DELETE FROM ${t.name} WHERE ${t.pk}=?`).run(c.k);
+      return true;
+    }
+    // the copy here is the newer one: it gives way to the incoming row
+    if (stock) vals.qty = (here && c.q != null ? Number(here.qty || 0) + Number(c.q) : Number(vals.qty || 0)) + Number(other.qty || 0);
+    d.prepare(`DELETE FROM ${t.name} WHERE ${t.pk}=?`).run(other[t.pk]);
+    fold(d, t, info, other[t.pk], c.k);
+    if (stock) c = { ...c, q: null };
+    write(d, t, c, vals);
+    return true;
+  }
+  return false;
+}
+
+function applyOne(d, t, c, ctx, info) {
+  // a row that was folded into another one: its stock changes go to the kept row, nothing else
+  const al = t.intId ? aliasOf(d, t.name, c.k) : null;
+  if (al != null) {
+    if (c.r && t.name === 'batches' && c.q) d.prepare('UPDATE batches SET qty = qty + ? WHERE id=?').run(c.q, al);
+    return;
+  }
   if (!c.r) { d.prepare(`DELETE FROM ${t.name} WHERE ${t.pk}=?`).run(c.k); return; }
   const vals = {};
   for (const [k, v] of Object.entries(c.r)) if (t.cols.includes(k) && k !== t.pk) vals[k] = typeof v === 'object' && v !== null ? JSON.stringify(v) : (typeof v === 'boolean' ? (v ? 1 : 0) : v);
   for (const k of String(c.z || '').split(',').filter(Boolean)) if (t.cols.includes(k) && k !== t.pk) vals[k] = null;
+  for (const f of t.fks) if (vals[f.col] != null) { const a = aliasOf(d, f.ref, vals[f.col]); if (a != null) vals[f.col] = a; }
   if (NUMBERED[t.name]) settleNumber(d, t, c, vals, ctx);
+  else if (t.uniq.length && merged(d, t, c, vals, info)) return;
+  write(d, t, c, vals);
+}
+
+function write(d, t, c, vals) {
   const exists = d.prepare(`SELECT 1 AS x FROM ${t.name} WHERE ${t.pk}=?`).get(c.k);
   if (exists) {
     const sets = [], args = [];
@@ -317,6 +402,11 @@ function pushPrefix(ms) { let s = ''; for (let i = 0; i < 8; i++) { s = PUSH[ms 
 // ---------- sync steps ----------
 async function push(d, key, sl) {
   let sent = 0;
+  if (getState(d, 'reset') === '1') {
+    const r = await rtdb('POST', `books/${key}/log`, { s: sl, x: 1 });
+    if (r && r.name) { putState(d, 'cursor', r.name); putState(d, 'floor', r.name); d.prepare('INSERT OR IGNORE INTO sync_seen(k,at) VALUES(?,?)').run(r.name, pushTime(r.name)); }
+    d.prepare('DELETE FROM sync_state WHERE k=?').run('reset');
+  }
   for (let round = 0; round < 20; round++) {
     const { changes, upTo } = outgoing(d);
     if (!changes.length) { if (upTo) d.prepare('DELETE FROM sync_out WHERE seq <= ?').run(upTo); break; }
@@ -346,7 +436,8 @@ async function pull(cid, d, key, sl) {
       const part = keys.slice(i, i + 200);
       for (const x of d.prepare(`SELECT k FROM sync_seen WHERE k IN (${part.map(() => '?').join(',')})`).all(...part)) seen.add(x.k);
     }
-    const fresh = keys.filter((k) => !seen.has(k));
+    const floor = getState(d, 'floor');
+    const fresh = keys.filter((k) => !seen.has(k) && (!floor || k >= floor));
     const theirs = fresh.filter((k) => page[k] && Number(page[k].s) !== sl).map((k) => page[k]);
     if (theirs.length) got += apply(cid, d, theirs);
     for (const k of fresh) d.prepare('INSERT OR IGNORE INTO sync_seen(k,at) VALUES(?,?)').run(k, pushTime(k));
@@ -471,4 +562,4 @@ function status(cid) {
 
 for (const [id, d] of db.openHandles()) attach(id, d);
 
-module.exports = { signIn, signOut, status, tick, turnOn, turnOff, remote, join, attach, CONFIG, _state: state, pushTime, pushPrefix };
+module.exports = { signIn, signOut, status, tick, turnOn, turnOff, remote, join, attach, afterReplace, CONFIG, _state: state, pushTime, pushPrefix };

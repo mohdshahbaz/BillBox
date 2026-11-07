@@ -7,6 +7,11 @@ public final class Engine {
     public let dataDir: String
     public let registry: Database
     private var open: [Int: Database] = [:]
+    /// Called for each company opened (live sync turns its tracking on: Sync.attach).
+    public var onOpen: ((Int, Database) -> Void)? { didSet { for (id, d) in open { onOpen?(id, d) } } }
+    /// Called after a backup was restored over a company's file (live sync sends the restored books out whole).
+    public var onReplace: ((Int) -> Void)?
+    var openHandles: [(Int, Database)] { open.map { ($0.key, $0.value) } }
 
     public init(dataDir: String) throws {
         self.dataDir = dataDir
@@ -62,6 +67,7 @@ public final class Engine {
         try Schema.apply(d)   // also upgrades older databases in place
         try tidyItems(d)
         open[id] = d
+        onOpen?(id, d)
         return d
     }
 

@@ -27,6 +27,24 @@ public final class Database {
     /// Compiled statements kept for reuse (the engine runs the same few hundred SQL texts over and over).
     fileprivate var cache: [String: OpaquePointer] = [:]
     fileprivate var busy: Set<String> = []
+    /// Live sync (Sync.swift): rows this device adds get ids from its own range (idBase + 1 …), so two devices never hand
+    /// out the same id. 0 = sync off, ids as SQLite picks them (backend/src/sqlite.js).
+    public var idBase = 0
+    public var idTables: Set<String> = []
+    var idNext: [String: Int] = [:]
+    public static let idRange = 10_000_000
+
+    /// Next free id of this device's range in table t.
+    func nextId(_ t: String) throws -> Int {
+        var n = idNext[t] ?? 0
+        if n == 0 {
+            // ids folded into another row (sync_alias) are never handed out again
+            let r = try Statement(self, "SELECT MAX(m) AS m FROM (SELECT MAX(id) AS m FROM \(t) WHERE id > ?1 AND id < ?2 UNION ALL SELECT MAX(from_id) FROM sync_alias WHERE tbl='\(t)' AND from_id > ?1 AND from_id < ?2)", raw: true).get(idBase, idBase + Database.idRange)
+            n = r.flatMap { unwrap($0["m"]) }.map { Int(JS.number($0)) + 1 } ?? idBase + 1
+        }
+        idNext[t] = n + 1
+        return n
+    }
 
     public init(_ path: String, readonly: Bool = false) throws {
         self.path = path
@@ -129,13 +147,36 @@ public struct RunResult {
 public final class Statement {
     private let db: Database
     private let sql: String
+    /// sync on: "INSERT INTO t(a,b) VALUES(…)" without an id gets this device's next id as its first value
+    private var idTable: String?
+    private var named = false
+    private static let insert = try! NSRegularExpression(pattern: #"^(\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+)(\w+)(\s*\()([^)]*)(\)\s*VALUES\s*\()"#, options: [.caseInsensitive])
 
-    init(_ db: Database, _ sql: String) {
+    init(_ db: Database, _ sql: String, raw: Bool = false) {
         self.db = db
-        self.sql = sql
+        var text = sql
+        if !raw && db.idBase != 0, let m = Statement.insert.firstMatch(in: sql, range: NSRange(sql.startIndex..., in: sql)) {
+            let g = { (i: Int) in String(sql[Range(m.range(at: i), in: sql)!]) }
+            let table = g(2)
+            if db.idTables.contains(table) && !g(4).split(separator: ",").contains(where: { $0.trimmingCharacters(in: .whitespaces).lowercased() == "id" }) {
+                idTable = table
+                named = !sql.contains("?")
+                let rest = String(sql[Range(m.range, in: sql)!.upperBound...])
+                text = g(1) + table + g(3) + "id," + g(4) + g(5) + (named ? "@__bbid," : "?,") + rest
+            }
+        }
+        self.sql = text
     }
 
-    private func withStatement<T>(_ args: [Any?], _ body: (OpaquePointer) throws -> T) throws -> T {
+    private func withStatement<T>(_ given: [Any?], _ body: (OpaquePointer) throws -> T) throws -> T {
+        var args = given
+        if let t = idTable {
+            let id = try db.nextId(t)
+            if !named { args = [id as Any?] + given }
+            else if given.count == 1, let o = given[0] as? [String: Any?] { var x = o; x["__bbid"] = id; args = [x] }
+            else if given.count == 1, let o = given[0] as? [String: Any] { var x = o; x["__bbid"] = id; args = [x] }
+            else { args = [["__bbid": id] as [String: Any]] }
+        }
         let (s, cached) = try db.statement(sql)
         defer { db.done(sql, s, cached: cached) }
         try bind(s, args)
@@ -223,6 +264,17 @@ public final class Statement {
             while rc == SQLITE_ROW { rc = sqlite3_step(s) }
             if rc != SQLITE_DONE { throw db.error(rc) }
             return RunResult(changes: Int(sqlite3_changes(db.handle)), lastInsertRowid: Int(sqlite3_last_insert_rowid(db.handle)))
+        }
+    }
+
+    /// `all` with the arguments in an array.
+    public func allArgs(_ args: [Any?]) throws -> [Row] {
+        try withStatement(args) { s in
+            var out: [Row] = []
+            var rc = sqlite3_step(s)
+            while rc == SQLITE_ROW { out.append(readRow(s)); rc = sqlite3_step(s) }
+            if rc != SQLITE_DONE { throw db.error(rc) }
+            return out
         }
     }
 

@@ -176,6 +176,8 @@ function swapIn(src, row) {
   fs.copyFileSync(src, tmp);
   for (const ext of ['-wal', '-shm']) fs.rmSync(dest + ext, { force: true });
   fs.renameSync(tmp, dest);
+  // a synced company: the restored books replace the books on the other devices too (services/sync.js)
+  try { require('./sync').afterReplace(row.id); } catch (e) { console.error('sync after restore:', e && e.message); }
 }
 
 const norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
