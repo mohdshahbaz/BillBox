@@ -546,11 +546,14 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
         }
     }
 
-    /// Rate-wise GST: one row per GST rate on the bill.
+    /// Rate-wise GST: one row per GST rate on the bill, with the tax columns of its supply: CGST and SGST within the state,
+    /// IGST across states (never a column of zeros).
     private var gstTable: some View {
-            VStack(alignment: .leading, spacing: 1.5) {
+            let inter = inv.str("supply") == "INTER" || (inv.num("igst") > 0 && inv.num("cgst") == 0)
+            let heads = inter ? ["GST %", "Items", "Taxable", "IGST"] : ["GST %", "Items", "Taxable", "CGST", "SGST"]
+            return VStack(alignment: .leading, spacing: 1.5) {
                 HStack(spacing: 0) {
-                    ForEach(["GST %", "Items", "Taxable", "CGST", "SGST", "IGST"], id: \.self) { h in
+                    ForEach(heads, id: \.self) { h in
                         t(h, 6.5, bold: true).frame(width: (h == "Items" ? 32 : 50) * g.cw, alignment: .trailing)
                     }
                 }
@@ -561,9 +564,12 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                         t(Fmt.qty(s.num("rate")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
                         t("\(Int(s.num("rows")))", 6.5).frame(width: 32 * g.cw, alignment: .trailing)
                         t(Fmt.amount(s.num("taxable")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
-                        t(Fmt.amount(s.num("cgst")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
-                        t(Fmt.amount(s.num("sgst")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
-                        t(Fmt.amount(s.num("igst")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
+                        if inter {
+                            t(Fmt.amount(s.num("igst")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
+                        } else {
+                            t(Fmt.amount(s.num("cgst")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
+                            t(Fmt.amount(s.num("sgst")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
+                        }
                     }
                 }
             }

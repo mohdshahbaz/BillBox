@@ -59,6 +59,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         // site and look like a Mac to its checks (platform, touch points), not only by the browser name
         cfg.defaultWebpagePreferences.preferredContentMode = .desktop
         cfg.userContentController.addUserScript(WKUserScript(source: Self.desktop, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        cfg.userContentController.addUserScript(WKUserScript(source: Self.quietKeyboard, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         let w = WKWebView(frame: CGRect(x: 0, y: 0, width: 1000, height: 720), configuration: cfg)
         // WhatsApp Web serves its desktop page only to a desktop browser
         w.customUserAgent = Self.userAgent
@@ -82,6 +83,9 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         // bill ran out of time. Invisible (1 % opacity) and it lets every touch through.
         w.accessibilityElementsHidden = true
         window.addSubview(w)
+        // sending in the background types into WhatsApp's boxes: the iPhone keyboard must not come up for that
+        w.evaluateJavaScript("window.__bbQuiet = true", completionHandler: nil)
+        w.endEditing(true)
     }
 
     /// Moves the page into the Connect sheet.
@@ -91,8 +95,47 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         w.alpha = 1
         w.isUserInteractionEnabled = true
         w.accessibilityElementsHidden = false
+        // in the Connect sheet the phone number is typed by hand: the keyboard works again
+        w.evaluateJavaScript("window.__bbLoud && window.__bbLoud()", completionHandler: nil)
         return w
     }
+
+    /// While the page is parked, its text boxes ask for no on-screen keyboard (inputmode none): the bill is put in and sent
+    /// by script, and focusing WhatsApp's boxes brought the iPhone keyboard up over the app. Back in the Connect sheet the
+    /// boxes are as WhatsApp made them (window.__bbLoud).
+    static let quietKeyboard = #"""
+    (() => {
+      if (window.__bbQuietInstalled) return;
+      window.__bbQuietInstalled = true;
+      if (window.__bbQuiet === undefined) window.__bbQuiet = true;
+      const typed = (el) => el && el.nodeType === 1 && (el.isContentEditable || el.getAttribute('contenteditable') === 'true' || /^(INPUT|TEXTAREA)$/.test(el.tagName));
+      const mark = (el) => {
+        if (!window.__bbQuiet || !typed(el) || el.getAttribute('inputmode') === 'none') return;
+        el.setAttribute('data-bb-im', el.getAttribute('inputmode') || '');
+        el.setAttribute('inputmode', 'none');
+      };
+      const focus = HTMLElement.prototype.focus;
+      HTMLElement.prototype.focus = function (...a) { mark(this); return focus.apply(this, a); };
+      document.addEventListener('focusin', (e) => mark(e.target), true);
+      const watch = () => new MutationObserver((ms) => {
+        if (!window.__bbQuiet) return;
+        for (const m of ms) for (const n of m.addedNodes) {
+          if (n.nodeType !== 1) continue;
+          mark(n);
+          if (n.querySelectorAll) n.querySelectorAll('input, textarea, [contenteditable="true"]').forEach(mark);
+        }
+      }).observe(document.documentElement, { childList: true, subtree: true });
+      if (document.documentElement) watch(); else document.addEventListener('DOMContentLoaded', watch);
+      window.__bbLoud = () => {
+        window.__bbQuiet = false;
+        document.querySelectorAll('[data-bb-im]').forEach((el) => {
+          const v = el.getAttribute('data-bb-im');
+          if (v) el.setAttribute('inputmode', v); else el.removeAttribute('inputmode');
+          el.removeAttribute('data-bb-im');
+        });
+      };
+    })();
+    """#
 
     // MARK: page loading
 
@@ -135,6 +178,8 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         return await limited(seconds: 25, fallback: "js-error: the WhatsApp page did not answer in 25 s") {
             do {
                 let r = try await w.callAsyncJavaScript(body, arguments: args, in: nil, contentWorld: .page)
+                // in the background, a box the script focused must not keep the iPhone keyboard up
+                if !self.showing { w.endEditing(true) }
                 return (r as? String) ?? "\(r ?? "")"
             } catch { return "js-error: \(error.localizedDescription)" }
         }

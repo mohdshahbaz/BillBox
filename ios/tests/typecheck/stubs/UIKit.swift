@@ -101,6 +101,7 @@ public class UIGraphicsImageRenderer: NSObject {
 
 open class UIResponder: NSObject {}
 open class UIView: UIResponder {
+    @discardableResult open func endEditing(_ force: Bool) -> Bool { true }
     public override init() {}
     public init(frame: CGRect) {}
     open var frame: CGRect = .zero

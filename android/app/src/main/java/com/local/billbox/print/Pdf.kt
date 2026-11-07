@@ -396,14 +396,17 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         val lx = x + 6; var ly = y + 4
         val rowH = 8.5f * fs
         if (on("print_gst_table")) {
-            val heads = listOf("GST %", "Items", "Taxable", "CGST", "SGST", "IGST")
+            // the tax columns of the bill's supply: CGST and SGST within the state, IGST across states (never a column of zeros)
+            val inter = inv.str("supply") == "INTER" || (inv.num("igst") > 0 && inv.num("cgst") == 0.0)
+            val heads = if (inter) listOf("GST %", "Items", "Taxable", "IGST") else listOf("GST %", "Items", "Taxable", "CGST", "SGST")
             var cx = lx
             for (hd in heads) { val cw = (if (hd == "Items") 32f else 50f) * g.cw; pen.text(hd, cx, ly, cw, rowH, 6.5f * fs, 700, 2); cx += cw }
             ly += rowH + 1
             pen.hLine(lx, cx, ly - 0.5f, 0.4f, MUTED)
             for (s in inv.list("gst_summary")) {
                 cx = lx
-                val vals = listOf(Fmt.qty(s.num("rate")), "${s.num("rows").toInt()}", Fmt.amount(s.num("taxable")), Fmt.amount(s.num("cgst")), Fmt.amount(s.num("sgst")), Fmt.amount(s.num("igst")))
+                val vals = listOf(Fmt.qty(s.num("rate")), "${s.num("rows").toInt()}", Fmt.amount(s.num("taxable"))) +
+                    if (inter) listOf(Fmt.amount(s.num("igst"))) else listOf(Fmt.amount(s.num("cgst")), Fmt.amount(s.num("sgst")))
                 vals.forEachIndexed { i, v -> val cw = (if (i == 1) 32f else 50f) * g.cw; pen.text(v, cx, ly, cw, rowH, 6.5f * fs, align = 2); cx += cw }
                 ly += rowH
             }

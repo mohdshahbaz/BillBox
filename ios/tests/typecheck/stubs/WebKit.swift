@@ -40,4 +40,5 @@ open class WKWebView: UIView {
     @discardableResult open func loadFileURL(_ url: URL, allowingReadAccessTo: URL) -> WKNavigation? { nil }
     open func callAsyncJavaScript(_ functionBody: String, arguments: [String: Any] = [:], in frame: WKFrameInfo? = nil, contentWorld: WKContentWorld) async throws -> Any? { nil }
     open func evaluateJavaScript(_ s: String) async throws -> Any { 0 }
+    open func evaluateJavaScript(_ s: String, completionHandler: ((Any?, Error?) -> Void)? = nil) {}
 }
