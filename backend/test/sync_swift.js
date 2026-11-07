@@ -79,6 +79,17 @@ if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_swift.js
       const s = await api('GET', '/api/sync', null, cB);
       assert.strictEqual(s.pending, 0); assert.strictEqual(s.errors, 0);
     });
+    await ok('the company edited on the iPhone (name, GSTIN) shows edited on the Mac, and back', async () => {
+      await api('PUT', `/api/companies/${cB}`, { name: 'AK Enterprises Bijnor', company_gstin: '09ABCDE1234F1Z5', state_code: '09', company_address: 'Civil Lines', company_phone: '', invoice_terms: 'x' }, cB);
+      await both();
+      const ma = await A("return db.registry.prepare('SELECT name FROM companies WHERE id=?').get(db.firstCompanyId()).name");
+      assert.strictEqual(ma, 'AK Enterprises Bijnor');
+      assert.deepStrictEqual(await qa("SELECT value FROM settings WHERE key='company_gstin'"), [{ value: '09ABCDE1234F1Z5' }]);
+      await A(`db.withCompany(db.firstCompanyId(), () => db.prepare("UPDATE settings SET value='AK Enterprises' WHERE key='company_name'").run())`);
+      await both();
+      const list = await api('GET', '/api/companies');
+      assert.strictEqual(list.companies.find((c) => c.id === cB).name, 'AK Enterprises');
+    });
     await ok('the same category and batch made on the Mac and the iPhone at once become one', async () => {
       const [it] = await qa('SELECT id FROM items ORDER BY id LIMIT 1');
       const exp = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);

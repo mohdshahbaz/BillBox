@@ -28,6 +28,7 @@ import UniformTypeIdentifiers
         switch key {
         case "appearance": AppearanceSettings().navigationTitle("Appearance").navigationBarTitleDisplayMode(.inline)
         case "companies": CompanySettings()
+        case let k where k.hasPrefix("company:"): CompanyEditPage(id: Int(k.dropFirst(8)))
         case "printing": PrintSettings()
         case "whatsapp": WhatsAppSettings().navigationTitle("WhatsApp").navigationBarTitleDisplayMode(.inline)
         case "billing": BillingDashboardSettings().navigationTitle("Billing & Dashboard").navigationBarTitleDisplayMode(.inline)
@@ -43,8 +44,6 @@ import UniformTypeIdentifiers
 
 @MainActor struct CompanySettings: View {
     @EnvironmentObject private var app: AppModel
-    @State private var editing: JSON?
-    @State private var creating = false
     @State private var deleting: JSON?
     @State private var yearStart = AppModel.currentFYStart + 1
 
@@ -60,14 +59,15 @@ import UniformTypeIdentifiers
                         Spacer()
                         if c.id == app.companyId { Label("Open", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption) }
                         else { Button("Open") { Task { await app.switchCompany(c.id) } }.buttonStyle(.bordered) }
-                        Button("Edit…") { editing = c }.buttonStyle(.bordered)
+                        // a page in the More tab's path, not a sheet: on iPhone the sheet could close again before it showed
+                        NavigationLink(value: MoreRoute.settings("company:\(c.id)")) { Text("Edit…") }.buttonStyle(.bordered)
                         Button(role: .destructive) { deleting = c } label: { Image(systemName: "trash") }.buttonStyle(.bordered)
                     }
                 }
             } footer: {
                 Text("Each company has its own books (stock, parties, bills). Switch company from the company menu at the top left.")
             }
-            Section { Button { creating = true } label: { Label("New company…", systemImage: "plus") } }
+            Section { NavigationLink(value: MoreRoute.settings("company:new")) { Label("New company…", systemImage: "plus") } }
             Section {
                 Picker("Financial year", selection: $yearStart) {
                     ForEach((AppModel.currentFYStart - 6)...(AppModel.currentFYStart + 1), id: \.self) { Text("FY " + fyLabelFor($0)).tag($0) }
@@ -84,44 +84,74 @@ import UniformTypeIdentifiers
         }
         .navigationTitle("Companies")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $creating) { CompanySheet(company: nil) }
-        .sheet(item: $editing) { c in CompanySheet(company: c) }
         .sheet(item: $deleting) { c in DeleteCompanySheet(company: c) }
     }
 }
 
-@MainActor struct CompanySheet: View {
+/// Settings › Companies › Edit… (or New company…): a page of the More tab, so redrawing the app keeps it open.
+@MainActor struct CompanyEditPage: View {
     @EnvironmentObject private var app: AppModel
-    let company: JSON?
+    let id: Int?   // nil: a new company
     @State private var f: [String: String] = [:]
+    @State private var busy = false
+    @State private var errorText: String?
+    private static let terms = "Goods once sold will not be taken back."
 
+    private var company: JSON? { id.flatMap { i in app.companies.first { $0.id == i } } }
     private func b(_ k: String, _ d: String = "") -> Binding<String> {
         Binding(get: { f[k] ?? (company?.has(k) == true ? company!.str(k) : d) }, set: { f[k] = $0 })
     }
+    private var canSave: Bool { !busy && !b("name").wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty && (id == nil || company != nil) }
 
     var body: some View {
-        FormSheet(title: company == nil ? "New company" : "Edit \(company!.str("name"))", width: 540, canSave: !b("name").wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty, onSave: {
-            var body: [String: Any?] = [:]
-            for k in ["name", "company_gstin", "state_code", "company_address", "company_phone", "invoice_terms"] {
-                body[k] = b(k, k == "state_code" ? "09" : (k == "invoice_terms" ? "Goods once sold will not be taken back." : "")).wrappedValue
+        Form {
+            Section {
+                Field("Company / business name", text: b("name")).textInputAutocapitalization(.words)
+                Field("GSTIN (blank if unregistered)", text: b("company_gstin")).textInputAutocapitalization(.characters).autocorrectionDisabled()
+                Field("State code (09 = Uttar Pradesh, 07 = Delhi)", text: b("state_code", "09")).keyboardType(.numberPad)
+                Field("Address", text: b("company_address"), axis: .vertical)
+                Field("Phone", text: b("company_phone")).keyboardType(.phonePad)
+                Field("Terms printed on invoices", text: b("invoice_terms", CompanyEditPage.terms), axis: .vertical)
             }
-            if let company {
-                _ = try await API.obj("PUT", "/companies/\(company.id)", body: body)
+            if let errorText { Section { Text(errorText).font(.callout).foregroundStyle(.red) } }
+            Section {
+                Button { Task { await save() } } label: { Label(busy ? "Saving…" : "Save", systemImage: "checkmark.circle.fill").frame(maxWidth: .infinity) }
+                    .buttonStyle(.borderedProminent).disabled(!canSave)
+            }
+        }
+        .groupedForm()
+        .navigationTitle(id == nil ? "New company" : "Edit \(company?.str("name") ?? "company")")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(!canSave) } }
+    }
+
+    private func save() async {
+        busy = true; errorText = nil
+        defer { busy = false }
+        var body: [String: Any?] = [:]
+        for k in ["name", "company_gstin", "state_code", "company_address", "company_phone", "invoice_terms"] {
+            body[k] = b(k, k == "state_code" ? "09" : (k == "invoice_terms" ? CompanyEditPage.terms : "")).wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        do {
+            if let id {
+                _ = try await API.obj("PUT", "/companies/\(id)", body: body)
+                try await app.reloadCompanies()
+                app.notify("Company saved.")
+                close()
             } else {
                 let r = try await API.obj("POST", "/companies", body: body)
                 try await app.reloadCompanies()
+                close()
                 await app.switchCompany(r.int("id"))
-                return
             }
-            try await app.reloadCompanies()
-        }) {
-            Field("Company / business name", text: b("name")).textInputAutocapitalization(.words)
-            Field("GSTIN (blank if unregistered)", text: b("company_gstin")).textInputAutocapitalization(.characters).autocorrectionDisabled()
-            Field("State code (09 = Uttar Pradesh, 07 = Delhi)", text: b("state_code", "09")).keyboardType(.numberPad)
-            Field("Address", text: b("company_address"), axis: .vertical)
-            Field("Phone", text: b("company_phone")).keyboardType(.phonePad)
-            Field("Terms printed on invoices", text: b("invoice_terms", "Goods once sold will not be taken back."), axis: .vertical)
+        } catch {
+            errorText = error.localizedDescription
         }
+    }
+
+    /// Back to the list of companies.
+    private func close() {
+        if case .settings(let k)? = app.morePath.last, k.hasPrefix("company:") { app.morePath.removeLast() }
     }
 }
 

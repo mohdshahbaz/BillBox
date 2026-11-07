@@ -260,6 +260,9 @@ function apply(cid, d, entries) {
     })());
   } finally { d.pragma('foreign_keys = ON'); }
   state.errors += failed;
+  // the company was renamed on another device: the company list here shows the new name too
+  const nm = d.prepare("SELECT value FROM settings WHERE key='company_name'").get();
+  if (nm && nm.value && String(nm.value).trim()) reg.prepare('UPDATE companies SET name=? WHERE id=? AND name<>?').run(String(nm.value).trim(), cid, String(nm.value).trim());
   return applied;
 }
 

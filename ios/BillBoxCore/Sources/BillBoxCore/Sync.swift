@@ -278,7 +278,7 @@ public final class Sync {
                                                        "payments": ("voucher_no", "PAY"), "debit_notes": ("note_no", "DN")]
 
     /// Another device's changes → this company's books (one transaction; tracking of these writes is dropped).
-    func apply(_ d: Database, _ entries: [[String: Any]]) throws -> Int {
+    func apply(_ cid: Int, _ d: Database, _ entries: [[String: Any]]) throws -> Int {
         let info = Dictionary(uniqueKeysWithValues: try tables(d).map { ($0.name, $0) })
         let sl = try slotNow()
         var resend: [(String, Any)] = []
@@ -306,6 +306,10 @@ public final class Sync {
             for (tbl, rid) in resend { try d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'u')").run(tbl, rid) }
         }
         locked { _errors += failed }
+        // the company was renamed on another device: the company list here shows the new name too
+        if let nm = try d.prepare("SELECT value FROM settings WHERE key='company_name'").get()?.s("value")?.trimmingCharacters(in: .whitespaces), !nm.isEmpty {
+            try reg.prepare("UPDATE companies SET name=? WHERE id=? AND name<>?").run(nm, cid, nm)
+        }
         return applied
     }
 
@@ -507,7 +511,7 @@ public final class Sync {
                 let floor = try self.getState(d, "floor")
                 for k in keys where try d.prepare("SELECT 1 AS x FROM sync_seen WHERE k=?").get(k) == nil && (floor == nil || k >= floor!) { fresh.append(k) }
                 let theirs = fresh.compactMap { page[$0] as? [String: Any] }.filter { Int(JS.number($0["s"])) != sl }
-                let n = theirs.isEmpty ? 0 : try self.apply(d, theirs)
+                let n = theirs.isEmpty ? 0 : try self.apply(cid, d, theirs)
                 for k in fresh { try d.prepare("INSERT OR IGNORE INTO sync_seen(k,at) VALUES(?,?)").run(k, Sync.pushTime(k)) }
                 var moved = false
                 if let last = keys.last {
