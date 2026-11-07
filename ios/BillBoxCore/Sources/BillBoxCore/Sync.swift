@@ -536,6 +536,14 @@ public final class Sync {
         try await push(cid, key, sl)
         let got = try await pull(cid, key, sl)
         if got > 0 { locked { _version += 1 } }
+        // the company's name in the account follows renames (Companies in your sync account)
+        let (name, sent): (String, String?) = try await inDB {
+            (try self.engine.companyRow(cid)?.str("name") ?? "", try self.getState(try self.company(cid), "info_name"))
+        }
+        if !name.isEmpty && sent != name {
+            _ = try await rtdb("PUT", "books/\(key)/info/name", name)
+            try await inDB { try self.putState(try self.company(cid), "info_name", name) }
+        }
     }
 
     /// One round for every synced company: the app calls this every few seconds (GET /sync/tick).
@@ -597,7 +605,8 @@ public final class Sync {
         let books = (try await rtdb("GET", "books", query: "&shallow=true")) as? [String: Any] ?? [:]
         let (m, row): ([String: String], Row?) = try await inDB { (try self.map(), try cid.flatMap { try self.engine.companyRow($0) }) }
         let here = Set(m.values)
-        let norm = { (x: Any?) in JS.string(unwrap(x) ?? "").trimmingCharacters(in: .whitespaces).lowercased() }
+        // "A.K Enterprises" = "AK ENTERPRISES"
+        let norm = { (x: Any?) in String(JS.string(unwrap(x) ?? "").lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }) }
         var out: [Row] = []
         for key in books.keys.sorted() {
             let info = (try await rtdb("GET", "books/\(key)/info")) as? [String: Any] ?? [:]
@@ -640,11 +649,18 @@ public final class Sync {
         if after.contains(where: { (log[$0] as? [String: Any])?["x"] != nil }) {
             throw HttpError(409, "A backup was restored on this copy after sync was turned on, so it cannot be merged. Use Bring here instead.")
         }
+        // only a copy no other device writes to can be merged away: the other devices would keep syncing into it
+        let sl0 = try await inDB { try self.slotNow() }
+        if keys.contains(where: { k in (log[k] as? [String: Any]).map { $0["c"] != nil && Int(JS.number($0["s"])) != sl0 } ?? false }) {
+            throw HttpError(409, "This copy of \(row.str("name")) is shared with your other devices, so it is the one to keep. Switch to the other \(row.str("name")) on this iPhone and tap Merge there.")
+        }
         let entries = after.compactMap { log[$0] as? [String: Any] }.filter { $0["c"] != nil }
         let snap = keys.filter { end == nil || $0 <= end! }.compactMap { log[$0] as? [String: Any] }
         _ = try await inDB { try self.backup.backupNow(reason: "before-merge") }
-        let joined = try await join(key)
-        let tid = joined.i("company_id")
+        // the other copy may already be on this device (brought here earlier): merge into that company
+        let have = try await inDB { try self.map().first { $0.value == key }.flatMap { Int($0.key) } }
+        let tid: Int
+        if let have { tid = have; try await syncCompany(have) } else { tid = try await join(key).i("company_id") }
         let sl = try await inDB { try self.slotNow() }
         let lo = sl * Sync.range, hi = (sl + 1) * Sync.range
         let mergedCount: Int = try await inDB {

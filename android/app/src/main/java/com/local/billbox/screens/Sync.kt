@@ -105,8 +105,8 @@ internal fun SyncPage() {
                         Text(b.str("name"), fontWeight = FontWeight.Medium)
                         if (b.str("fy").isNotEmpty()) Hint("Year ${b.str("fy")}")
                     }
-                    if (b.bool("on_this_device")) Hint("On this phone")
-                    else if (b.bool("same_name") && canMerge) Button(onClick = { mergeKey = b.str("key") }, enabled = !busy) { Text("Merge") }
+                    if (b.bool("same_name") && canMerge) Button(onClick = { mergeKey = b.str("key") }, enabled = !busy) { Text("Merge") }
+                    else if (b.bool("on_this_device")) Hint("On this phone")
                     else TextButton(onClick = { run("/sync/join", mapOf("key" to b.str("key")), "The company is on this phone now. Switch to it from the company list.") }, enabled = !busy) { Text("Bring here") }
                 }
             }

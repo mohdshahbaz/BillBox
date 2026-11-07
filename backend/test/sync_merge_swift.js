@@ -37,8 +37,8 @@ if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_merge_sw
   let passed = 0;
   const ok = async (name, fn) => { await fn(); passed++; console.log('  ok  ', name); };
   try {
-    await A("db.registry.prepare(\"UPDATE companies SET name='AK Enterprises' WHERE id=1\").run(); await S.signIn({ email: 'm@x.in', password: 'secret1', create: true }); return S.turnOn(1)");
-    await api('PUT', '/api/companies/1', { name: 'AK Enterprises', ...co });
+    await A("db.registry.prepare(\"UPDATE companies SET name='AK Enterprises' WHERE id=1\").run(); db.withCompany(1, () => db.prepare(\"UPDATE settings SET value='AK Enterprises' WHERE key='company_name'\").run()); await S.signIn({ email: 'm@x.in', password: 'secret1', create: true }); return S.turnOn(1)");
+    await api('PUT', '/api/companies/1', { name: 'A.K ENTERPRISES', ...co });   // spelt differently: still the same company
     await api('POST', '/api/sync/signin', { email: 'm@x.in', password: 'secret1' });
     await ok('the iPhone cannot start a second book of the same company', async () => {
       await assert.rejects(api('POST', '/api/sync/on'), /already in your sync account/);
@@ -46,19 +46,26 @@ if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_merge_sw
     // how older versions got there
     await api('PUT', '/api/companies/1', { name: 'tmp', ...co });
     await api('POST', '/api/sync/on');
-    await api('PUT', '/api/companies/1', { name: 'AK Enterprises', ...co });
+    await api('PUT', '/api/companies/1', { name: 'A.K ENTERPRISES', ...co });
     const [bt] = await qa('SELECT id,item_id,qty FROM batches WHERE qty > 20 ORDER BY exp_date, id LIMIT 1');
     await A(`return db.withCompany(1, () => billing.createInvoice({ pay_mode: 'CASH', lines: [{ item_id: ${bt.item_id}, batch_id: ${bt.id}, qty: 2 }] }))`);
     await api('POST', '/api/invoices', { pay_mode: 'CASH', lines: [{ item_id: bt.item_id, batch_id: bt.id, qty: 3 }] });
     await B({ sql: "INSERT INTO parties(name,type) VALUES('Only on iPhone','CUSTOMER')", company: 1 });
+    // and the Mac's copy was also brought here (so both are "On this iPhone")
+    const mac = (await api('GET', '/api/sync/remote')).books.find((x) => x.same_name);
+    const joined = (await api('POST', '/api/sync/join', { key: mac.key })).company_id;
     await tick();
+    await ok('the copy the Mac uses cannot be merged away', async () => {
+      const own = (await api('GET', '/api/sync/remote', null, joined)).books.find((x) => x.same_name && x.on_this_device);
+      await assert.rejects(api('POST', '/api/sync/merge', { key: own.key }, joined), /shared with your other devices/);
+    });
     await ok('merging on the iPhone: its bills and party join the Mac\'s book, stock counts both', async () => {
       const r = await api('GET', '/api/sync/remote');
       const other = r.books.find((x) => x.same_name);
       assert.ok(r.can_merge && other, JSON.stringify(r));
       const m = await api('POST', '/api/sync/merge', { key: other.key });
       cB = m.company_id;
-      assert.ok(m.on && cB !== 1 && m.merged > 0, JSON.stringify(m));
+      assert.ok(m.on && cB === joined && m.merged > 0, JSON.stringify(m));
       await tick();
       assert.strictEqual((await qa(`SELECT qty FROM batches WHERE id=${bt.id}`))[0].qty, bt.qty - 5);
       assert.strictEqual((await qa("SELECT COUNT(*) n FROM parties WHERE name='Only on iPhone'"))[0].n, 1);
@@ -68,7 +75,7 @@ if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_merge_sw
         assert.deepStrictEqual(await qb(`SELECT * FROM ${t} ORDER BY 1`), JSON.parse(JSON.stringify(await qa(`SELECT * FROM ${t} ORDER BY 1`))), t);
       }
       const list = await api('GET', '/api/companies');
-      assert.deepStrictEqual(list.companies.map((c) => c.name), ['AK Enterprises']);
+      assert.deepStrictEqual(list.companies.map((c) => c.name), ['A.K ENTERPRISES']);
     });
     console.log(`sync merge (iPhone engine): ${passed} checks passed`);
   } catch (e) { console.error('  FAIL', e.message); process.exitCode = 1; } finally { a.kill(); b.kill(); server.close(); }

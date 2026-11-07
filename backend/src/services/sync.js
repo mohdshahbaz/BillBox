@@ -462,6 +462,12 @@ async function syncCompany(cid) {
   await push(d, key, sl);
   const got = await pull(cid, d, key, sl);
   if (got) state.version++;
+  // the company's name in the account follows renames (Companies in your sync account)
+  const row = db.companyRow(cid);
+  if (row && row.name && getState(d, 'info_name') !== row.name) {
+    await rtdb('PUT', `books/${key}/info/name`, row.name);
+    putState(d, 'info_name', row.name);
+  }
   return got;
 }
 
@@ -529,7 +535,7 @@ async function remote(cid) {
   const m = map();
   const here = new Set(Object.values(m));
   const row = cid ? db.companyRow(cid) : null;
-  const norm = (x) => String(x || '').trim().toLowerCase();
+  const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');   // "A.K Enterprises" = "AK ENTERPRISES"
   const out = [];
   for (const key of Object.keys(books)) {
     const info = (await rtdb('GET', `books/${key}/info`)) || {};
@@ -578,12 +584,19 @@ async function merge(cid, key) {
   const end = snapshotEnd(keys, log, srcInfo);
   const after = end ? keys.filter((k) => k > end) : [];
   if (after.some((k) => log[k] && log[k].x)) throw new HttpError(409, 'A backup was restored on this copy after sync was turned on, so it cannot be merged. Use Bring here instead.');
+  // only a copy no other device writes to can be merged away: the other devices would keep syncing into it
+  const sl0 = Number(getApp('sync_slot'));
+  if (keys.some((k) => log[k] && log[k].c && Number(log[k].s) !== sl0)) {
+    throw new HttpError(409, `This copy of ${row.name} is shared with your other devices, so it is the one to keep. Switch to the other ${row.name} on this device and tap Merge there.`);
+  }
   const entries = after.map((k) => log[k]).filter((e) => e && e.c);
   const snap = keys.filter((k) => !end || k <= end).map((k) => log[k]).filter((e) => e && e.c);
 
   require('./backup').backupNow({ reason: 'before-merge' });
-  const joined = await join(key);
-  const tid = joined.company_id;
+  // the other copy may already be on this device (brought here earlier): merge into that company
+  const have = Object.entries(map()).find(([, v]) => v === key);
+  const tid = have ? Number(have[0]) : (await join(key)).company_id;
+  if (have) await syncCompany(tid);
   const d = db.openCompany(tid);
   // both copies must have started from the same books (same items and parties under the same ids)
   const probe = [];

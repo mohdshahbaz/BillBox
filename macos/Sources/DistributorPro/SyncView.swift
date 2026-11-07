@@ -66,12 +66,10 @@ import SwiftUI
                                 if !b.str("fy").isEmpty { Text("Year \(b.str("fy"))").font(.caption).foregroundStyle(.secondary) }
                             }
                             Spacer()
+                            // the same company as the open one, synced into a book of its own: merge the two
+                            if b.bool("same_name") && canMerge { Button("Merge") { mergeKey = b.str("key") }.buttonStyle(.borderedProminent).disabled(busy) }
                             if b.bool("on_this_device") { Text("On this \(device)").font(.caption).foregroundStyle(.secondary) }
-                            else {
-                                // the same company as the open one, synced from another device into its own book: merge the two
-                                if b.bool("same_name") && canMerge { Button("Merge") { mergeKey = b.str("key") }.buttonStyle(.borderedProminent).disabled(busy) }
-                                Button("Bring here") { Task { await join(b.str("key")) } }.disabled(busy)
-                            }
+                            else { Button("Bring here") { Task { await join(b.str("key")) } }.disabled(busy) }
                         }
                     }
                     if loadedRemote && remote.isEmpty { Text("No company is synced in this account yet.").foregroundStyle(.secondary) }

@@ -135,10 +135,10 @@ class _SyncTabState extends State<SyncTab> {
                   contentPadding: EdgeInsets.zero,
                   title: Text('${b['name']}'),
                   subtitle: b['fy'] == null ? null : Text('Year ${b['fy']}'),
-                  trailing: b['on_this_device'] == true
-                      ? const Text('On this computer', style: muted)
-                      : (b['same_name'] == true && canMerge)
+                  trailing: (b['same_name'] == true && canMerge)
                       ? FilledButton(onPressed: busy ? null : () => _confirmMerge('${b['key']}'), child: const Text('Merge'))
+                      : b['on_this_device'] == true
+                      ? const Text('On this computer', style: muted)
                       : TextButton(onPressed: busy ? null : () => _run('/sync/join', {'key': b['key']}, 'The company is on this computer now. Switch to it from the company menu.'), child: const Text('Bring here')),
                 ),
               if (remote != null && remote!.isEmpty) const Text('No company is synced in this account yet.', style: muted),
