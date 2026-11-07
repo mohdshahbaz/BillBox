@@ -36,6 +36,7 @@ open class WKWebView: UIView {
     open var isLoading: Bool { false }
     @discardableResult open func load(_ r: URLRequest) -> WKNavigation? { nil }
     @discardableResult open func reload() -> WKNavigation? { nil }
+    open func stopLoading() {}
     @discardableResult open func loadFileURL(_ url: URL, allowingReadAccessTo: URL) -> WKNavigation? { nil }
     open func callAsyncJavaScript(_ functionBody: String, arguments: [String: Any] = [:], in frame: WKFrameInfo? = nil, contentWorld: WKContentWorld) async throws -> Any? { nil }
     open func evaluateJavaScript(_ s: String) async throws -> Any { 0 }

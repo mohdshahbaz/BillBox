@@ -40,9 +40,14 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
 
     // MARK: web view
 
-    /// A current desktop Safari: WhatsApp Web refuses to link browsers it thinks are out of date, and serves its desktop page
-    /// (with the QR code and "Log in with phone number") only to a desktop browser.
-    static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+    /// A current desktop Firefox: WhatsApp Web refuses to link browsers it thinks are out of date, and serves its desktop
+    /// page (with the QR code and "Log in with phone number") only to a desktop browser. The version follows Firefox's
+    /// four-weekly releases (146 on 9 Dec 2025), so it never looks out of date.
+    static var userAgent: String {
+        let since = Date().timeIntervalSince(Date(timeIntervalSince1970: 1_765_238_400)) / 86_400   // 9 Dec 2025
+        let v = 146 + max(0, Int(since / 28))
+        return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:\(v).0) Gecko/20100101 Firefox/\(v).0"
+    }
 
     func ensure() -> WKWebView {
         if let web { return web }
