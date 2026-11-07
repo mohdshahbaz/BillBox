@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
+import '../state/app_state.dart';
 import '../widgets.dart';
 
 /// Settings › Updates: the newest BillBox release of this edition (engine GET /update, services/update.js), downloaded
