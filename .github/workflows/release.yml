@@ -1,6 +1,7 @@
 # Builds BillBox for Android, the Mac and the iPhone and publishes them as a GitHub release.
 #
-#   git tag v15.2.0 && git push origin v15.2.0         (or: Actions › Release › Run workflow, and type the version)
+#   git tag v15.2.0 && git push origin v15.2.0
+#   or: Actions › Release › Run workflow › choose admin or public (the version can be left empty: next number)
 #
 # Android is signed with your release key when these repository secrets exist (android/tools/make_keystore.sh makes them):
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
@@ -15,11 +16,17 @@ on:
     branches: ['release/**']
   workflow_dispatch:
     inputs:
+      edition:
+        description: 'Which build: public (website, live licences) or admin (your test build: test licences, Razorpay test mode)'
+        type: choice
+        options: [admin, public]
+        default: admin
       version:
-        description: 'Version to release, e.g. 15.2.0 (a tag v15.2.0 is made on the chosen branch)'
-        required: true
+        description: 'Version, e.g. 16.2.4 (leave empty: the next number after the newest release)'
+        required: false
+        default: ''
       prerelease:
-        description: 'Mark as a pre-release (test build)'
+        description: 'Mark a public build as a pre-release (admin builds always are)'
         type: boolean
         default: false
 
@@ -44,7 +51,20 @@ jobs:
         env:
           INPUT: ${{ github.event.inputs.version }}
           PRE: ${{ github.event.inputs.prerelease }}
+          EDITION_IN: ${{ github.event.inputs.edition }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            INPUT="${INPUT#v}"; INPUT="${INPUT%-admin}"
+            if [ -z "$INPUT" ]; then
+              # the next patch number after the newest release (public or admin)
+              LAST="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | sed -E 's/^v//; s/-.*$//' \
+                | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)?$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)"
+              IFS=. read -r A B C <<<"${LAST:-0.0.0}"; INPUT="$A.$B.$(( ${C:-0} + 1 ))"
+            fi
+            [ "$EDITION_IN" = admin ] && INPUT="$INPUT-admin"
+            echo "Chosen: $INPUT"
+          fi
           RAW="${INPUT:-${GITHUB_REF_NAME}}"; RAW="${RAW#release/}"; V="${RAW#v}"
           [[ "$V" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::Version '$RAW' must look like 15.2.0 (or 15.2.0-beta1)"; exit 1; }
           BASE="${V%%-*}"; IFS=. read -r MA MI PA <<<"$BASE"; PA="${PA:-0}"
