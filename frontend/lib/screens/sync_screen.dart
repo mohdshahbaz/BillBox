@@ -134,7 +134,12 @@ class _SyncTabState extends State<SyncTab> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text('${b['name']}'),
-                  subtitle: b['fy'] == null ? null : Text('Year ${b['fy']}'),
+                  // which copy is open here, and which devices use each copy
+                  subtitle: Text([
+                    if (b['fy'] != null) 'Year ${b['fy']}',
+                    if (b['open'] == true) 'Open now',
+                    if ((b['used_by'] as List?)?.isNotEmpty == true) 'Used by: ${(b['used_by'] as List).join(', ')}',
+                  ].join(' · ')),
                   trailing: (b['same_name'] == true && canMerge)
                       ? FilledButton(onPressed: busy ? null : () => _confirmMerge('${b['key']}'), child: const Text('Merge'))
                       : b['on_this_device'] == true

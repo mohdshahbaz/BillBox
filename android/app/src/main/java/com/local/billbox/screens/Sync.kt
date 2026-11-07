@@ -104,6 +104,13 @@ internal fun SyncPage() {
                     Column(Modifier.weight(1f)) {
                         Text(b.str("name"), fontWeight = FontWeight.Medium)
                         if (b.str("fy").isNotEmpty()) Hint("Year ${b.str("fy")}")
+                        // which copy is open here, and which devices use each copy
+                        val arr = b.o.optJSONArray("used_by")
+                        val names = mutableListOf<String>()
+                        if (arr != null) for (i in 0 until arr.length()) names.add(arr.optString(i))
+                        val who = names.joinToString(", ")
+                        val line = listOfNotNull(if (b.bool("open")) "Open now" else null, if (who.isNotEmpty()) "Used by: $who" else null).joinToString(" · ")
+                        if (line.isNotEmpty()) Hint(line)
                     }
                     if (b.bool("same_name") && canMerge) Button(onClick = { mergeKey = b.str("key") }, enabled = !busy) { Text("Merge") }
                     else if (b.bool("on_this_device")) Hint("On this phone")

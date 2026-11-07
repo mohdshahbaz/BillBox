@@ -122,13 +122,21 @@ async function rtdb(method, rel, body, query = '') {
   return null;
 }
 
+/** "darwin · Shop-Mac" (the platform, and the computer's name where there is one): tells this device's installs apart. */
+function deviceName() {
+  const p = String((typeof process !== 'undefined' && process.platform) || 'device');
+  let h = '';
+  try { const os = require('os'); h = typeof os.hostname === 'function' ? String(os.hostname() || '') : ''; } catch { h = ''; }
+  return h ? `${p} · ${h}` : p;
+}
+
 /** This device's slot: its place among the account's devices (each install adds itself once). */
 async function slot() {
   const have = Number(getApp('sync_slot') || 0);
   if (have) return have;
   let mine = getApp('sync_device');
   if (!mine) {
-    const r = await rtdb('POST', 'devices', { at: { '.sv': 'timestamp' }, name: String((typeof process !== 'undefined' && process.platform) || 'device') });
+    const r = await rtdb('POST', 'devices', { at: { '.sv': 'timestamp' }, name: deviceName() });
     mine = r.name; setApp('sync_device', mine);
   }
   const all = Object.keys((await rtdb('GET', 'devices', undefined, '&shallow=true')) || {}).sort();
@@ -537,11 +545,19 @@ async function remote(cid) {
   const row = cid ? db.companyRow(cid) : null;
   const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');   // "A.K Enterprises" = "AK ENTERPRISES"
   const out = [];
+  // which devices write to each book ("Mac, iPhone (this one)"), from its latest entries
+  const dev = (await rtdb('GET', 'devices')) || {};
+  const slots = Object.keys(dev).sort();
+  const mine = await mySlots();
+  const kind = (n) => (/^darwin/.test(n) ? 'Mac' : /^iphone/i.test(n) ? 'iPhone' : /^android/.test(n) ? 'Android' : /^win32/.test(n) ? 'Windows' : /^linux/.test(n) ? 'Linux' : 'Device');
   for (const key of Object.keys(books)) {
     const info = (await rtdb('GET', `books/${key}/info`)) || {};
     if (info.merged_into) continue;   // its changes were moved into another book (merge)
+    const last = (await rtdb('GET', `books/${key}/log`, undefined, `&orderBy=${encodeURIComponent('"$key"')}&limitToLast=300`)) || {};
+    const used = new Set();
+    for (const e of Object.values(last)) if (e && e.s) { const d = dev[slots[Number(e.s) - 1]]; used.add(mine.has(Number(e.s)) ? 'this device' : kind(String((d && d.name) || ''))); }
     out.push({
-      key, name: info.name || 'Company', fy: info.fy || null, on_this_device: here.has(key),
+      key, name: info.name || 'Company', fy: info.fy || null, on_this_device: here.has(key), open: !!cid && m[cid] === key, used_by: [...used].sort(),
       // the open company has the same name but syncs into another book (or none): it can be merged into this one
       same_name: !!row && norm(info.name) === norm(row.name) && (info.fy || null) === (row.fy || null) && m[cid] !== key,
     });
@@ -569,12 +585,25 @@ function snapshotEnd(keys, log, info) {
  * book had after its starting copy is replayed on it (bills keep their stock, a bill number taken there gets the next
  * one) and goes out to the other devices; this company's old copy is kept as a backup and hidden from the list.
  */
+/**
+ * The slots that are this device: its own, and earlier installs of the same kind (an iPhone that signed out and in again
+ * registered anew). A book written only by these is this device's own copy.
+ */
+async function mySlots() {
+  const dev = (await rtdb('GET', 'devices')) || {};
+  const me = getApp('sync_device');
+  const name = me && dev[me] ? dev[me].name : null;
+  const out = new Set([Number(getApp('sync_slot'))]);
+  Object.keys(dev).sort().forEach((k, i) => { if (name && dev[k] && dev[k].name === name) out.add(i + 1); });
+  return out;
+}
+
 async function merge(cid, key) {
   const m = map();
   const src = m[cid];
   if (src && key && src !== key) {
-    const sl = Number(getApp('sync_slot'));
-    const others = async (k) => Object.values((await rtdb('GET', `books/${k}/log`)) || {}).some((e) => e && e.c && Number(e.s) !== sl);
+    const mine = await mySlots();
+    const others = async (k) => Object.values((await rtdb('GET', `books/${k}/log`)) || {}).some((e) => e && e.c && !mine.has(Number(e.s)));
     // the open copy is the one the other devices use: the other copy (on this device, made here) goes into it instead
     const there = Object.entries(m).find(([, v]) => v === key);
     if (there && (await others(src)) && !(await others(key))) {
@@ -601,8 +630,8 @@ async function mergeInto(cid, key) {
   const after = end ? keys.filter((k) => k > end) : [];
   if (after.some((k) => log[k] && log[k].x)) throw new HttpError(409, 'A backup was restored on this copy after sync was turned on, so it cannot be merged. Use Bring here instead.');
   // only a copy no other device writes to can be merged away: the other devices would keep syncing into it
-  const sl0 = Number(getApp('sync_slot'));
-  if (keys.some((k) => log[k] && log[k].c && Number(log[k].s) !== sl0)) {
+  const mine = await mySlots();
+  if (keys.some((k) => log[k] && log[k].c && !mine.has(Number(log[k].s)))) {
     throw new HttpError(409, `This copy of ${row.name} is shared with your other devices, so it is the one to keep. Switch to the other ${row.name} on this device and tap Merge there.`);
   }
   const entries = after.map((k) => log[k]).filter((e) => e && e.c);

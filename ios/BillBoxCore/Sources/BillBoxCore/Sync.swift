@@ -608,12 +608,30 @@ public final class Sync {
         // "A.K Enterprises" = "AK ENTERPRISES"
         let norm = { (x: Any?) in String(JS.string(unwrap(x) ?? "").lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }) }
         var out: [Row] = []
+        // which devices write to each book ("Mac, this device"), from its latest entries
+        let dev = (try await rtdb("GET", "devices")) as? [String: Any] ?? [:]
+        let slots = dev.keys.sorted()
+        let mine = try await mySlots()
+        func kind(_ n: String) -> String {
+            n.hasPrefix("darwin") ? "Mac" : n.lowercased().hasPrefix("iphone") ? "iPhone" : n.hasPrefix("android") ? "Android" : n.hasPrefix("win32") ? "Windows" : n.hasPrefix("linux") ? "Linux" : "Device"
+        }
+        var allowed = CharacterSet.alphanumerics; allowed.insert(charactersIn: "-._~")
+        let order = "\"$key\"".addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
         for key in books.keys.sorted() {
             let info = (try await rtdb("GET", "books/\(key)/info")) as? [String: Any] ?? [:]
             if info["merged_into"] != nil { continue }   // its changes were moved into another book (merge)
+            let last = (try await rtdb("GET", "books/\(key)/log", query: "&orderBy=\(order)&limitToLast=300")) as? [String: Any] ?? [:]
+            var used = Set<String>()
+            for case let e as [String: Any] in last.values {
+                let sl = Int(JS.number(e["s"]))
+                guard sl > 0 else { continue }
+                let n = sl <= slots.count ? ((dev[slots[sl - 1]] as? [String: Any])?["name"] as? String ?? "") : ""
+                used.insert(mine.contains(sl) ? "this device" : kind(n))
+            }
             let fyR = (info["fy"] as? String) ?? "", fyL = row.map { JS.string(unwrap($0["fy"]) ?? "") } ?? ""
             let same = row != nil && norm(info["name"]) == norm(row!["name"]) && fyR == fyL && m[String(cid ?? 0)] != key
-            out.append(["key": key, "name": (info["name"] as? String) ?? "Company", "fy": info["fy"] ?? NSNull(), "on_this_device": here.contains(key), "same_name": same])
+            out.append(["key": key, "name": (info["name"] as? String) ?? "Company", "fy": info["fy"] ?? NSNull(), "on_this_device": here.contains(key), "same_name": same,
+                        "open": cid.map { m[String($0)] == key } ?? false, "used_by": used.sorted()])
         }
         return ["books": out, "can_merge": cid.map { m[String($0)] != nil } ?? false]
     }
@@ -635,14 +653,25 @@ public final class Sync {
     /// Two devices turned sync on for their own copy of one company, so it synced into two books. Merging makes the open
     /// company part of the other book: that book comes here as a fresh company, every change this company's book had
     /// after its starting copy is replayed on it and goes out to the other devices; the old copy stays (hidden) as a backup.
+    /// The slots that are this device: its own, and earlier installs of the same kind (an iPhone that signed out and in
+    /// again registered anew). A book written only by these is this device's own copy.
+    func mySlots() async throws -> Set<Int> {
+        let dev = (try await rtdb("GET", "devices")) as? [String: Any] ?? [:]
+        let (me, sl) = try await inDB { (try self.app("sync_device"), try self.slotNow()) }
+        let name = me.flatMap { (dev[$0] as? [String: Any])?["name"] as? String }
+        var out: Set<Int> = [sl]
+        for (i, k) in dev.keys.sorted().enumerated() where name != nil && (dev[k] as? [String: Any])?["name"] as? String == name { out.insert(i + 1) }
+        return out
+    }
+
     func merge(_ cid: Int, _ key: String) async throws -> Row {
         let m = try await inDB { try self.map() }
         if let src = m[String(cid)], !key.isEmpty, src != key {
-            let sl = try await inDB { try self.slotNow() }
+            let mine = try await mySlots()
             func others(_ k: String) async throws -> Bool {
                 ((try await rtdb("GET", "books/\(k)/log")) as? [String: Any] ?? [:]).values.contains {
                     guard let e = $0 as? [String: Any] else { return false }
-                    return e["c"] != nil && Int(JS.number(e["s"])) != sl
+                    return e["c"] != nil && !mine.contains(Int(JS.number(e["s"])))
                 }
             }
             // the open copy is the one the other devices use: the other copy (on this device, made here) goes into it instead
@@ -671,8 +700,8 @@ public final class Sync {
             throw HttpError(409, "A backup was restored on this copy after sync was turned on, so it cannot be merged. Use Bring here instead.")
         }
         // only a copy no other device writes to can be merged away: the other devices would keep syncing into it
-        let sl0 = try await inDB { try self.slotNow() }
-        if keys.contains(where: { k in (log[k] as? [String: Any]).map { $0["c"] != nil && Int(JS.number($0["s"])) != sl0 } ?? false }) {
+        let mine = try await mySlots()
+        if keys.contains(where: { k in (log[k] as? [String: Any]).map { $0["c"] != nil && !mine.contains(Int(JS.number($0["s"]))) } ?? false }) {
             throw HttpError(409, "This copy of \(row.str("name")) is shared with your other devices, so it is the one to keep. Switch to the other \(row.str("name")) on this iPhone and tap Merge there.")
         }
         let entries = after.compactMap { log[$0] as? [String: Any] }.filter { $0["c"] != nil }

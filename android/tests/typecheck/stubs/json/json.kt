@@ -31,6 +31,7 @@ class JSONArray() {
     fun put(v: Any?): JSONArray = this
     fun length(): Int = 0
     fun opt(i: Int): Any? = null
+    fun optString(i: Int): String = ""
     fun optJSONObject(i: Int): JSONObject? = null
     fun getString(i: Int): String = ""
     fun getJSONObject(i: Int): JSONObject = TODO()

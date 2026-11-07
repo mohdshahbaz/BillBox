@@ -43,6 +43,7 @@ const server = http.createServer((req, res) => {
       let keys = Object.keys(v).sort();
       if (u.searchParams.has('startAt')) { const s = JSON.parse(u.searchParams.get('startAt')); keys = keys.filter((k) => k >= s); }
       if (u.searchParams.has('limitToFirst')) keys = keys.slice(0, Number(u.searchParams.get('limitToFirst')));
+      if (u.searchParams.has('limitToLast')) keys = keys.slice(-Number(u.searchParams.get('limitToLast')));
       v = Object.fromEntries(keys.map((k) => [k, v[k]]));
     }
     send(200, v);

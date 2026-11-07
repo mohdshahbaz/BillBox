@@ -64,6 +64,10 @@ import SwiftUI
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(b.str("name")).font(.callout.weight(.medium))
                                 if !b.str("fy").isEmpty { Text("Year \(b.str("fy"))").font(.caption).foregroundStyle(.secondary) }
+                                // which copy is open here, and which devices use each copy
+                                let who = (b.raw["used_by"] as? [String] ?? []).joined(separator: ", ")
+                                Text([b.bool("open") ? "Open now" : nil, who.isEmpty ? nil : "Used by: \(who)"].compactMap { $0 }.joined(separator: " · "))
+                                    .font(.caption).foregroundStyle(b.bool("open") ? Color.accentColor : .secondary)
                             }
                             Spacer()
                             // the same company as the open one, synced into a book of its own: merge the two
