@@ -391,7 +391,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
             // a reload would cut off the previous bill's upload: wait for it to leave first (only here, not for every bill)
             await waitSettled(maxSeconds: 15)
             trace.mark("settle")
-            await load("https://web.whatsapp.com/send?phone=\(phone)")
+            await load(Self.chatURL(phone))
             trace.mark("load")
         }
 
@@ -400,6 +400,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         var waitStart = Date()
         var chatListSince: Date?      // when the page first showed only the chat list (the chat for this number never opened)
         var retriedOpen = false
+        var searched = false
         while true {
             // the waiting happens inside the page (it looks every 60 ms and answers the moment the chat box is there),
             // instead of this app asking every 300 ms
@@ -414,13 +415,20 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
                 showing = true
             }
             if state == "chats" {
-                // linked, but the page sits on the chat list instead of opening this number's chat: try once more, then say so
+                // linked, but the page sits on the chat list instead of opening this number's chat: look the number up in
+                // the search box and open it; then reload once, then say so
                 if chatListSince == nil { chatListSince = Date() }
+                if !searched && Date().timeIntervalSince(chatListSince!) > 5 {
+                    searched = true
+                    let r = await run(Self.js(Self.openBySearchScript), ["phone": phone])
+                    trace.mark("search-\(r)")
+                    if r == "clicked" { chatListSince = Date(); continue }
+                }
                 if Date().timeIntervalSince(chatListSince!) > 20 {
                     if retriedOpen { break }
                     retriedOpen = true
                     chatListSince = nil
-                    await load("https://web.whatsapp.com/send?phone=\(phone)")
+                    await load(Self.chatURL(phone))
                     waitStart = Date()
                 }
             } else { chatListSince = nil }
@@ -499,6 +507,12 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         }
     }
 
+    /// The link wa.me itself opens (with type=phone_number): the short /send?phone= form left the desktop-Firefox page on the
+    /// chat list.
+    static func chatURL(_ phone: String) -> String {
+        "https://web.whatsapp.com/send/?phone=\(phone)&text&type=phone_number&app_absent=0"
+    }
+
     private func ensureComposer(phone: String) async -> Bool {
         var reloaded = false
         for i in 0..<224 {
@@ -507,7 +521,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
             if st == "invalid" { return false }
             if i == 64 && !reloaded {
                 reloaded = true
-                await load("https://web.whatsapp.com/send?phone=\(phone)")
+                await load(Self.chatURL(phone))
             }
             await pause(ms: 250)
         }
@@ -570,7 +584,10 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     const wait = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const v = fn(); if (v) return v; await sleep(50); } return null; };
     const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
     const press = (e) => { for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) e.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window })); };
-    const composerEl = () => document.querySelector('footer div[contenteditable="true"]');
+    // the chat box: in the footer of the open chat (the desktop-Firefox page may not wrap it in <footer>)
+    const composerEl = () => document.querySelector('footer div[contenteditable="true"]')
+      || document.querySelector('#main div[contenteditable="true"][role="textbox"]')
+      || document.querySelector('#main div[contenteditable="true"][data-tab]');
     // What was already on the page before the bill was attached (the search box, the chat box, any always-present "Send" label).
     // Only elements that appear AFTER attaching count as the preview, so the left-hand search box is never mistaken for the caption box.
     const base = window.__bbBase || { ed: new Set(), sd: new Set() };
@@ -600,7 +617,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     private static let waitComposerScript = #"""
     const q = (s) => document.querySelector(s);
     const st = () => {
-      if (q('footer div[contenteditable="true"]')) return 'composer';
+      if (q('footer div[contenteditable="true"]') || q('#main div[contenteditable="true"][role="textbox"]') || q('#main div[contenteditable="true"][data-tab]')) return 'composer';
       const d = q('div[role="dialog"]');
       if (d && /invalid|isn.t on WhatsApp|not on WhatsApp/i.test(d.innerText || '')) return 'invalid';
       if (q('[data-link-code]')) return 'code';
@@ -612,6 +629,27 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
     let s = st();
     while ((s === 'loading' || s === 'chats') && Date.now() - t0 < ms) { await sleep(60); s = st(); }
     return s;
+    """#
+
+    /// The page stayed on the chat list: type the number into "Search or start a new chat" and open the first chat found.
+    private static let openBySearchScript = #"""
+    const side = document.querySelector('#side') || document;
+    const box = [...side.querySelectorAll('[contenteditable="true"], input[type="text"], input:not([type])')].find(vis)
+      || [...document.querySelectorAll('[aria-label*="Search" i][contenteditable="true"], input[aria-label*="Search" i]')].find(vis);
+    if (!box) return 'no-search';
+    box.focus(); press(box);
+    if (box.tagName === 'INPUT') {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      set.call(box, phone); box.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+      document.execCommand('selectAll', false); document.execCommand('insertText', false, phone);
+      box.dispatchEvent(new InputEvent('input', { bubbles: true, data: phone }));
+    }
+    await sleep(900);
+    const row = await wait(() => [...document.querySelectorAll('#pane-side [role="listitem"], #pane-side [role="row"], [aria-label*="Search results" i] [role="listitem"], [aria-label*="Search results" i] [role="row"]')].filter(vis)[0], 6000);
+    if (!row) return 'no-result';
+    press(row.querySelector('[role="gridcell"]') || row.querySelector('div[tabindex]') || row);
+    return 'clicked';
     """#
 
     /// Waits INSIDE the page for the attachment preview (the Send button or the caption box).
