@@ -321,22 +321,26 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
     private var settling: Task<Void, Never>?
 
     /// Waits for the previous bill's upload to leave, but never longer than `maxSeconds` (a phone that is offline would hold every later bill for 45 s).
-    private func waitSettled(maxSeconds: Int) async {
-        guard let s = settling else { return }
-        await withTaskGroup(of: Void.self) { g in
-            g.addTask { await s.value }
-            g.addTask { await pause(ms: maxSeconds * 1000) }
-            _ = await g.next()
-            g.cancelAll()
+    private func waitSettled(_ previous: Task<Void, Never>?, maxSeconds: Int) async {
+        guard let s = previous else { return }
+        // a race, not a task group: a group waits for its tasks even after cancelling them, and the upload never cancels
+        final class Once { var c: CheckedContinuation<Void, Never>?; func done() { c?.resume(); c = nil } }
+        let once = Once()
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            once.c = c
+            Task { @MainActor in await s.value; once.done() }
+            Task { @MainActor in await pause(ms: maxSeconds * 1000); once.done() }
         }
     }
 
     /// Queues one bill. Bills are sent one after another, never at the same time. Returns when WhatsApp has taken it (or failed).
     func send(pdf: @escaping @MainActor () -> Data?, fileName: String, phone: String, caption: String) async throws {
         let prev = chain
+        // the bill before this one (taken now: `settling` is replaced below, and waiting on this bill's own upload froze it)
+        let prevSettle = settling
         let job = Task { @MainActor () -> Error? in
             await prev?.value
-            do { try await self.sendNow(makePdf: pdf, fileName: fileName, phone: phone, caption: caption); return nil } catch { return error }
+            do { try await self.sendNow(makePdf: pdf, fileName: fileName, phone: phone, caption: caption, previous: prevSettle); return nil } catch { return error }
         }
         // the caller is told as soon as the bill is on its way; the next bill waits until this one has left the phone
         chain = Task { _ = await job.value }
@@ -363,7 +367,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
         }
     }
 
-    private func sendNow(makePdf: @escaping @MainActor () -> Data?, fileName: String, phone: String, caption: String) async throws {
+    private func sendNow(makePdf: @escaping @MainActor () -> Data?, fileName: String, phone: String, caption: String, previous: Task<Void, Never>? = nil) async throws {
         _ = ensure()
         status = "Sending…"
         var trace = StepTrace()
@@ -376,7 +380,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate, NSWin
         trace.mark("check")
         if !reuse {
             // a reload would cut off the previous bill's upload: wait for it to leave first (only here, not for every bill)
-            await waitSettled(maxSeconds: 15)
+            await waitSettled(previous, maxSeconds: 15)
             trace.mark("settle")
             await load("https://web.whatsapp.com/send?phone=\(phone)")
             trace.mark("load")
