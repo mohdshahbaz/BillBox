@@ -1,0 +1,75 @@
+// Merging on the iPhone engine: the iPhone's own book of the company joins the Mac's book.
+//   node test/sync_merge_swift.js <path to bbcheck>
+const os = require('os'), fs = require('fs'), path = require('path'), assert = require('assert'), readline = require('readline');
+const { fork, spawn, execFileSync } = require('child_process');
+const { server } = require('./fake_firebase');
+const BIN = process.argv[2];
+if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_merge_swift.js <bbcheck>'); process.exit(2); }
+
+(async () => {
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  const port = server.address().port;
+  const env = (dir) => ({ ...process.env, DATA_DIR: dir, HOME: dir, BILLBOX_FIREBASE_KEY: 'K', BILLBOX_FIREBASE_DB: `http://127.0.0.1:${port}`,
+    BILLBOX_FIREBASE_AUTH: `http://127.0.0.1:${port}/v1`, BILLBOX_FIREBASE_TOKEN: `http://127.0.0.1:${port}/token`, NODE_NO_WARNINGS: '1' });
+  const dirA = fs.mkdtempSync(path.join(os.tmpdir(), 'mergesw-A-')), dirB = fs.mkdtempSync(path.join(os.tmpdir(), 'mergesw-B-'));
+  execFileSync(process.execPath, [path.join(__dirname, '../src/seed.js')], { env: env(dirA), stdio: 'ignore' });
+  // the iPhone starts from the same books (as if restored from the Mac's backup)
+  const file = fs.readdirSync(dirA).find((f) => /^company_.*\.db$/.test(f));
+  fs.copyFileSync(path.join(dirA, file), path.join(dirB, 'distributor.db'));
+
+  const a = fork(path.join(__dirname, 'sync_device.js'), [], { env: env(dirA), stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
+  let na = 0; const wa = {};
+  await new Promise((ok) => a.once('message', ok));
+  a.on('message', (m) => { if (m.id && wa[m.id]) { const w = wa[m.id]; delete wa[m.id]; m.err ? w.no(new Error('A: ' + m.err)) : w.ok(m.r); } });
+  const A = (code) => new Promise((ok, no) => { const id = ++na; wa[id] = { ok, no }; a.send({ id, code }); });
+  const qa = (sql) => A(`return db.withCompany(1, () => db.prepare(${JSON.stringify(sql)}).all())`);
+
+  const b = spawn(BIN, ['--serve', dirB], { env: env(dirB), stdio: ['pipe', 'pipe', 'inherit'] });
+  let nb = 0; const wb = {};
+  readline.createInterface({ input: b.stdout }).on('line', (l) => { let m; try { m = JSON.parse(l); } catch { return; } if (wb[m.id]) { wb[m.id](m); delete wb[m.id]; } });
+  const B = (o) => new Promise((ok) => { const id = ++nb; wb[id] = ok; b.stdin.write(JSON.stringify({ id, ...o }) + '\n'); });
+  let cB = 1;
+  const api = async (method, p, body, company) => { const r = await B({ method, path: p, body: body || {}, company: company || cB }); if (r.status >= 400) throw new Error(`B ${p}: ${JSON.stringify(r.body)}`); return r.body; };
+  const qb = async (sql) => (await B({ sql, company: cB })).body;
+  const tick = async () => { for (let i = 0; i < 3; i++) { await A('return S.tick()'); await api('GET', '/api/sync/tick'); } };
+  const co = { company_gstin: '', state_code: '09', company_address: 'Bijnor', company_phone: '', invoice_terms: 'x' };
+
+  let passed = 0;
+  const ok = async (name, fn) => { await fn(); passed++; console.log('  ok  ', name); };
+  try {
+    await A("db.registry.prepare(\"UPDATE companies SET name='AK Enterprises' WHERE id=1\").run(); await S.signIn({ email: 'm@x.in', password: 'secret1', create: true }); return S.turnOn(1)");
+    await api('PUT', '/api/companies/1', { name: 'AK Enterprises', ...co });
+    await api('POST', '/api/sync/signin', { email: 'm@x.in', password: 'secret1' });
+    await ok('the iPhone cannot start a second book of the same company', async () => {
+      await assert.rejects(api('POST', '/api/sync/on'), /already in your sync account/);
+    });
+    // how older versions got there
+    await api('PUT', '/api/companies/1', { name: 'tmp', ...co });
+    await api('POST', '/api/sync/on');
+    await api('PUT', '/api/companies/1', { name: 'AK Enterprises', ...co });
+    const [bt] = await qa('SELECT id,item_id,qty FROM batches WHERE qty > 20 ORDER BY exp_date, id LIMIT 1');
+    await A(`return db.withCompany(1, () => billing.createInvoice({ pay_mode: 'CASH', lines: [{ item_id: ${bt.item_id}, batch_id: ${bt.id}, qty: 2 }] }))`);
+    await api('POST', '/api/invoices', { pay_mode: 'CASH', lines: [{ item_id: bt.item_id, batch_id: bt.id, qty: 3 }] });
+    await B({ sql: "INSERT INTO parties(name,type) VALUES('Only on iPhone','CUSTOMER')", company: 1 });
+    await tick();
+    await ok('merging on the iPhone: its bills and party join the Mac\'s book, stock counts both', async () => {
+      const r = await api('GET', '/api/sync/remote');
+      const other = r.books.find((x) => x.same_name);
+      assert.ok(r.can_merge && other, JSON.stringify(r));
+      const m = await api('POST', '/api/sync/merge', { key: other.key });
+      cB = m.company_id;
+      assert.ok(m.on && cB !== 1 && m.merged > 0, JSON.stringify(m));
+      await tick();
+      assert.strictEqual((await qa(`SELECT qty FROM batches WHERE id=${bt.id}`))[0].qty, bt.qty - 5);
+      assert.strictEqual((await qa("SELECT COUNT(*) n FROM parties WHERE name='Only on iPhone'"))[0].n, 1);
+      const nos = (await qa('SELECT invoice_no FROM invoices')).map((x) => x.invoice_no);
+      assert.strictEqual(new Set(nos).size, 2); assert.ok(!nos.some((x) => x.includes('~')), nos.join(' '));
+      for (const t of ['items', 'batches', 'parties', 'invoices', 'invoice_lines', 'ledger', 'counters', 'receipts']) {
+        assert.deepStrictEqual(await qb(`SELECT * FROM ${t} ORDER BY 1`), JSON.parse(JSON.stringify(await qa(`SELECT * FROM ${t} ORDER BY 1`))), t);
+      }
+      const list = await api('GET', '/api/companies');
+      assert.deepStrictEqual(list.companies.map((c) => c.name), ['AK Enterprises']);
+    });
+    console.log(`sync merge (iPhone engine): ${passed} checks passed`);
+  } catch (e) { console.error('  FAIL', e.message); process.exitCode = 1; } finally { a.kill(); b.kill(); server.close(); }
+})();

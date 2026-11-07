@@ -12,7 +12,8 @@ router.post('/sync/signout', h((req, res) => { S.signOut(); res.json(S.status(ci
 router.post('/sync/on', ha(async (req, res) => res.json(await S.turnOn(cid(req)))));
 router.post('/sync/off', h((req, res) => res.json(S.turnOff(cid(req)))));
 router.post('/sync/now', ha(async (req, res) => { await S.tick(); res.json(S.status(cid(req))); }));
-router.get('/sync/remote', ha(async (req, res) => res.json(await S.remote())));
+router.get('/sync/remote', ha(async (req, res) => res.json(await S.remote(cid(req)))));
+router.post('/sync/merge', ha(async (req, res) => res.json(await S.merge(cid(req), String((req.body || {}).key || '')))));
 router.post('/sync/join', ha(async (req, res) => res.json(await S.join(String((req.body || {}).key || '')))));
 
 module.exports = router;

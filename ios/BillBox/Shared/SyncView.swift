@@ -11,6 +11,8 @@ import SwiftUI
     @State private var busy = false
     @State private var remote: [JSON] = []
     @State private var loadedRemote = false
+    @State private var canMerge = false
+    @State private var mergeKey: String?
 
     #if os(macOS)
     private let device = "Mac"
@@ -65,13 +67,19 @@ import SwiftUI
                             }
                             Spacer()
                             if b.bool("on_this_device") { Text("On this \(device)").font(.caption).foregroundStyle(.secondary) }
-                            else { Button("Bring here") { Task { await join(b.str("key")) } }.disabled(busy) }
+                            else {
+                                // the same company as the open one, synced from another device into its own book: merge the two
+                                if b.bool("same_name") && canMerge { Button("Merge") { mergeKey = b.str("key") }.buttonStyle(.borderedProminent).disabled(busy) }
+                                Button("Bring here") { Task { await join(b.str("key")) } }.disabled(busy)
+                            }
                         }
                     }
                     if loadedRemote && remote.isEmpty { Text("No company is synced in this account yet.").foregroundStyle(.secondary) }
                     DriveButton(loadedRemote ? "Look again" : "Show the companies in this account", "list.bullet", disabled: busy) { Task { await loadRemote() } }
                 } header: { Text("Companies in your sync account") } footer: {
-                    Text("Bring here makes a new company on this \(device) that fills itself from your other devices.")
+                    Text(remote.contains { $0.bool("same_name") } && canMerge
+                         ? "\(companyName) is in the account twice: each device turned on sync for its own copy, so they do not see each other's bills. Merge puts this \(device)'s bills, parties and stock changes into the other copy and makes it the one used here (a backup is made first)."
+                         : "Bring here makes a new company on this \(device) that fills itself from your other devices.")
                 }
             }
 
@@ -82,6 +90,12 @@ import SwiftUI
             } header: { Text("One-time Firebase setup") }
         }
         .groupedForm()
+        .confirmationDialog("Merge \(companyName) into the other copy?", isPresented: Binding(get: { mergeKey != nil }, set: { if !$0 { mergeKey = nil } }), titleVisibility: .visible) {
+            Button("Merge") { if let k = mergeKey { Task { await merge(k) } } }
+            Button("Cancel", role: .cancel) { mergeKey = nil }
+        } message: {
+            Text("This \(device)'s bills, parties and stock changes since sync was turned on go into the other copy, which every device then shares. This \(device)'s copy is backed up first and kept hidden.")
+        }
         .task(id: app.companyId) { await load() }
     }
 
@@ -111,8 +125,21 @@ import SwiftUI
 
     private func loadRemote() async {
         guard signedIn else { return }
-        do { remote = try await API.obj("GET", "/sync/remote").list("books"); loadedRemote = true }
+        do { let r = try await API.obj("GET", "/sync/remote"); remote = r.list("books"); canMerge = r.bool("can_merge"); loadedRemote = true }
         catch { s.raw["last_error"] = error.localizedDescription }
+    }
+
+    private func merge(_ key: String) async {
+        busy = true; defer { busy = false }
+        mergeKey = nil
+        await app.guarded {
+            let r = try await API.obj("POST", "/sync/merge", body: ["key": key])
+            try await app.reloadCompanies()
+            await app.switchCompany(r.int("company_id"))
+            app.notify("Merged: \(r.int("merged")) changes from this \(device) went into the shared copy.")
+            s = r
+            await loadRemote()
+        }
     }
 
     private func join(_ key: String) async {

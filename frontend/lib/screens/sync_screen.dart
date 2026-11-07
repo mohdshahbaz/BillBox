@@ -15,6 +15,7 @@ class SyncTab extends StatefulWidget {
 class _SyncTabState extends State<SyncTab> {
   Json s = {};
   List<Json>? remote;
+  bool canMerge = false;
   final email = TextEditingController(), password = TextEditingController();
   bool busy = false;
 
@@ -30,7 +31,7 @@ class _SyncTabState extends State<SyncTab> {
   Future<void> _loadRemote() async {
     try {
       final r = await Api.get('/sync/remote') as Json;
-      if (mounted) setState(() => remote = (r['books'] as List).cast<Json>());
+      if (mounted) setState(() { remote = (r['books'] as List).cast<Json>(); canMerge = r['can_merge'] == true; });
     } on ApiException catch (e) {
       if (mounted) toast(context, e.message, error: true);
     }
@@ -42,6 +43,11 @@ class _SyncTabState extends State<SyncTab> {
       final r = await Api.post(path, body) as Json;
       setState(() => s = r);
       if (path == '/sync/join' && mounted) await AppScope.read(context).reloadCompanies();
+      if (path == '/sync/merge' && mounted) {
+        final app = AppScope.read(context);
+        await app.reloadCompanies();
+        await app.switchCompany((r['company_id'] as num).toInt());
+      }
       if (path == '/sync/signin') password.clear();
       if (!mounted) return;
       final err = '${r['last_error'] ?? ''}';
@@ -49,6 +55,20 @@ class _SyncTabState extends State<SyncTab> {
       if (path == '/sync/signout') { setState(() => remote = null); } else { await _loadRemote(); }
     });
     if (mounted) setState(() => busy = false);
+  }
+
+  Future<void> _confirmMerge(String key) async {
+    final name = AppScope.read(context).companyName;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Merge $name into the other copy?'),
+        content: const Text('This computer\'s bills, parties and stock changes since sync was turned on go into the other copy, which every device then shares. '
+            'This computer\'s copy is backed up first and kept hidden.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Merge'))],
+      ),
+    );
+    if (yes == true) await _run('/sync/merge', {'key': key}, 'Merged: this computer\'s changes went into the shared copy.');
   }
 
   Widget _btn(String label, IconData icon, VoidCallback? f, {bool primary = false, bool danger = false}) {
@@ -117,9 +137,14 @@ class _SyncTabState extends State<SyncTab> {
                   subtitle: b['fy'] == null ? null : Text('Year ${b['fy']}'),
                   trailing: b['on_this_device'] == true
                       ? const Text('On this computer', style: muted)
+                      : (b['same_name'] == true && canMerge)
+                      ? FilledButton(onPressed: busy ? null : () => _confirmMerge('${b['key']}'), child: const Text('Merge'))
                       : TextButton(onPressed: busy ? null : () => _run('/sync/join', {'key': b['key']}, 'The company is on this computer now. Switch to it from the company menu.'), child: const Text('Bring here')),
                 ),
               if (remote != null && remote!.isEmpty) const Text('No company is synced in this account yet.', style: muted),
+              if (canMerge && (remote ?? []).any((b) => b['same_name'] == true))
+                Text('$name is in the account twice: each device turned on sync for its own copy, so they do not see each other\'s bills. '
+                    'Merge puts this computer\'s bills, parties and stock changes into the other copy and makes it the one used here (a backup is made first).', style: muted),
               const SizedBox(height: 8),
               _btn(remote == null ? 'Show the companies in this account' : 'Look again', Icons.list, _loadRemote),
             ]),

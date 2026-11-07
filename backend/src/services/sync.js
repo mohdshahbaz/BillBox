@@ -404,7 +404,7 @@ function pushPrefix(ms) { let s = ''; for (let i = 0; i < 8; i++) { s = PUSH[ms 
 
 // ---------- sync steps ----------
 async function push(d, key, sl) {
-  let sent = 0;
+  let sent = 0, last = null;
   if (getState(d, 'reset') === '1') {
     const r = await rtdb('POST', `books/${key}/log`, { s: sl, x: 1 });
     if (r && r.name) { putState(d, 'cursor', r.name); putState(d, 'floor', r.name); d.prepare('INSERT OR IGNORE INTO sync_seen(k,at) VALUES(?,?)').run(r.name, pushTime(r.name)); }
@@ -415,12 +415,12 @@ async function push(d, key, sl) {
     if (!changes.length) { if (upTo) d.prepare('DELETE FROM sync_out WHERE seq <= ?').run(upTo); break; }
     for (let i = 0; i < changes.length; i += CHUNK) {
       const r = await rtdb('POST', `books/${key}/log`, { s: sl, c: changes.slice(i, i + CHUNK) });
-      if (r && r.name) d.prepare('INSERT OR IGNORE INTO sync_seen(k,at) VALUES(?,?)').run(r.name, pushTime(r.name));
+      if (r && r.name) { d.prepare('INSERT OR IGNORE INTO sync_seen(k,at) VALUES(?,?)').run(r.name, pushTime(r.name)); last = r.name; }
     }
     d.prepare('DELETE FROM sync_out WHERE seq <= ?').run(upTo);
     sent += changes.length;
   }
-  return sent;
+  return { sent, last };
 }
 
 async function pull(cid, d, key, sl) {
@@ -489,6 +489,12 @@ async function turnOn(cid) {
   await slot();
   const m = map();
   if (m[cid]) return status(cid);
+  // the account already has this company (from another device): two books of one company would never meet
+  const same = (await remote(cid)).books.find((b) => b.same_name && !b.on_this_device);
+  if (same) {
+    throw new HttpError(409, `${row.name} is already in your sync account from another device. Use "Bring here" under Companies in your sync account `
+      + 'to use that copy on this device (back up first if this copy has bills the other one does not).');
+  }
   const key = randomKey();
   await rtdb('PUT', `books/${key}/info`, { name: row.name, fy: row.fy || null, at: { '.sv': 'timestamp' }, by: getApp('sync_slot') });
   m[cid] = key; setMap(m);
@@ -500,7 +506,9 @@ async function turnOn(cid) {
     for (const t of tables(d)) {
       d.prepare(`INSERT INTO sync_out(tbl,rid,op) SELECT '${t.name}', ${t.pk}, 'i' FROM ${t.name}`).run();
     }
-    await push(d, key, Number(getApp('sync_slot')));
+    const { last } = await push(d, key, Number(getApp('sync_slot')));
+    // where the starting copy ends in the log: a later merge (below) replays only the changes after it
+    if (last) await rtdb('PUT', `books/${key}/info/snap`, last);
   } catch (e) {
     state.lastError = e.message;
   }
@@ -516,15 +524,111 @@ function turnOff(cid) {
 }
 
 /** Books of this account that are not on this device yet. */
-async function remote() {
+async function remote(cid) {
   const books = (await rtdb('GET', 'books', undefined, '&shallow=true')) || {};
-  const here = new Set(Object.values(map()));
+  const m = map();
+  const here = new Set(Object.values(m));
+  const row = cid ? db.companyRow(cid) : null;
+  const norm = (x) => String(x || '').trim().toLowerCase();
   const out = [];
   for (const key of Object.keys(books)) {
     const info = (await rtdb('GET', `books/${key}/info`)) || {};
-    out.push({ key, name: info.name || 'Company', fy: info.fy || null, on_this_device: here.has(key) });
+    if (info.merged_into) continue;   // its changes were moved into another book (merge)
+    out.push({
+      key, name: info.name || 'Company', fy: info.fy || null, on_this_device: here.has(key),
+      // the open company has the same name but syncs into another book (or none): it can be merged into this one
+      same_name: !!row && norm(info.name) === norm(row.name) && (info.fy || null) === (row.fy || null) && m[cid] !== key,
+    });
   }
-  return { books: out };
+  return { books: out, can_merge: !!(cid && m[cid]) };
+}
+
+/** Where the starting copy ends in a book's log: info.snap, or (older books) the first run of entries sent together. */
+function snapshotEnd(keys, log, info) {
+  if (info && info.snap && keys.includes(info.snap)) return info.snap;
+  if (!keys.length) return null;
+  let end = keys[0];
+  for (let i = 1; i < keys.length; i++) {
+    const a = log[keys[i - 1]], b = log[keys[i]];
+    if (!b || b.x || Number(b.s) !== Number(log[keys[0]].s) || pushTime(keys[i]) - pushTime(keys[i - 1]) > 10000) break;
+    end = keys[i];
+    if (a && a.x) break;
+  }
+  return end;
+}
+
+/**
+ * Two devices turned sync on for their own copy of one company, so it synced into two books. Merging (on one of them)
+ * makes the open company part of the other book: that book comes here as a fresh company, every change this company's
+ * book had after its starting copy is replayed on it (bills keep their stock, a bill number taken there gets the next
+ * one) and goes out to the other devices; this company's old copy is kept as a backup and hidden from the list.
+ */
+async function merge(cid, key) {
+  const m = map();
+  const src = m[cid];
+  if (!src) throw new HttpError(400, 'Turn on sync for this company first, or use Bring here.');
+  if (!key || src === key) throw new HttpError(400, 'Choose the other copy of this company.');
+  const row = db.companyRow(cid);
+  const info = await rtdb('GET', `books/${key}/info`);
+  if (!info) throw new HttpError(404, 'That company is no longer in the sync account.');
+  await syncCompany(cid);                                   // this copy's last changes are in its book first
+  const srcInfo = (await rtdb('GET', `books/${src}/info`)) || {};
+  const log = (await rtdb('GET', `books/${src}/log`)) || {};
+  const keys = Object.keys(log).sort();
+  const end = snapshotEnd(keys, log, srcInfo);
+  const after = end ? keys.filter((k) => k > end) : [];
+  if (after.some((k) => log[k] && log[k].x)) throw new HttpError(409, 'A backup was restored on this copy after sync was turned on, so it cannot be merged. Use Bring here instead.');
+  const entries = after.map((k) => log[k]).filter((e) => e && e.c);
+  const snap = keys.filter((k) => !end || k <= end).map((k) => log[k]).filter((e) => e && e.c);
+
+  require('./backup').backupNow({ reason: 'before-merge' });
+  const joined = await join(key);
+  const tid = joined.company_id;
+  const d = db.openCompany(tid);
+  // both copies must have started from the same books (same items and parties under the same ids)
+  const probe = [];
+  for (const e of snap) for (const c of [].concat(e.c || [])) if (c && c.r && (c.t === 'items' || c.t === 'parties')) probe.push(c);
+  if (probe.length) {
+    const same = probe.filter((c) => { const x = d.prepare(`SELECT name FROM ${c.t} WHERE id=?`).get(c.k); return x && x.name === c.r.name; }).length;
+    if (same / probe.length < 0.8) {
+      db.registry.prepare('UPDATE companies SET active=0 WHERE id=?').run(tid);
+      const mm = map(); delete mm[tid]; setMap(mm);
+      throw new HttpError(409, `The two copies of ${row.name} did not start from the same books (different items and parties), so they cannot be merged. `
+        + 'Keep one: use Bring here on this device, or stop syncing it here.');
+    }
+  }
+  const sl = Number(getApp('sync_slot'));
+  apply(tid, d, entries);
+  db.withCompany(tid, () => d.transaction(() => {
+    // bills made here whose number the other copy had already used take this device's next number
+    for (const [tbl, [col, series]] of Object.entries(NUMBERED)) {
+      for (const r of d.prepare(`SELECT id, date, ${col} AS no FROM ${tbl} WHERE ${col} LIKE '%~%' AND id > ? AND id < ?`).all(sl * RANGE, (sl + 1) * RANGE)) {
+        const old = String(r.no).split('~')[0];
+        const fresh = nextNo(series, r.date);
+        d.prepare(`UPDATE ${tbl} SET ${col}=? WHERE id=?`).run(fresh, r.id);
+        d.prepare('UPDATE ledger SET ref_no=?, narration=REPLACE(narration, ?, ?) WHERE ref_no=? AND id > ? AND id < ?').run(fresh, old, fresh, old, sl * RANGE, (sl + 1) * RANGE);
+        d.prepare("INSERT INTO sync_out(tbl,rid,op) SELECT 'ledger', id, 'u' FROM ledger WHERE ref_no=? AND id > ? AND id < ?").run(fresh, sl * RANGE, (sl + 1) * RANGE);
+        d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'u')").run(tbl, r.id);
+      }
+    }
+    // the replayed changes go out to the other devices (a batch's stock as the change it made)
+    for (const e of entries) {
+      for (const c of [].concat(e.c || []).filter(Boolean)) {
+        if (!c.r) d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'d')").run(c.t, c.k);
+        else if (c.t === 'batches' && c.q != null) d.prepare("INSERT INTO sync_out(tbl,rid,op,dq) VALUES(?,?,'u',?)").run(c.t, c.k, c.q);
+        else d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'i')").run(c.t, c.k);
+      }
+    }
+    for (const k of d.prepare('SELECT key FROM counters').all()) d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES('counters',?,'u')").run(k.key);
+  })());
+  // the merged copy takes this company's place; the old copy stays (hidden) as a backup
+  db.registry.prepare('UPDATE companies SET name=? WHERE id=?').run(row.name, tid);
+  db.registry.prepare('UPDATE companies SET active=0 WHERE id=?').run(cid);
+  const mm = map(); delete mm[cid]; setMap(mm);
+  try { await rtdb('PUT', `books/${src}/info/merged_into`, key); } catch (e) { state.lastError = e.message; }
+  try { await syncCompany(tid); } catch (e) { state.lastError = e.message; }
+  state.version++;
+  return { company_id: tid, merged: entries.length, ...status(tid) };
 }
 
 /** Bring a synced company onto this device: a new, empty company that fills itself from the other devices' changes. */
@@ -565,4 +669,4 @@ function status(cid) {
 
 for (const [id, d] of db.openHandles()) attach(id, d);
 
-module.exports = { signIn, signOut, status, tick, turnOn, turnOff, remote, join, attach, afterReplace, CONFIG, _state: state, pushTime, pushPrefix };
+module.exports = { signIn, signOut, status, tick, turnOn, turnOff, remote, join, merge, attach, afterReplace, CONFIG, _state: state, pushTime, pushPrefix };

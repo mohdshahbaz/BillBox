@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -50,16 +51,19 @@ internal fun SyncPage() {
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var remote by remember { mutableStateOf<List<J>?>(null) }
+    var canMerge by remember { mutableStateOf(false) }
+    var mergeKey by remember { mutableStateOf<String?>(null) }
     val signedIn = s.bool("signed_in")
     val on = s.bool("on")
     val name = app.company?.str("name") ?: "this company"
-    suspend fun loadRemote() { if (s.bool("signed_in")) try { remote = Api.get("/sync/remote").list("books") } catch (e: Exception) { app.notify(e.message ?: "Could not read the sync account.", true) } }
+    suspend fun loadRemote() { if (s.bool("signed_in")) try { val r = Api.get("/sync/remote"); remote = r.list("books"); canMerge = r.bool("can_merge") } catch (e: Exception) { app.notify(e.message ?: "Could not read the sync account.", true) } }
     LaunchedEffect(app.companyId) { try { s = Api.get("/sync") } catch (_: Exception) {}; if (remote == null) loadRemote() }
     fun run(path: String, body: Map<String, Any?> = emptyMap(), done: String? = null) = app.launch {
         busy = true
         try {
             s = Api.obj("POST", path, body = body)
             if (path == "/sync/join") app.reloadCompanies()
+            if (path == "/sync/merge") { app.reloadCompanies(); app.switchCompany(s.int("company_id")) }
             if (s.str("last_error").isNotEmpty()) app.notify(s.str("last_error"), true) else if (done != null) app.notify(done)
             if (path == "/sync/signin") password = ""
             if (path == "/sync/signout") remote = null else loadRemote()
@@ -102,10 +106,12 @@ internal fun SyncPage() {
                         if (b.str("fy").isNotEmpty()) Hint("Year ${b.str("fy")}")
                     }
                     if (b.bool("on_this_device")) Hint("On this phone")
+                    else if (b.bool("same_name") && canMerge) Button(onClick = { mergeKey = b.str("key") }, enabled = !busy) { Text("Merge") }
                     else TextButton(onClick = { run("/sync/join", mapOf("key" to b.str("key")), "The company is on this phone now. Switch to it from the company list.") }, enabled = !busy) { Text("Bring here") }
                 }
             }
             if (remote?.isEmpty() == true) Hint("No company is synced in this account yet.")
+            if (canMerge && remote?.any { it.bool("same_name") } == true) Hint("$name is in the account twice: each device turned on sync for its own copy, so they do not see each other's bills. Merge puts this phone's bills, parties and stock changes into the other copy and makes it the one used here (a backup is made first).")
             SyncBtn(if (remote == null) "Show the companies in this account" else "Look again", enabled = !busy) { app.launch { loadRemote() } }
         }
 
@@ -114,6 +120,12 @@ internal fun SyncPage() {
         Text(s.str("rules"), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
         SyncBtn("Copy rules") { copyText(s.str("rules")); app.notify("Rules copied.") }
         Spacer(Modifier.height(80.dp))
+    }
+    mergeKey?.let { k ->
+        AlertDialog(onDismissRequest = { mergeKey = null }, title = { Text("Merge $name into the other copy?") },
+            text = { Text("This phone's bills, parties and stock changes since sync was turned on go into the other copy, which every device then shares. This phone's copy is backed up first and kept hidden.") },
+            confirmButton = { TextButton(onClick = { mergeKey = null; run("/sync/merge", mapOf("key" to k), "Merged: this phone's changes went into the shared copy.") }) { Text("Merge") } },
+            dismissButton = { TextButton(onClick = { mergeKey = null }) { Text("Cancel") } })
     }
 }
 

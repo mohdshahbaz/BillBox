@@ -459,7 +459,9 @@ public final class Sync {
         return d
     }
 
-    func push(_ cid: Int, _ key: String, _ sl: Int) async throws {
+    @discardableResult
+    func push(_ cid: Int, _ key: String, _ sl: Int) async throws -> String? {
+        var last: String?
         if try await inDB({ try self.getState(try self.company(cid), "reset") }) == "1" {
             let name = (try await rtdb("POST", "books/\(key)/log", ["s": sl, "x": 1] as [String: Any]) as? [String: Any])?["name"] as? String
             try await inDB {
@@ -475,13 +477,13 @@ public final class Sync {
             let out = try await inDB { try self.outgoing(try self.company(cid)) }
             if out.changes.isEmpty {
                 if out.upTo > 0 { try await inDB { try self.company(cid).prepare("DELETE FROM sync_out WHERE seq <= ?").run(out.upTo) } }
-                return
+                return last
             }
             var names: [String] = []
             var i = 0
             while i < out.changes.count {
                 let part = Array(out.changes[i..<min(i + Sync.chunk, out.changes.count)])
-                if let n = (try await rtdb("POST", "books/\(key)/log", ["s": sl, "c": part] as [String: Any]) as? [String: Any])?["name"] as? String { names.append(n) }
+                if let n = (try await rtdb("POST", "books/\(key)/log", ["s": sl, "c": part] as [String: Any]) as? [String: Any])?["name"] as? String { names.append(n); last = n }
                 i += Sync.chunk
             }
             try await inDB {
@@ -490,6 +492,7 @@ public final class Sync {
                 try d.prepare("DELETE FROM sync_out WHERE seq <= ?").run(out.upTo)
             }
         }
+        return last
     }
 
     func pull(_ cid: Int, _ key: String, _ sl: Int) async throws -> Int {
@@ -556,6 +559,10 @@ public final class Sync {
         guard let row = try await inDB({ try self.engine.companyRow(cid) }) else { throw HttpError(404, "Company not found") }
         let sl = try await slot()
         if try await inDB({ try self.map()[String(cid)] }) != nil { return try await status(cid) }
+        // the account already has this company (from another device): two books of one company would never meet
+        if ((try await remote(cid))["books"] as? [Row] ?? []).contains(where: { $0["same_name"] as? Bool == true && $0["on_this_device"] as? Bool != true }) {
+            throw HttpError(409, "\(row.str("name")) is already in your sync account from another device. Use \"Bring here\" under Companies in your sync account to use that copy on this device (back up first if this copy has bills the other one does not).")
+        }
         let key = Sync.randomKey()
         _ = try await rtdb("PUT", "books/\(key)/info", ["name": row.str("name"), "fy": row.v("fy") ?? NSNull(), "at": [".sv": "timestamp"], "by": sl] as [String: Any])
         try await inDB {
@@ -566,7 +573,10 @@ public final class Sync {
             // everything already in the books goes up once, as the starting point for the other devices
             for t in try self.tables(d) { try d.exec("INSERT INTO sync_out(tbl,rid,op) SELECT '\(t.name)', \(t.pk), 'i' FROM \(t.name)") }
         }
-        do { try await push(cid, key, sl) } catch { locked { _lastError = (error as? HttpError)?.message ?? error.localizedDescription } }
+        do {
+            // where the starting copy ends in the log: a later merge replays only the changes after it
+            if let last = try await push(cid, key, sl) { _ = try await rtdb("PUT", "books/\(key)/info/snap", last) }
+        } catch { locked { _lastError = (error as? HttpError)?.message ?? error.localizedDescription } }
         return try await status(cid)
     }
 
@@ -583,15 +593,113 @@ public final class Sync {
     }
 
     /// Books of this account, marked when they are on this device already.
-    func remote() async throws -> Row {
+    func remote(_ cid: Int? = nil) async throws -> Row {
         let books = (try await rtdb("GET", "books", query: "&shallow=true")) as? [String: Any] ?? [:]
-        let here = Set(try await inDB { Array(try self.map().values) })
+        let (m, row): ([String: String], Row?) = try await inDB { (try self.map(), try cid.flatMap { try self.engine.companyRow($0) }) }
+        let here = Set(m.values)
+        let norm = { (x: Any?) in JS.string(unwrap(x) ?? "").trimmingCharacters(in: .whitespaces).lowercased() }
         var out: [Row] = []
         for key in books.keys.sorted() {
             let info = (try await rtdb("GET", "books/\(key)/info")) as? [String: Any] ?? [:]
-            out.append(["key": key, "name": (info["name"] as? String) ?? "Company", "fy": info["fy"] ?? NSNull(), "on_this_device": here.contains(key)])
+            if info["merged_into"] != nil { continue }   // its changes were moved into another book (merge)
+            let fyR = (info["fy"] as? String) ?? "", fyL = row.map { JS.string(unwrap($0["fy"]) ?? "") } ?? ""
+            let same = row != nil && norm(info["name"]) == norm(row!["name"]) && fyR == fyL && m[String(cid ?? 0)] != key
+            out.append(["key": key, "name": (info["name"] as? String) ?? "Company", "fy": info["fy"] ?? NSNull(), "on_this_device": here.contains(key), "same_name": same])
         }
-        return ["books": out]
+        return ["books": out, "can_merge": cid.map { m[String($0)] != nil } ?? false]
+    }
+
+    /// Where the starting copy ends in a book's log: info.snap, or (older books) the first run of entries sent together.
+    static func snapshotEnd(_ keys: [String], _ log: [String: Any], _ info: [String: Any]) -> String? {
+        if let s = info["snap"] as? String, keys.contains(s) { return s }
+        guard let first = keys.first else { return nil }
+        let s0 = JS.number((log[first] as? [String: Any])?["s"])
+        var end = first
+        for i in 1..<max(keys.count, 1) where i < keys.count {
+            let b = log[keys[i]] as? [String: Any] ?? [:]
+            if b["x"] != nil || JS.number(b["s"]) != s0 || pushTime(keys[i]) - pushTime(keys[i - 1]) > 10000 { break }
+            end = keys[i]
+        }
+        return end
+    }
+
+    /// Two devices turned sync on for their own copy of one company, so it synced into two books. Merging makes the open
+    /// company part of the other book: that book comes here as a fresh company, every change this company's book had
+    /// after its starting copy is replayed on it and goes out to the other devices; the old copy stays (hidden) as a backup.
+    func merge(_ cid: Int, _ key: String) async throws -> Row {
+        guard let src = try await inDB({ try self.map()[String(cid)] }) else { throw HttpError(400, "Turn on sync for this company first, or use Bring here.") }
+        if key.isEmpty || key == src { throw HttpError(400, "Choose the other copy of this company.") }
+        guard let row = try await inDB({ try self.engine.companyRow(cid) }) else { throw HttpError(404, "Company not found") }
+        guard (try await rtdb("GET", "books/\(key)/info")) is [String: Any] else { throw HttpError(404, "That company is no longer in the sync account.") }
+        try await syncCompany(cid)                                   // this copy's last changes are in its book first
+        let srcInfo = (try await rtdb("GET", "books/\(src)/info")) as? [String: Any] ?? [:]
+        let log = (try await rtdb("GET", "books/\(src)/log")) as? [String: Any] ?? [:]
+        let keys = log.keys.sorted()
+        let end = Sync.snapshotEnd(keys, log, srcInfo)
+        let after = end.map { e in keys.filter { $0 > e } } ?? []
+        if after.contains(where: { (log[$0] as? [String: Any])?["x"] != nil }) {
+            throw HttpError(409, "A backup was restored on this copy after sync was turned on, so it cannot be merged. Use Bring here instead.")
+        }
+        let entries = after.compactMap { log[$0] as? [String: Any] }.filter { $0["c"] != nil }
+        let snap = keys.filter { end == nil || $0 <= end! }.compactMap { log[$0] as? [String: Any] }
+        _ = try await inDB { try self.backup.backupNow(reason: "before-merge") }
+        let joined = try await join(key)
+        let tid = joined.i("company_id")
+        let sl = try await inDB { try self.slotNow() }
+        let lo = sl * Sync.range, hi = (sl + 1) * Sync.range
+        let mergedCount: Int = try await inDB {
+            guard let d = try self.engine.openCompany(tid) else { throw HttpError(404, "Company not found") }
+            // both copies must have started from the same books (same items and parties under the same ids)
+            var probe = 0, same = 0
+            for e in snap {
+                for case let c as [String: Any] in (e["c"] as? [Any] ?? []) {
+                    guard let t = c["t"] as? String, t == "items" || t == "parties", let r = c["r"] as? [String: Any] else { continue }
+                    probe += 1
+                    if let x = try d.prepare("SELECT name FROM \(t) WHERE id=?").get(c["k"] ?? NSNull()), x.str("name") == JS.string(r["name"]) { same += 1 }
+                }
+            }
+            if probe > 0 && Double(same) / Double(probe) < 0.8 {
+                try self.reg.prepare("UPDATE companies SET active=0 WHERE id=?").run(tid)
+                var mm = try self.map(); mm[String(tid)] = nil; try self.setMap(mm)
+                throw HttpError(409, "The two copies of \(row.str("name")) did not start from the same books (different items and parties), so they cannot be merged. Keep one: use Bring here on this device, or stop syncing it here.")
+            }
+            _ = try self.apply(tid, d, entries)
+            try d.transaction {
+                // bills made here whose number the other copy had already used take this device's next number
+                for (tbl, (col, series)) in Sync.numbered {
+                    for r in try d.prepare("SELECT id, date, \(col) AS no FROM \(tbl) WHERE \(col) LIKE '%~%' AND id > ? AND id < ?").all(lo, hi) {
+                        let old = String(r.str("no").split(separator: "~").first ?? "")
+                        let fresh = try nextNo(d, series, r.s("date"))
+                        try d.prepare("UPDATE \(tbl) SET \(col)=? WHERE id=?").run(fresh, r.i("id"))
+                        try d.prepare("UPDATE ledger SET ref_no=?, narration=REPLACE(narration, ?, ?) WHERE ref_no=? AND id > ? AND id < ?").runArgs([fresh, old, fresh, old, lo, hi])
+                        try d.prepare("INSERT INTO sync_out(tbl,rid,op) SELECT 'ledger', id, 'u' FROM ledger WHERE ref_no=? AND id > ? AND id < ?").run(fresh, lo, hi)
+                        try d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'u')").run(tbl, r.i("id"))
+                    }
+                }
+                // the replayed changes go out to the other devices (a batch's stock as the change it made)
+                for e in entries {
+                    for case let c as [String: Any] in (e["c"] as? [Any] ?? []) {
+                        let t = JS.string(c["t"]), k: Any = c["k"] ?? NSNull()
+                        if c["r"] == nil { try d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'d')").run(t, k) }
+                        else if t == "batches", let q = unwrap(c["q"]) { try d.prepare("INSERT INTO sync_out(tbl,rid,op,dq) VALUES(?,?,'u',?)").run(t, k, JS.number(q)) }
+                        else { try d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'i')").run(t, k) }
+                    }
+                }
+                for c in try d.prepare("SELECT key FROM counters").all() { try d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES('counters',?,'u')").run(c.str("key")) }
+            }
+            // the merged copy takes this company's place; the old copy stays (hidden) as a backup
+            try self.reg.prepare("UPDATE companies SET name=? WHERE id=?").run(row.str("name"), tid)
+            try self.reg.prepare("UPDATE companies SET active=0 WHERE id=?").run(cid)
+            var mm = try self.map(); mm[String(cid)] = nil; try self.setMap(mm)
+            return entries.count
+        }
+        _ = try? await rtdb("PUT", "books/\(src)/info/merged_into", key)
+        do { try await syncCompany(tid) } catch { locked { _lastError = (error as? HttpError)?.message ?? error.localizedDescription } }
+        locked { _version += 1 }
+        var r = try await status(tid)
+        r["company_id"] = tid
+        r["merged"] = mergedCount
+        return r
     }
 
     /// Bring a synced company onto this device: a new, empty company that fills itself from the other devices' changes.
@@ -650,7 +758,8 @@ public final class Sync {
         guard s.count == 2 else { return nil }
         switch (m, s[1]) {
         case ("GET", "tick"): return ok(await tick())
-        case ("GET", "remote"): return ok(try await remote())
+        case ("GET", "remote"): return ok(try await remote(cid))
+        case ("POST", "merge"): return ok(try await merge(cid ?? 0, b.str("key")))
         case ("POST", "signin"): try await signIn(b); return ok(try await status(cid))
         case ("POST", "signout"): try await inDB { try self.signOut() }; return ok(try await status(cid))
         case ("POST", "on"): return ok(try await turnOn(cid ?? 0))
