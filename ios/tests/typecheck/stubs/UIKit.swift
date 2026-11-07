@@ -106,6 +106,7 @@ open class UIView: UIResponder {
     open var frame: CGRect = .zero
     open var bounds: CGRect = .zero
     open var isHidden = false
+    open var accessibilityElementsHidden = false
     open var tintColor: UIColor! = nil
     open var alpha: CGFloat = 1
     open var isUserInteractionEnabled = true

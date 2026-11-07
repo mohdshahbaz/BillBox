@@ -78,7 +78,10 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         w.frame = CGRect(x: 0, y: 0, width: 1000, height: 720)
         w.alpha = 0.01
         w.isUserInteractionEnabled = false
-        window.insertSubview(w, at: 0)
+        // on top of the app, not under it: a page covered by the app's screens was slowed down by iOS, and attaching the
+        // bill ran out of time. Invisible (1 % opacity) and it lets every touch through.
+        w.accessibilityElementsHidden = true
+        window.addSubview(w)
     }
 
     /// Moves the page into the Connect sheet.
@@ -87,6 +90,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         w.removeFromSuperview()
         w.alpha = 1
         w.isUserInteractionEnabled = true
+        w.accessibilityElementsHidden = false
         return w
     }
 
@@ -321,6 +325,10 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         var summary: String { steps.map { "\($0.0) \($0.1)ms" }.joined(separator: " · ") + " · total \(Int(Date().timeIntervalSince(start) * 1000))ms" }
     }
 
+    /// The step the bill being sent has reached (told in the message when a bill takes too long).
+    private var stage = ""
+    private func step(_ t: inout StepTrace, _ name: String) { t.mark(name); stage = name }
+
     /// The previous bill's upload, still finishing in the page. Only a page reload would cut it off, so only a reload waits for it.
     private var settling: Task<Void, Never>?
 
@@ -346,14 +354,20 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         chain = Task { _ = await self.limited(seconds: limit, fallback: nil) { await job.value } }
         settling = Task { _ = await job.value; _ = await self.run(Self.js(Self.settleScript)) }
         let timeout = SendError(message: "WhatsApp did not finish sending in \(limit) s, so it was stopped. Check the chat before sending again; if it keeps happening, reconnect in Settings > WhatsApp.")
-        let failure: Error? = await limited(seconds: limit, fallback: timeout) { await job.value }
+        var failure: Error? = await limited(seconds: limit, fallback: timeout) { await job.value }
         if let f = failure as? SendError, f.message == timeout.message {
+            // say where it stopped, so the cause can be found (chat not opening, the bill not attaching, the Send click…)
+            let where_ = ["start": "starting", "check": "checking the open chat", "settle": "waiting for the previous bill", "load": "opening the chat",
+                          "chat": "opening the chat", "stage": "attaching the bill", "send": "sending"][stage]
+                ?? (stage.hasPrefix("attach") ? "attaching the bill" : stage.hasPrefix("search") ? "finding the chat by search" : stage)
+            let diag = await limited(seconds: 4, fallback: "") { await self.run(Self.js(Self.diagnose)) }
+            failure = SendError(message: "WhatsApp did not finish sending in \(limit) s (stopped while \(where_)), so it was stopped. Check the chat before sending again; Settings › WhatsApp › Show page shows what WhatsApp is doing.")
+            lastResult = "timeout at \(stage) \(diag)"
             // the stuck bill must not hold up the next ones: forget it, drop the open chat and stop the page's loading
             chain = nil
             openChat = nil
             web?.stopLoading()
             loadDone?.resume(); loadDone = nil
-            lastResult = "timeout after \(limit) s"
         }
         if status == "Sending…" { status = connected ? "Connected" : "Not connected" }   // never stay stuck on "Sending…"
         if let e = failure { throw e }
@@ -380,19 +394,20 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         _ = ensure()
         status = "Sending…"
         var trace = StepTrace()
+        stage = "start"
         // the bill is drawn while WhatsApp Web opens the chat, instead of before
         let pdfJob = Task { @MainActor in makePdf() }
         let reuse: Bool
         // one call: is the chat box up, and whose chat is it (was two calls)
         let now = await run(Self.js(Self.chatNowScript))
         if let o = openChat, o.phone == phone, now == "composer|" + o.heading { reuse = true } else { reuse = false }
-        trace.mark("check")
+        step(&trace, "check")
         if !reuse {
             // a reload would cut off the previous bill's upload: wait for it to leave first (only here, not for every bill)
             await waitSettled(maxSeconds: 15)
-            trace.mark("settle")
+            step(&trace, "settle")
             await load(Self.chatURL(phone))
-            trace.mark("load")
+            step(&trace, "load")
         }
 
         var state = "loading"
@@ -421,7 +436,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
                 if !searched && Date().timeIntervalSince(chatListSince!) > 5 {
                     searched = true
                     let r = await run(Self.js(Self.openBySearchScript), ["phone": phone])
-                    trace.mark("search-\(r)")
+                    step(&trace, "search-\(r)")
                     if r == "clicked" { chatListSince = Date(); continue }
                 }
                 if Date().timeIntervalSince(chatListSince!) > 20 {
@@ -445,7 +460,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         }
         if shownLogin { showing = false }
         connected = true
-        trace.mark("chat")
+        step(&trace, "chat")
         if !reuse { await pause(ms: 100) }   // the chat box has just been mounted: a moment for its paste handler (was 200 ms)
 
         guard await ensureComposer(phone: phone) else {
@@ -456,7 +471,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         openChat = (phone, await chatHeading())
         let args: [String: Any] = ["b64": pdf.base64EncodedString(), "name": fileName + ".pdf"]
         let prepared = await run(Self.js(Self.prepareScript), args)
-        trace.mark("stage")
+        step(&trace, "stage")
         guard prepared == "ready" else { lastResult = prepared; throw SendError(message: "WhatsApp Web did not accept the bill (\(prepared)).") }
 
         abortAt = Date().addingTimeInterval(45)   // attaching and sending must be done by then: a stuck step can never hold up every bill after it
@@ -471,7 +486,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
             _ = await run(Self.js(Self.attachScript), ["method": method])
             let ok = await previewOpen(seconds: method == "input" ? 8 : 5)
             tried.append("\(method):\(ok ? "yes" : "no")")
-            if ok { opened = true; UserDefaults.standard.set(method, forKey: "wa_attach_first"); trace.mark("attach-\(method)"); break }
+            if ok { opened = true; UserDefaults.standard.set(method, forKey: "wa_attach_first"); step(&trace, "attach-\(method)"); break }
             await closePreviewIfAny()
             if overtime { break }
         }
@@ -487,7 +502,7 @@ final class WhatsAppWeb: NSObject, ObservableObject, WKNavigationDelegate {
         if result.hasPrefix("clicked") { result = "clicked" }
         // "clicked" already means a new outgoing message appeared or the preview closed, the very test the confirm step makes: no second wait
         if result == "clicked" { result = "sent" } else { result = await run(Self.js(Self.confirmScript), ["name": fileName + ".pdf"]) }
-        trace.mark("send")
+        step(&trace, "send")
         lastResult = "\(result) [\(tried.joined(separator: ", "))] \(sentNote) ⏱ \(trace.summary)"
         status = "Connected"
         if result == "sent", !caption.isEmpty, sentNote.contains("no-caption") {
