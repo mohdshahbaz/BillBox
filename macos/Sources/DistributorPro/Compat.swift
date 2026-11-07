@@ -32,6 +32,20 @@ extension View {
         if #available(macOS 13.0, *) { self.formStyle(.grouped).scrollContentBackground(.hidden) } else { self }
     }
 
+    /// A Settings tab's form. macOS 13+: the grouped form, which scrolls by itself. macOS 12 (Monterey): a Form does not
+    /// scroll and a long tab (Billing & Dashboard) made the tab view lay itself out again and again until the app was
+    /// stopped, so it goes inside a scroll view there.
+    @ViewBuilder func settingsForm() -> some View {
+        if #available(macOS 13.0, *) {
+            self.formStyle(.grouped).scrollContentBackground(.hidden)
+        } else {
+            ScrollView(.vertical) {
+                self.padding(.horizontal, 20).padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+        }
+    }
+
     func card(_ radius: CGFloat = 10) -> some View { self.modifier(CardBackground(radius: radius)) }
 }
 

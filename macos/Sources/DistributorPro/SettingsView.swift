@@ -150,7 +150,7 @@ import AppKit
                 .font(.caption).foregroundStyle(.secondary)
             HStack { Spacer(); Button("Save") { Task { await save() } }.buttonStyle(.borderedProminent) }
         }
-        .groupedForm()
+        .settingsForm()
         .onAppear {
             guard !loaded else { return }
             loaded = true
@@ -189,7 +189,7 @@ import AppKit
                 Task { await app.saveSettings(["low_stock_qty": low.trimmingCharacters(in: .whitespaces)]); app.notify("Saved.") }
             }.buttonStyle(.borderedProminent) }
         }
-        .groupedForm()
+        .settingsForm()
         .onAppear { if !loaded { loaded = true; low = Fmt.qty(app.lowStockQty) } }
     }
 }
@@ -447,7 +447,7 @@ func fyLabelFor(_ start: Int) -> String { "\(start)-" + String(String(start + 1)
             } header: { Text("Dashboard") }
             NumberingSections()
         }
-        .groupedForm()
+        .settingsForm()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
@@ -534,6 +534,6 @@ func fyLabelFor(_ start: Int) -> String { "\(start)-" + String(String(start + 1)
                 Toggle("Show “Payments from a photo” on Parties", isOn: $showPhotoCard)
             } header: { Text("Payments") }
         }
-        .groupedForm()
+        .settingsForm()
     }
 }

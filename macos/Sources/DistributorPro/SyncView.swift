@@ -81,7 +81,7 @@ import SwiftUI
                 Button("Copy rules") { Files.copy(s.str("rules")); app.notify("Rules copied.") }
             } header: { Text("One-time Firebase setup") }
         }
-        .groupedForm()
+        .settingsForm()
         .task(id: app.companyId) { await load() }
     }
 

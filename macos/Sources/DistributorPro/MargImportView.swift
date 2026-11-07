@@ -30,7 +30,7 @@ import UniformTypeIdentifiers
             if let r = result ?? report { summary(r) }
             if let path { MargPriceFix(path: path) }
         }
-        .groupedForm()
+        .settingsForm()
         .confirmationDialog("Import this Marg backup into \(app.companyName)?", isPresented: $confirm, titleVisibility: .visible) {
             Button("Import") { Task { await run() } }
             Button("Cancel", role: .cancel) {}

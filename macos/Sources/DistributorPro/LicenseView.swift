@@ -60,7 +60,7 @@ import SwiftUI
                 }
             }
         }
-        .groupedForm()
+        .settingsForm()
         .navigationTitle("Licence")
         .task { await load() }
     }

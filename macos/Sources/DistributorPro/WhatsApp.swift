@@ -131,7 +131,7 @@ enum WhatsApp {
             if !web.lastResult.isEmpty { Text("Last send: \(web.lastResult)").font(.caption2).foregroundStyle(.secondary) }
             HStack { Spacer(); Button("Save") { Task { await save(quiet: false) } }.buttonStyle(.borderedProminent) }
         }
-        .groupedForm()
+        .settingsForm()
         .onAppear {
             guard !loaded else { return }
             loaded = true
