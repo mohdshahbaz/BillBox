@@ -89,6 +89,29 @@ class AppState(private val context: Context) {
             startError = e.message
         }
         ready = true
+        startSyncLoop()
+    }
+
+    private var syncLoop: kotlinx.coroutines.Job? = null
+    private var syncVersion = -1
+    /** Live sync (Settings › Sync): every 3 s the engine swaps changes with the other devices; when some arrived, every
+     *  open screen reloads (dataVersion) and the billing lists too. */
+    private fun startSyncLoop() {
+        if (syncLoop != null) return
+        syncLoop = scope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(3000)
+                val r = try { Api.get("/sync/tick") } catch (_: Exception) { null } ?: continue
+                if (!r.bool("on")) continue
+                val v = r.int("version")
+                if (syncVersion >= 0 && v != syncVersion) {
+                    Api.onDataChanged?.invoke()
+                    Api.onItemsChanged?.invoke()
+                    try { settings = Api.get("/settings") } catch (_: Exception) {}
+                }
+                syncVersion = v
+            }
+        }
     }
 
     suspend fun reloadCompanies(pick: Boolean = false) {

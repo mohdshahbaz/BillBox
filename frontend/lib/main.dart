@@ -204,7 +204,9 @@ class _ShellState extends State<Shell> {
                 key: ValueKey(app.companyId),
                 child: Stack(fit: StackFit.expand, children: [
                   Offstage(offstage: _i != 1, child: BillingScreen(key: _bk(app.companyId))),
-                  if (_i != 1) Positioned.fill(child: Padding(padding: EdgeInsets.all(isNarrow(context) ? 14 : 24), child: _page(_i))),
+                  // list screens read the books again when another device's changes arrive (live sync); forms keep what is typed
+                  if (_i != 1) Positioned.fill(child: Padding(padding: EdgeInsets.all(isNarrow(context) ? 14 : 24),
+                      child: KeyedSubtree(key: ValueKey(const {0, 3, 4, 5, 7}.contains(_i) ? app.dataVersion : -1), child: _page(_i)))),
                 ]),
               ),
             ),

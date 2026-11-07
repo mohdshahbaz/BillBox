@@ -106,6 +106,29 @@ final class AppModel: ObservableObject {
             serverError = error.localizedDescription
         }
         ready = true
+        startSyncLoop()
+    }
+
+    private var syncLoop: Task<Void, Never>?
+    private var syncVersion = -1
+    /// Live sync (Settings › Sync): every 3 s the engine swaps changes with the other devices; when some arrived, every
+    /// open screen reloads (dataVersion) and the billing lists too.
+    func startSyncLoop() {
+        guard syncLoop == nil else { return }
+        syncLoop = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard let r = try? await API.obj("GET", "/sync/tick"), r.bool("on") else { continue }
+                let v = r.int("version")
+                guard let self else { return }
+                if self.syncVersion >= 0 && v != self.syncVersion {
+                    API.onDataChanged?()
+                    API.onItemsChanged?()
+                    if let s = try? await API.obj("GET", "/settings") { self.settings = s }
+                }
+                self.syncVersion = v
+            }
+        }
     }
 
     func reloadCompanies(pick: Bool = false) async throws {

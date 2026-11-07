@@ -160,7 +160,7 @@ function resetTrial() {
 }
 
 /** Whether a request may change the books. Reading, printing, exports, backups and the licence itself always work. */
-const ALWAYS = /^\/(license|backup|companies\/\d+\/activate)(\/|$)/;
+const ALWAYS = /^\/(license|backup|sync|companies\/\d+\/activate)(\/|$)/;
 function allows(method, path) {
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return true;
   const p = String(path).replace(/^\/api/, '');

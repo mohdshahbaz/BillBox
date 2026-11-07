@@ -30,6 +30,8 @@ function split(sql) {
     }
     if (c === '-' && sql[i + 1] === '-') { const j = sql.indexOf('\n', i); i = j < 0 ? sql.length : j + 1; cur += ' '; continue; }
     if (c === '/' && sql[i + 1] === '*') { const j = sql.indexOf('*/', i + 2); i = j < 0 ? sql.length : j + 2; cur += ' '; continue; }
+    // a trigger's body (BEGIN … END) holds statements of its own: its semicolons do not end the CREATE TRIGGER
+    if (c === ';' && /^\s*CREATE\s+(?:TEMP\s+|TEMPORARY\s+)?TRIGGER\b/i.test(cur) && /\bBEGIN\b/i.test(cur) && !/\bEND\s*$/i.test(cur)) { cur += c; i++; continue; }
     if (c === ';') { if (cur.trim()) out.push(cur.trim()); cur = ''; i++; continue; }
     cur += c; i++;
   }

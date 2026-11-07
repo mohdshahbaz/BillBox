@@ -5,15 +5,43 @@
  */
 const { DatabaseSync } = require('node:sqlite');
 
-module.exports = class Database {
+const ID_RANGE = 10000000; // ids per device: slot × 10 000 000 stays below 2^31 for the Android app's Int ids (slots ≤ 210)
+const INSERT = /^(\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+)(\w+)(\s*\()([^)]*)(\)\s*VALUES\s*\()/i;
+
+class Database {
   constructor(file, opts = {}) {
     this.d = new DatabaseSync(file, { readOnly: !!opts.readonly });
     this.depth = 0;
+    // Live sync (services/sync.js): rows this device adds get ids from its own range (idBase + 1 …), so two devices
+    // never hand out the same id. 0 = sync off, ids as SQLite picks them.
+    this.idBase = 0;
+    this.idTables = new Set();
+    this.idNext = {};
+  }
+  /** Next free id of this device's range in table t. */
+  nextId(t) {
+    let n = this.idNext[t];
+    if (n == null) {
+      const r = this.d.prepare(`SELECT MAX(id) AS m FROM ${t} WHERE id > ? AND id < ?`).get(this.idBase, this.idBase + ID_RANGE);
+      n = r && r.m != null ? Number(r.m) + 1 : this.idBase + 1;
+    }
+    this.idNext[t] = n + 1;
+    return n;
   }
   pragma(s) { this.d.exec('PRAGMA ' + s); }
   exec(s) { this.d.exec(s); }
   close() { this.d.close(); }
   prepare(s) {
+    // sync on: "INSERT INTO t(a,b) VALUES(…)" without an id gets this device's next id as its first value
+    let idTable = null, named = false;
+    if (this.idBase) {
+      const m = INSERT.exec(s);
+      if (m && this.idTables.has(m[2]) && !m[4].split(',').some((c) => c.trim().toLowerCase() === 'id')) {
+        idTable = m[2];
+        named = !s.includes('?');
+        s = m[1] + m[2] + m[3] + 'id,' + m[4] + m[5] + (named ? '@__bbid,' : '?,') + s.slice(m[0].length);
+      }
+    }
     const st = this.d.prepare(s);
     // better-sqlite3 ignores object keys the SQL does not use; node:sqlite throws on them, so keep only the names the statement mentions
     const used = new Set([...s.matchAll(/[@:$]([A-Za-z_]\w*)/g)].map((m) => m[1]));
@@ -23,6 +51,15 @@ module.exports = class Database {
       }
       return a;
     };
+    if (idTable) {
+      const withId = (a) => {
+        const id = this.nextId(idTable);
+        if (!named) return [id, ...a];
+        const o = a.length === 1 && a[0] && typeof a[0] === 'object' ? a[0] : {};
+        return [{ ...o, __bbid: id }];
+      };
+      return { run: (...a) => st.run(...norm(withId(a))), get: (...a) => st.get(...norm(withId(a))), all: (...a) => st.all(...norm(withId(a))) };
+    }
     return { run: (...a) => st.run(...norm(a)), get: (...a) => st.get(...norm(a)), all: (...a) => st.all(...norm(a)) };
   }
   transaction(fn) {
@@ -43,3 +80,5 @@ module.exports = class Database {
     };
   }
 };
+Database.ID_RANGE = ID_RANGE;
+module.exports = Database;

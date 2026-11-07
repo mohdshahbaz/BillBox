@@ -45,6 +45,9 @@ jobs:
       - name: Licences against a fake licence server (backend/test/license.js)
         working-directory: backend
         run: node --disable-warning=ExperimentalWarning test/license.js
+      - name: Live sync between two devices against a fake Firebase (backend/test/sync.js)
+        working-directory: backend
+        run: node --disable-warning=ExperimentalWarning test/sync.js
 
       - name: Licence server (website/functions) against a fake Razorpay, checked by the engine
         run: node --disable-warning=ExperimentalWarning website/test/server.test.mjs

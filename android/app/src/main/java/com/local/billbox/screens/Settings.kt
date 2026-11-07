@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -116,6 +117,7 @@ private val pages = listOf(
     SettingsPage("parties", "Parties & Payments", Icons.Default.People, Color(0xFF8E24AA)),
     SettingsPage("stock", "Stock", Icons.Default.Inventory2, Color(0xFF795548)),
     SettingsPage("backup", "Backup", Icons.Default.Backup, Color(0xFF00897B)),
+    SettingsPage("sync", "Sync", Icons.Default.Sync, Color(0xFF039BE5)),
     SettingsPage("marg", "Import from Marg ERP", Icons.Default.Download, Color(0xFF3949AB)),
     SettingsPage("licence", "Licence", Icons.Default.Verified, Color(0xFFF9A825)),
 )
@@ -150,6 +152,7 @@ fun SettingsScreen() {
                         "parties" -> PartiesPaymentsPage()
                         "stock" -> StockPage()
                         "backup" -> BackupPage()
+                        "sync" -> SyncPage()
                         "marg" -> MargImportPage()
                         "licence" -> LicencePage()
                     }

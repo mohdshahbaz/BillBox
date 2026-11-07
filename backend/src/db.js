@@ -30,6 +30,15 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
 if (!registry.prepare('PRAGMA table_info(companies)').all().some((c) => c.name === 'fy')) registry.exec('ALTER TABLE companies ADD COLUMN fy TEXT');
 
 const als = new AsyncLocalStorage();
+// live sync (services/sync.js) tracks the changes of synced companies; it loads once this module is complete
+let syncReady = false;
+function syncAttach(id, d) {
+  if (!syncReady) return;
+  try {
+    const S = require('./services/sync');
+    if (typeof S.attach === 'function') S.attach(id, d); // (still loading when it was required first: it attaches the open books itself)
+  } catch (e) { console.error('sync attach:', e && e.message); }
+}
 const open = new Map(); // company id -> raw database handle
 
 function companyRow(id) {
@@ -55,6 +64,7 @@ function openCompany(id) {
   applySchema(d); // also upgrades older databases in place
   tidyItems(d);
   open.set(id, d);
+  syncAttach(id, d);
   return d;
 }
 
@@ -110,7 +120,7 @@ const db = {
   pragma: (s) => current().pragma(s),
   transaction: (fn) => (...a) => current().transaction(fn)(...a),
   // multi-company helpers
-  registry, dataDir, openCompany, closeCompany, createCompany, withCompany, firstCompanyId, companyRow,
+  registry, dataDir, openHandles: () => [...open], openCompany, closeCompany, createCompany, withCompany, firstCompanyId, companyRow,
   middleware(req, res, next) {
     const id = Number(req.get('x-company-id')) || firstCompanyId();
     const d = openCompany(id);
@@ -120,3 +130,5 @@ const db = {
 };
 
 module.exports = db;
+syncReady = true;
+for (const [id, d] of open) syncAttach(id, d);

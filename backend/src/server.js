@@ -21,6 +21,7 @@ app.use('/api', (req, res, next) => (license.allows(req.method, req.path) ? next
 app.use('/api', require('./routes/license'));
 app.use('/api', require('./routes/companies'));
 app.use('/api', require('./routes/backup'));
+app.use('/api', require('./routes/sync'));
 app.use('/api', db.middleware);
 for (const r of ['items', 'parties', 'salesmen', 'invoices', 'purchases', 'debitNotes', 'import', 'reports']) app.use('/api', require(`./routes/${r}`));
 

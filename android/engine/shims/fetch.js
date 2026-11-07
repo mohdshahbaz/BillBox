@@ -9,7 +9,7 @@ function fetchShim(url, opts = {}) {
         if (!net) return no(new TypeError('fetch failed'));
         // a body (Google Drive uploads, sign-in forms) goes as base64
         const b = opts.body == null ? null : Buffer.isBuffer(opts.body) || opts.body instanceof Uint8Array ? Buffer.from(opts.body) : Buffer.from(String(opts.body), 'utf8');
-        const r = JSON.parse(net.request(String(url), JSON.stringify({ method: opts.method || 'GET', headers: opts.headers || {}, timeoutMs: b ? 120000 : 20000,
+        const r = JSON.parse(net.request(String(url), JSON.stringify({ method: opts.method || 'GET', headers: opts.headers || {}, timeoutMs: opts.timeoutMs || (b ? 120000 : 20000),
           ...(b ? { b64: b.toString('base64') } : {}) })));
         if (r.error) return no(new TypeError(r.error));
         const body = Buffer.from(r.b64 || '', 'base64');

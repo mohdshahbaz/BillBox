@@ -91,7 +91,7 @@ object MaterialTheme {
                                   textStyle: TextStyle = TextStyle(), label: (@Composable () -> Unit)? = null, placeholder: (@Composable () -> Unit)? = null,
                                   leadingIcon: (@Composable () -> Unit)? = null, trailingIcon: (@Composable () -> Unit)? = null, prefix: (@Composable () -> Unit)? = null,
                                   suffix: (@Composable () -> Unit)? = null, supportingText: (@Composable () -> Unit)? = null, isError: Boolean = false,
-                                  keyboardOptions: KeyboardOptions = KeyboardOptions(), keyboardActions: KeyboardActions = KeyboardActions(), singleLine: Boolean = false,
+                                  keyboardOptions: KeyboardOptions = KeyboardOptions(), keyboardActions: KeyboardActions = KeyboardActions(), singleLine: Boolean = false, visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
                                   maxLines: Int = Int.MAX_VALUE, minLines: Int = 1, shape: Shape = TODO()) {}
 
 @Composable fun DropdownMenu(expanded: Boolean, onDismissRequest: () -> Unit, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {}

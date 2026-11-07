@@ -11,7 +11,8 @@ const { settings } = require('../../backend/src/services/billing');
 const { pageTextFromItems } = require('../../backend/src/services/pdfExtract');
 
 const license = require('../../backend/src/services/license');
-const pre = [require('../../backend/src/routes/license'), require('../../backend/src/routes/companies'), require('../../backend/src/routes/backup')];
+const pre = [require('../../backend/src/routes/license'), require('../../backend/src/routes/companies'), require('../../backend/src/routes/backup'),
+  require('../../backend/src/routes/sync')];
 const post = ['items', 'parties', 'salesmen', 'invoices', 'purchases', 'debitNotes', 'import', 'reports']
   .map((n) => ({ items: require('../../backend/src/routes/items'), parties: require('../../backend/src/routes/parties'),
     salesmen: require('../../backend/src/routes/salesmen'), invoices: require('../../backend/src/routes/invoices'),

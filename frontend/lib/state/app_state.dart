@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../api.dart';
 
@@ -39,6 +40,36 @@ class AppState extends ChangeNotifier {
     }
     ready = true;
     notifyListeners();
+    _startSync();
+  }
+
+  /// Bumped when changes from other devices arrive (live sync): the list screens rebuild and read the books again.
+  int dataVersion = 0;
+  Timer? _sync;
+  int _syncVersion = -1;
+  bool _syncBusy = false;
+  /// Settings › Sync: every 3 s the engine swaps changes with the other devices (GET /sync/tick).
+  void _startSync() {
+    _sync ??= Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (_syncBusy) return;
+      _syncBusy = true;
+      try {
+        final r = await Api.get('/sync/tick') as Json;
+        if (r['on'] == true) {
+          final v = (r['version'] as num?)?.toInt() ?? 0;
+          if (_syncVersion >= 0 && v != _syncVersion) {
+            await loadSettings();
+            dataVersion++;
+            notifyListeners();
+          }
+          _syncVersion = v;
+        }
+      } catch (_) {
+        // the engine is busy or offline: the next tick tries again
+      } finally {
+        _syncBusy = false;
+      }
+    });
   }
 
   Future<void> reloadCompanies({bool pick = false}) async {
