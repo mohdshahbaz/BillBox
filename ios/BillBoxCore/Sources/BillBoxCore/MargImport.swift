@@ -596,7 +596,7 @@ public enum MargImport {
         let m = model(try readSource(p))
         try checkYear(db, m)
         var numbering: Row = [:]
-        let out = try db.transaction { () throws -> (added: Row, existing: Row) in let w = try write(db, m); numbering = try followMarg(db, m); return w }
+        let out = try db.transaction { () throws -> (added: Row, existing: Row) in let w = try write(db, m); numbering = try followLast(db); return w }
         var r = m.summary
         r["added"] = out.added
         r["already_here"] = out.existing

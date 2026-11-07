@@ -29,8 +29,10 @@ func numbering(_ db: Database, _ prefix: String, _ date: String?) throws -> Numb
         return JS.string(v)
     }
     let typed = JS.trim(try get("num_\(prefix)_prefix"))
-    let label = typed.isEmpty ? prefix : typed
-    let withFy = try get("num_fy") != "0"
+    let bare = try get("num_\(prefix)_bare") == "1"
+    let label = bare ? "" : (typed.isEmpty ? prefix : typed)
+    let ownFy = try get("num_\(prefix)_fy")
+    let withFy = ownFy != "" ? ownFy != "0" : try get("num_fy") != "0"
     let own = JS.parseInt(try get("num_\(prefix)_digits"))
     let d = JS.parseInt(try get("num_digits"))
     let digits = own >= 1 && own <= 9 ? Int(own) : (d >= 3 && d <= 6 ? Int(d) : 5)
@@ -38,7 +40,39 @@ func numbering(_ db: Database, _ prefix: String, _ date: String?) throws -> Numb
     let last = label.unicodeScalars.last.map { CharacterSet.alphanumerics.contains($0) && $0.isASCII } ?? false
     let sep = last ? "/" : ""
     let head = withFy ? "\(label)\(sep)\(year)/" : label
-    return Numbering(prefix: prefix, label: label, withFy: withFy, digits: digits, head: head, key: withFy ? "\(prefix)/\(year)" : prefix)
+    // a series set to follow other numbers (followLast) keeps its own count, apart from the plain one
+    let key = withFy ? "\(prefix)/\(year)" : (ownFy != "" || bare ? "\(prefix)@\(head)" : prefix)
+    return Numbering(prefix: prefix, label: label, withFy: withFy, digits: digits, head: head, key: key)
+}
+
+/// Every series carries on from its last document (the newest by date): bills imported from Marg (A000422, 000423,
+/// DNB00003) make the next bill A000423, 000424, DNB00004 (misc.js followLast). Returns the series changed.
+func followLast(_ db: Database) throws -> Row {
+    let set = db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+    let del = db.prepare("DELETE FROM settings WHERE key=?")
+    var out: Row = [:]
+    for (s, t, col) in numberSeries {
+        guard let row = try db.prepare("SELECT \(col) AS no, date FROM \(t) ORDER BY date DESC, id DESC LIMIT 1").get(),
+              let last = rx("^(.*?)([0-9]+)$").exec(JS.trim(JS.string(row["no"] ?? nil))), let num = last[2] else { continue }
+        let head = last[1] ?? ""
+        // BillBox's own numbering (for that bill's year, or this one's): nothing to follow
+        if try numbering(db, s, row.s("date")).head == head || numbering(db, s, nil).head == head { continue }
+        if head.isEmpty { try set.run("num_\(s)_bare", "1") } else { try del.run("num_\(s)_bare"); try set.run("num_\(s)_prefix", head) }
+        // as many digits as the last one (A000422 → 6; A422 → 3, and A999 still goes on to A1000)
+        try set.run("num_\(s)_digits", String(min(9, num.jsLength)))
+        try set.run("num_\(s)_fy", "0")
+        out[s] = try peekNo(db, s, nil)["next_no"] ?? ""
+    }
+    return out
+}
+
+/// Settings › Numbering saved by hand: the series it names no longer follow other numbers (followLast).
+func numberingEdited(_ db: Database, _ b: Row) throws {
+    let del = db.prepare("DELETE FROM settings WHERE key=?")
+    for (s, _, _) in numberSeries {
+        if b.defined("num_\(s)_prefix") || b.defined("num_\(s)_digits") { try del.run("num_\(s)_bare"); try del.run("num_\(s)_fy") }
+        if b.defined("num_fy") { try del.run("num_\(s)_fy") }
+    }
 }
 
 /// The highest number already used after this beginning, e.g. (422, "A000422") for "A".

@@ -16,6 +16,8 @@ function fy(d = new Date()) {
  *   num_<SERIES>_digits  1 to 9 digits for that series (Marg: A000001 = 6, DNB00001 = 5)
  *   num_fy               '0' leaves the year out (one running count)                default: INV/26-27/00001
  *   num_digits           3 to 6 digits for every series without its own            default: 5
+ *   num_<SERIES>_fy      '0' / '1': that series leaves out / shows the year, whatever num_fy says (set by followLast)
+ *   num_<SERIES>_bare    '1': numbers are only digits (Marg 000423), no beginning
  * A new number always follows the highest one already used with the same beginning (bills imported from Marg,
  * or made before the numbering was changed), so numbers carry on from the last bill and never clash.
  */
@@ -23,15 +25,19 @@ const SERIES = { INV: ['invoices', 'invoice_no'], RCT: ['receipts', 'receipt_no'
 
 function numbering(prefix, date) {
   const get = (k) => { const r = db.prepare('SELECT value FROM settings WHERE key=?').get(k); return r && r.value !== null ? String(r.value) : ''; };
-  const label = get(`num_${prefix}_prefix`).trim() || prefix;
-  const withFy = get('num_fy') !== '0';
+  const bare = get(`num_${prefix}_bare`) === '1';
+  const label = bare ? '' : (get(`num_${prefix}_prefix`).trim() || prefix);
+  const ownFy = get(`num_${prefix}_fy`);
+  const withFy = ownFy !== '' ? ownFy !== '0' : get('num_fy') !== '0';
   const own = parseInt(get(`num_${prefix}_digits`), 10);
   const d = parseInt(get('num_digits'), 10);
   const digits = own >= 1 && own <= 9 ? own : d >= 3 && d <= 6 ? d : 5;
   const year = fy(date || new Date());
   const sep = /[A-Za-z0-9]$/.test(label) ? '/' : '';
   const head = withFy ? `${label}${sep}${year}/` : label;
-  return { prefix, label, withFy, digits, head, key: withFy ? `${prefix}/${year}` : prefix };
+  // a series set to follow other numbers (followLast) keeps its own count, apart from the plain one
+  const key = withFy ? `${prefix}/${year}` : ownFy !== '' || bare ? `${prefix}@${head}` : prefix;
+  return { prefix, label, withFy, digits, head, key };
 }
 
 /** The highest number already used after this beginning ({ n, no }), e.g. A000422 for "A". */
@@ -75,6 +81,44 @@ function setNext(prefix, next, date) {
   return peekNo(prefix, date);
 }
 
+/**
+ * Every series carries on from its last document (the newest by date): bills imported from Marg (A000422, 000423,
+ * DNB00003) make the next bill A000423, 000424, DNB00004 — the beginning and digit count are read from it, without the
+ * year unless it had one. A series whose newest document already has BillBox's own numbering stays as it is.
+ * Returns { INV: next number, … } for the series changed.
+ */
+function followLast() {
+  const set = db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
+  const del = db.prepare('DELETE FROM settings WHERE key=?');
+  const split = (no) => /^(.*?)([0-9]+)$/.exec(String(no || '').trim());
+  const out = {};
+  for (const [s, [t, col]] of Object.entries(SERIES)) {
+    const row = db.prepare(`SELECT ${col} AS no, date FROM ${t} ORDER BY date DESC, id DESC LIMIT 1`).get();
+    const last = row && split(row.no);
+    if (!last) continue;
+    const head = last[1];
+    // BillBox's own numbering (for that bill's year, or this one's): nothing to follow
+    if (numbering(s, row.date).head === head || numbering(s).head === head) continue;
+    // as many digits as the last one (A000422 → 6; A422 → 3, and A999 still goes on to A1000)
+    const digits = last[2].length;
+    if (head === '') set.run(`num_${s}_bare`, '1');
+    else { del.run(`num_${s}_bare`); set.run(`num_${s}_prefix`, head); }
+    set.run(`num_${s}_digits`, String(Math.min(9, digits)));
+    set.run(`num_${s}_fy`, '0');
+    out[s] = peekNo(s).next_no;
+  }
+  return out;
+}
+
+/** Settings › Numbering saved by hand: the series it names no longer follow other numbers (followLast). */
+function numberingEdited(body) {
+  const del = db.prepare('DELETE FROM settings WHERE key=?');
+  for (const s of Object.keys(SERIES)) {
+    if (body[`num_${s}_prefix`] !== undefined || body[`num_${s}_digits`] !== undefined) { del.run(`num_${s}_bare`); del.run(`num_${s}_fy`); }
+    if (body.num_fy !== undefined) del.run(`num_${s}_fy`);
+  }
+}
+
 class HttpError extends Error {
   constructor(status, message, code) { super(message); this.status = status; this.code = code; }
 }
@@ -94,4 +138,4 @@ function normDays(v) {
   return u.length ? u.join(',') : null;
 }
 
-module.exports = { normDays, today, fy, nextNo, peekNo, setNext, SERIES, HttpError, h, ha, blank };
+module.exports = { normDays, today, fy, nextNo, peekNo, setNext, followLast, numberingEdited, SERIES, HttpError, h, ha, blank };

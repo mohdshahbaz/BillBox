@@ -51,6 +51,20 @@ public final class Engine {
     }
 
     /// Pieces-per-box is read from names like "(1X144)"; units are always PCS (boxes are shown from pieces-per-box).
+    /// Books that came from Marg before numbering followed it: once, the next bill of every series carries on from the
+    /// last one (A000423 after Marg's A000422) instead of starting INV/26-27/00001 (Utils followLast).
+    private func followMargOnce(_ d: Database, _ file: String) {
+        // remembered per company file in the registry (the books themselves stay as they were)
+        let mark = "num_follow_checked:\(file)"
+        do {
+            if try registry.prepare("SELECT 1 AS x FROM app_settings WHERE key=?").get(mark) != nil { return }
+            let marg = try d.prepare("SELECT 1 AS x FROM batches WHERE batch_no='MARG' LIMIT 1").get() != nil
+                || d.prepare("SELECT 1 AS x FROM purchases WHERE source='MARG' LIMIT 1").get() != nil
+            if marg { _ = try followLast(d) }
+            try registry.prepare("INSERT INTO app_settings(key,value) VALUES(?,'1') ON CONFLICT(key) DO NOTHING").run(mark)
+        } catch {}
+    }
+
     private func tidyItems(_ d: Database) throws {
         let up = d.prepare("UPDATE items SET pcs_per_box=? WHERE id=?")
         for it in try d.prepare("SELECT id,name,pcs_per_box FROM items").all() {
@@ -66,6 +80,7 @@ public final class Engine {
         let d = try Database(path(row.str("file")))
         try Schema.apply(d)   // also upgrades older databases in place
         try tidyItems(d)
+        followMargOnce(d, row.str("file"))
         open[id] = d
         onOpen?(id, d)
         return d

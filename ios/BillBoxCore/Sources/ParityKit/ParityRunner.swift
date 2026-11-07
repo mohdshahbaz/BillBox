@@ -25,7 +25,7 @@ public final class ParityRunner {
         var out: Row = [:]
         let reg = router.engine.registry
         out["registry"] = try reg.prepare("SELECT id,name,file,active,fy FROM companies ORDER BY id").all().map { r -> Row in var x = r; x["file"] = nil; return x }
-        out["app_settings"] = try reg.prepare("SELECT key,value FROM app_settings WHERE key NOT LIKE 'backup_last%' ORDER BY key").all()
+        out["app_settings"] = try reg.prepare("SELECT key,value FROM app_settings WHERE key NOT LIKE 'backup_last%' AND key NOT LIKE 'num_follow_checked%' ORDER BY key").all()
         var comps: Row = [:]
         for c in try reg.prepare("SELECT id FROM companies ORDER BY id").all() {
             let id = c["id"] as! Int

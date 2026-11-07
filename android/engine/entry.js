@@ -84,7 +84,7 @@ function request(step) {
 function dump() {
   const out = {};
   out.registry = db.registry.prepare('SELECT id,name,file,active,fy FROM companies ORDER BY id').all().map((r) => { const x = { ...r }; delete x.file; return x; });
-  out.app_settings = db.registry.prepare("SELECT key,value FROM app_settings WHERE key NOT LIKE 'backup_last%' ORDER BY key").all();
+  out.app_settings = db.registry.prepare("SELECT key,value FROM app_settings WHERE key NOT LIKE 'backup_last%' AND key NOT LIKE 'num_follow_checked%' ORDER BY key").all();
   out.companies = {};
   for (const { id } of db.registry.prepare('SELECT id FROM companies ORDER BY id').all()) {
     const d = db.openCompany(id);

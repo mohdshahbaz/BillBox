@@ -259,7 +259,7 @@ public final class Router {
         case ("PUT", 1, "settings"):
             if b.defined("low_stock_qty") && !(JS.number(b["low_stock_qty"] ?? nil) >= 0) { throw HttpError(400, "Low-stock level must be 0 or more") }
             let up = db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-            try db.transaction { for (k, v) in b { try up.run(k, JS.string(v)) } }
+            try db.transaction { try numberingEdited(db, b); for (k, v) in b { try up.run(k, JS.string(v)) } }
             return ok(try Billing.settings(db))
 
         // purchases.js

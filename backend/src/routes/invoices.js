@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const EWB = require('../services/ewayBill');
 const db = require('../db');
-const { h, HttpError, today, peekNo, setNext, SERIES } = require('../utils/misc');
+const { h, HttpError, today, peekNo, setNext, SERIES, numberingEdited } = require('../utils/misc');
 const { buildInvoice, createInvoice, updateInvoice, deleteInvoice, getInvoice, settings } = require('../services/billing');
 const { invoiceHtml } = require('../views/invoiceHtml');
 
@@ -80,7 +80,7 @@ router.put('/settings', h((req, res) => {
   const up = db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
   const b = req.body || {};
   if (b.low_stock_qty !== undefined && !(Number(b.low_stock_qty) >= 0)) throw new HttpError(400, 'Low-stock level must be 0 or more');
-  db.transaction(() => { for (const [k, v] of Object.entries(b)) up.run(k, String(v)); })();
+  db.transaction(() => { numberingEdited(b); for (const [k, v] of Object.entries(b)) up.run(k, String(v)); })();
   res.json(settings());
 }));
 

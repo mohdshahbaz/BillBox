@@ -3,7 +3,7 @@ const path = require('path');
 const zlib = require('zlib');
 const db = require('../db');
 const { r2 } = require('../utils/gst');
-const { HttpError, peekNo } = require('../utils/misc');
+const { HttpError, peekNo, followLast } = require('../utils/misc');
 const { fyRange } = require('../utils/fy');
 const { mrpFromName, packFromName } = require('./pdfParser');
 const { pinned, byRules, cleanQuery } = require('./category');
@@ -482,6 +482,7 @@ function previewMarg(p) {
 }
 
 /**
+ * (Older versions; imports now use followLast in utils/misc.js, which every series follows.)
  * After a Marg import, new bills carry on Marg's own numbering — A000423 after A000422, P000015, DNB00003 — unless the
  * numbering was already chosen in Settings (then that is kept). The prefix and digit count are read from the last bill.
  */
@@ -512,7 +513,7 @@ function importMarg(p) {
   const m = model(readSource(p));
   checkYear(m);
   let numbering = {};
-  const out = db.transaction(() => { const w = write(m); numbering = followMarg(m); return w; })();
+  const out = db.transaction(() => { const w = write(m); numbering = followLast(); return w; })();
   return { ...m.summary, added: out.added, already_here: out.existing, numbering };
 }
 

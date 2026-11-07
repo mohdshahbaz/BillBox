@@ -56,6 +56,21 @@ function tidyItems(d) {
   d.exec("UPDATE items SET unit='PCS' WHERE unit IS NOT 'PCS'");
 }
 
+/**
+ * Books that came from Marg before numbering followed it: once, the next bill of every series carries on from the last
+ * one (A000423 after Marg's A000422) instead of starting INV/26-27/00001 (utils/misc.js followLast).
+ */
+function followMargOnce(d, file) {
+  // remembered per company file in the registry (the books themselves stay as they were)
+  const mark = `num_follow_checked:${file}`;
+  try {
+    if (registry.prepare('SELECT 1 AS x FROM app_settings WHERE key=?').get(mark)) return;
+    const marg = d.prepare("SELECT 1 AS x FROM batches WHERE batch_no='MARG' LIMIT 1").get() || d.prepare("SELECT 1 AS x FROM purchases WHERE source='MARG' LIMIT 1").get();
+    if (marg) als.run(d, () => require('./utils/misc').followLast());
+    registry.prepare("INSERT INTO app_settings(key,value) VALUES(?,'1') ON CONFLICT(key) DO NOTHING").run(mark);
+  } catch (e) { console.error('numbering:', e && e.message); }
+}
+
 function openCompany(id) {
   if (open.has(id)) return open.get(id);
   const row = companyRow(id);
@@ -63,6 +78,7 @@ function openCompany(id) {
   const d = new Database(path.join(dataDir, row.file));
   applySchema(d); // also upgrades older databases in place
   tidyItems(d);
+  followMargOnce(d, row.file);
   open.set(id, d);
   syncAttach(id, d);
   return d;
