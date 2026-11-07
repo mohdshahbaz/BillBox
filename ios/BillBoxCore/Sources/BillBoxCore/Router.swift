@@ -66,6 +66,10 @@ public final class Router {
                 return r
             }
         }
+        if seg.first == "update" && method.uppercased() == "GET" {
+            // Settings › Updates: the newest release of this edition (Update.swift); no books are touched
+            return await answer { .json(200, try await Update.check(version: query["version"] ?? "", edition: query["edition"] ?? "", platform: query["platform"] ?? "")) }
+        }
         if seg.first == "license" {
             return await answer {
                 guard let r = try await self.license.route(method.uppercased(), seg, JSONNorm.row(body)) else { throw HttpError(404, "Not found") }

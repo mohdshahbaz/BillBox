@@ -16,6 +16,7 @@ import AppKit
             StockSettings().tabItem { Label("Stock", systemImage: "archivebox") }.tag("stock")
             BackupSettings().tabItem { Label("Backup", systemImage: "externaldrive") }.tag("backup")
             SyncSettings().tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath.icloud") }.tag("sync")
+            UpdateSettings().tabItem { Label("Updates", systemImage: "arrow.down.circle") }.tag("updates")
             MargImportView().tabItem { Label("Import from Marg", systemImage: "square.and.arrow.down.on.square") }.tag("marg")
             LicenseSettings().tabItem { Label("Licence", systemImage: "key") }.tag("licence")
         }

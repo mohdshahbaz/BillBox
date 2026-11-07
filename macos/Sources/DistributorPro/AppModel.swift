@@ -107,6 +107,10 @@ final class AppModel: ObservableObject {
         }
         ready = true
         startSyncLoop()
+        // a newer BillBox: said once when the app opens (Settings › Updates installs it)
+        Task { [weak self] in
+            if let u = try? await AppUpdate.check(), u.bool("available") { self?.notify("BillBox \(u.str("latest")) is available: Settings › Updates.") }
+        }
     }
 
     private var syncLoop: Task<Void, Never>?

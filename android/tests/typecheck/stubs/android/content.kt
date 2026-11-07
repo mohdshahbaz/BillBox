@@ -31,6 +31,7 @@ open class Intent(action: String? = null) {
     constructor(action: String, uri: Uri) : this(action)
     var clipData: ClipData? = null
     fun setType(type: String?): Intent = this
+    fun setDataAndType(data: Uri?, type: String?): Intent = this
     fun setPackage(p: String?): Intent = this
     fun putExtra(name: String, value: String?): Intent = this
     fun putExtra(name: String, value: android.os.Parcelable?): Intent = this

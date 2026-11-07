@@ -22,6 +22,7 @@ app.use('/api', require('./routes/license'));
 app.use('/api', require('./routes/companies'));
 app.use('/api', require('./routes/backup'));
 app.use('/api', require('./routes/sync'));
+app.use('/api', require('./routes/update'));
 app.use('/api', db.middleware);
 for (const r of ['items', 'parties', 'salesmen', 'invoices', 'purchases', 'debitNotes', 'import', 'reports']) app.use('/api', require(`./routes/${r}`));
 
@@ -35,8 +36,9 @@ app.use((err, req, res, next) => {
   }
   const status = err.status || 500;
   if (status === 500) console.error(err);
-  // a failure the app itself reports (HttpError, e.g. "Cannot write to the backup folder") keeps its reason in `detail`
-  const detail = status === 500 && err instanceof HttpError ? err.message : undefined;
+  // a failure the app itself reports (HttpError, e.g. "Cannot write to the backup folder") keeps its reason in `detail`;
+  // any other failure says what went wrong too, so "Server error" on a screen can be traced
+  const detail = status === 500 ? String((err && err.message) || err) : undefined;
   res.status(status).json({ error: status === 500 ? 'Server error' : err.message, code: err.code, detail });
 });
 

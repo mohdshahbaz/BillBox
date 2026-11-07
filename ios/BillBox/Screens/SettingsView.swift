@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
     static let pages: [(key: String, title: String, symbol: String, color: Color)] = [
         ("appearance", "Appearance", "paintpalette", .pink), ("companies", "Companies", "building.2", .blue), ("printing", "Printing", "printer", .gray),
         ("whatsapp", "WhatsApp", "message", .green), ("billing", "Billing & Dashboard", "gauge.with.dots.needle.33percent", .orange),
-        ("parties", "Parties & Payments", "person.2.fill", .purple), ("stock", "Stock", "archivebox", .brown), ("backup", "Backup", "externaldrive", .teal), ("sync", "Sync", "arrow.triangle.2.circlepath.icloud", .cyan),
+        ("parties", "Parties & Payments", "person.2.fill", .purple), ("stock", "Stock", "archivebox", .brown), ("backup", "Backup", "externaldrive", .teal), ("sync", "Sync", "arrow.triangle.2.circlepath.icloud", .cyan), ("update", "Updates", "arrow.down.circle", .green),
         ("marg", "Import from Marg ERP", "square.and.arrow.down.on.square", .indigo), ("licence", "Licence", "key.fill", .yellow),
     ]
 
@@ -36,6 +36,7 @@ import UniformTypeIdentifiers
         case "stock": StockSettings()
         case "backup": BackupSettings()
         case "sync": SyncSettings().navigationTitle("Sync").navigationBarTitleDisplayMode(.inline)
+        case "update": UpdateSettings().navigationTitle("Updates").navigationBarTitleDisplayMode(.inline)
         case "licence": LicenseSettings().navigationBarTitleDisplayMode(.inline)
         default: MargImportView().navigationTitle("Import from Marg ERP").navigationBarTitleDisplayMode(.inline)
         }

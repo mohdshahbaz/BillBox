@@ -2,7 +2,7 @@
 package android.os
 class Bundle
 interface Parcelable
-object Build { object VERSION { @JvmField val SDK_INT: Int = 34 } }
+object Build { object VERSION { @JvmField val SDK_INT: Int = 34 }; object VERSION_CODES { const val O = 26 } }
 class Looper { companion object { fun getMainLooper(): Looper = Looper() } }
 class Handler(looper: Looper) { fun post(r: Runnable): Boolean = true }
 class CancellationSignal { val isCanceled: Boolean = false }

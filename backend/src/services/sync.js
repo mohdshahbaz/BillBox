@@ -572,6 +572,22 @@ function snapshotEnd(keys, log, info) {
 async function merge(cid, key) {
   const m = map();
   const src = m[cid];
+  if (src && key && src !== key) {
+    const sl = Number(getApp('sync_slot'));
+    const others = async (k) => Object.values((await rtdb('GET', `books/${k}/log`)) || {}).some((e) => e && e.c && Number(e.s) !== sl);
+    // the open copy is the one the other devices use: the other copy (on this device, made here) goes into it instead
+    const there = Object.entries(m).find(([, v]) => v === key);
+    if (there && (await others(src)) && !(await others(key))) {
+      const r = await mergeInto(Number(there[0]), src);
+      return { ...r, ...status(cid), company_id: cid };
+    }
+  }
+  return mergeInto(cid, key);
+}
+
+async function mergeInto(cid, key) {
+  const m = map();
+  const src = m[cid];
   if (!src) throw new HttpError(400, 'Turn on sync for this company first, or use Bring here.');
   if (!key || src === key) throw new HttpError(400, 'Choose the other copy of this company.');
   const row = db.companyRow(cid);

@@ -12,7 +12,7 @@ const { pageTextFromItems } = require('../../backend/src/services/pdfExtract');
 
 const license = require('../../backend/src/services/license');
 const pre = [require('../../backend/src/routes/license'), require('../../backend/src/routes/companies'), require('../../backend/src/routes/backup'),
-  require('../../backend/src/routes/sync')];
+  require('../../backend/src/routes/sync'), require('../../backend/src/routes/update')];
 const post = ['items', 'parties', 'salesmen', 'invoices', 'purchases', 'debitNotes', 'import', 'reports']
   .map((n) => ({ items: require('../../backend/src/routes/items'), parties: require('../../backend/src/routes/parties'),
     salesmen: require('../../backend/src/routes/salesmen'), invoices: require('../../backend/src/routes/invoices'),
@@ -62,7 +62,7 @@ function request(step) {
       }
       const st = err.status || 500;
       if (st === 500) console.error(err && err.stack || err);
-      res.status(st).json({ error: st === 500 ? 'Server error' : err.message, code: err.code, detail: st === 500 && err instanceof HttpError ? err.message : undefined });
+      res.status(st).json({ error: st === 500 ? 'Server error' : err.message, code: err.code, detail: st === 500 ? String((err && err.message) || err) : undefined });   // the reason, so "Server error" can be traced
     };
     const run = (m) => { req.params = m.params; try { m.rt.hs[m.rt.hs.length - 1](req, res, (e) => (e ? onError(e) : res.status(404).json({ error: 'Not found' }))); } catch (e) { onError(e); } };
     try {

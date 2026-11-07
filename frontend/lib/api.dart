@@ -30,7 +30,7 @@ class Api {
   static dynamic _handle(http.Response r) {
     final body = r.body.isEmpty ? null : jsonDecode(r.body);
     if (r.statusCode >= 400) {
-      final msg = body is Map ? body['error'] as String? : null;
+      final msg = body is Map ? ((body['detail'] as String?) ?? (body['error'] as String?)) : null;
       throw ApiException(msg ?? 'Request failed (${r.statusCode})', r.statusCode, body is Map ? body['code'] as String? : null);
     }
     return body;

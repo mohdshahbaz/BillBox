@@ -186,7 +186,7 @@ public final class License {
     /// Reading, printing, exports, backups and the licence itself always work; the rest needs the trial or a licence.
     func allows(_ method: String, _ segs: [String]) -> Bool {
         if License.edition.isEmpty || method == "GET" || method == "HEAD" { return true }
-        if let f = segs.first, ["license", "backup"].contains(f) { return true }
+        if let f = segs.first, ["license", "backup", "sync", "update"].contains(f) { return true }
         if segs.count == 3 && segs[0] == "companies" && segs[2] == "activate" { return true }
         if segs.count == 3 && segs[0] == "invoices" && segs[2] == "printed" { return true }
         if segs.last == "preview" { return true }

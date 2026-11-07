@@ -90,6 +90,13 @@ class AppState(private val context: Context) {
         }
         ready = true
         startSyncLoop()
+        // a newer BillBox: said once when the app opens (Settings › Updates installs it)
+        scope.launch {
+            try {
+                val u = Api.get("/update", mapOf("version" to com.local.billbox.system.Updater.version, "edition" to com.local.billbox.engine.Edition.NAME, "platform" to "android"))
+                if (u.bool("available")) notify("BillBox ${u.str("latest")} is available: Settings › Updates installs it.")
+            } catch (_: Exception) {}
+        }
     }
 
     private var syncLoop: kotlinx.coroutines.Job? = null

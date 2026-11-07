@@ -636,6 +636,27 @@ public final class Sync {
     /// company part of the other book: that book comes here as a fresh company, every change this company's book had
     /// after its starting copy is replayed on it and goes out to the other devices; the old copy stays (hidden) as a backup.
     func merge(_ cid: Int, _ key: String) async throws -> Row {
+        let m = try await inDB { try self.map() }
+        if let src = m[String(cid)], !key.isEmpty, src != key {
+            let sl = try await inDB { try self.slotNow() }
+            func others(_ k: String) async throws -> Bool {
+                ((try await rtdb("GET", "books/\(k)/log")) as? [String: Any] ?? [:]).values.contains {
+                    guard let e = $0 as? [String: Any] else { return false }
+                    return e["c"] != nil && Int(JS.number(e["s"])) != sl
+                }
+            }
+            // the open copy is the one the other devices use: the other copy (on this device, made here) goes into it instead
+            if let there = m.first(where: { $0.value == key }).flatMap({ Int($0.key) }), try await others(src), !(try await others(key)) {
+                var r = try await mergeInto(there, src)
+                for (k, v) in try await status(cid) { r[k] = v }
+                r["company_id"] = cid
+                return r
+            }
+        }
+        return try await mergeInto(cid, key)
+    }
+
+    func mergeInto(_ cid: Int, _ key: String) async throws -> Row {
         guard let src = try await inDB({ try self.map()[String(cid)] }) else { throw HttpError(400, "Turn on sync for this company first, or use Bring here.") }
         if key.isEmpty || key == src { throw HttpError(400, "Choose the other copy of this company.") }
         guard let row = try await inDB({ try self.engine.companyRow(cid) }) else { throw HttpError(404, "Company not found") }

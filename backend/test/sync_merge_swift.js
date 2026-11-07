@@ -55,17 +55,12 @@ if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_merge_sw
     const mac = (await api('GET', '/api/sync/remote')).books.find((x) => x.same_name);
     const joined = (await api('POST', '/api/sync/join', { key: mac.key })).company_id;
     await tick();
-    await ok('the copy the Mac uses cannot be merged away', async () => {
-      const own = (await api('GET', '/api/sync/remote', null, joined)).books.find((x) => x.same_name && x.on_this_device);
-      await assert.rejects(api('POST', '/api/sync/merge', { key: own.key }, joined), /shared with your other devices/);
-    });
-    await ok('merging on the iPhone: its bills and party join the Mac\'s book, stock counts both', async () => {
-      const r = await api('GET', '/api/sync/remote');
-      const other = r.books.find((x) => x.same_name);
-      assert.ok(r.can_merge && other, JSON.stringify(r));
-      const m = await api('POST', '/api/sync/merge', { key: other.key });
-      cB = m.company_id;
-      assert.ok(m.on && cB === joined && m.merged > 0, JSON.stringify(m));
+    await ok('merging from the Mac\'s copy (open on the iPhone) brings the iPhone\'s own copy into it', async () => {
+      cB = joined;
+      const own = (await api('GET', '/api/sync/remote')).books.find((x) => x.same_name && x.on_this_device);
+      assert.ok(own, 'the iPhone\'s own copy is offered');
+      const m = await api('POST', '/api/sync/merge', { key: own.key });
+      assert.ok(m.on && m.company_id === joined && m.merged > 0, JSON.stringify(m));
       await tick();
       assert.strictEqual((await qa(`SELECT qty FROM batches WHERE id=${bt.id}`))[0].qty, bt.qty - 5);
       assert.strictEqual((await qa("SELECT COUNT(*) n FROM parties WHERE name='Only on iPhone'"))[0].n, 1);
@@ -75,7 +70,8 @@ if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_merge_sw
         assert.deepStrictEqual(await qb(`SELECT * FROM ${t} ORDER BY 1`), JSON.parse(JSON.stringify(await qa(`SELECT * FROM ${t} ORDER BY 1`))), t);
       }
       const list = await api('GET', '/api/companies');
-      assert.deepStrictEqual(list.companies.map((c) => c.name), ['A.K ENTERPRISES']);
+      assert.strictEqual(list.companies.length, 1);
+      assert.strictEqual((await api('GET', '/api/sync/remote')).books.length, 1);
     });
     console.log(`sync merge (iPhone engine): ${passed} checks passed`);
   } catch (e) { console.error('  FAIL', e.message); process.exitCode = 1; } finally { a.kill(); b.kill(); server.close(); }
