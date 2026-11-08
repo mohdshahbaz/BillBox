@@ -5,24 +5,64 @@ import AppKit
     /// the tab stays chosen when the window is redrawn (a theme change) and when Settings is opened again
     @AppStorage("settingsTab") private var tab = "appearance"
 
-    var body: some View {
-        TabView(selection: $tab) {
-            AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }.tag("appearance")
-            CompanySettings().tabItem { Label("Companies", systemImage: "building.2") }.tag("companies")
-            PrintSettings().tabItem { Label("Printing", systemImage: "printer") }.tag("printing")
-            WhatsAppSettings().tabItem { Label("WhatsApp", systemImage: "message") }.tag("whatsapp")
-            BillingDashboardSettings().tabItem { Label("Billing & Dashboard", systemImage: "gauge") }.tag("billing")
-            PartiesPaymentsSettings().tabItem { Label("Parties & Payments", systemImage: "person.2") }.tag("parties")
-            StockSettings().tabItem { Label("Stock", systemImage: "archivebox") }.tag("stock")
-            BackupSettings().tabItem { Label("Backup", systemImage: "externaldrive") }.tag("backup")
-            SyncSettings().tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath.icloud") }.tag("sync")
-            UpdateSettings().tabItem { Label("Updates", systemImage: "arrow.down.circle") }.tag("updates")
-            MargImportView().tabItem { Label("Import from Marg", systemImage: "square.and.arrow.down.on.square") }.tag("marg")
-            LicenseSettings().tabItem { Label("Licence", systemImage: "key") }.tag("licence")
+    struct TabInfo { let id: String; let title: String; let symbol: String }
+    static let tabs: [TabInfo] = [
+        TabInfo(id: "appearance", title: "Appearance", symbol: "paintpalette"), TabInfo(id: "companies", title: "Companies", symbol: "building.2"), TabInfo(id: "printing", title: "Printing", symbol: "printer"),
+        TabInfo(id: "whatsapp", title: "WhatsApp", symbol: "message"), TabInfo(id: "billing", title: "Billing & Dashboard", symbol: "gauge"), TabInfo(id: "parties", title: "Parties & Payments", symbol: "person.2"),
+        TabInfo(id: "stock", title: "Stock", symbol: "archivebox"), TabInfo(id: "backup", title: "Backup", symbol: "externaldrive"), TabInfo(id: "sync", title: "Sync", symbol: "arrow.triangle.2.circlepath.icloud"),
+        TabInfo(id: "updates", title: "Updates", symbol: "arrow.down.circle"), TabInfo(id: "marg", title: "Import from Marg", symbol: "square.and.arrow.down.on.square"), TabInfo(id: "licence", title: "Licence", symbol: "key"),
+    ]
+
+    @ViewBuilder private func page(_ id: String) -> some View {
+        switch id {
+        case "companies": CompanySettings()
+        case "printing": PrintSettings()
+        case "whatsapp": WhatsAppSettings()
+        case "billing": BillingDashboardSettings()
+        case "parties": PartiesPaymentsSettings()
+        case "stock": StockSettings()
+        case "backup": BackupSettings()
+        case "sync": SyncSettings()
+        case "updates": UpdateSettings()
+        case "marg": MargImportView()
+        case "licence": LicenseSettings()
+        default: AppearanceSettings()
         }
-        // every tab gets the whole window and scrolls inside it: a long tab (Billing & Dashboard) must not push the window or the tab bar out of shape
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(16)
+    }
+
+    var body: some View {
+        Group {
+            if #available(macOS 13.0, *) {
+                TabView(selection: $tab) {
+                    ForEach(Self.tabs, id: \.id) { t in page(t.id).tabItem { Label(t.title, systemImage: t.symbol) }.tag(t.id) }
+                }
+                // every tab gets the whole window and scrolls inside it: a long tab (Billing & Dashboard) must not push the window or the tab bar out of shape
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(16)
+            } else {
+                // macOS 12 (Monterey): twelve tabs made the tab bar wider than the window, so the whole page was pushed past
+                // both edges (labels and buttons cut off); there the tabs are a row that scrolls sideways
+                VStack(spacing: 0) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Self.tabs, id: \.id) { t in
+                                Button { tab = t.id } label: {
+                                    Label(t.title, systemImage: t.symbol)
+                                        .padding(.horizontal, 10).padding(.vertical, 5)
+                                        .background(RoundedRectangle(cornerRadius: 6).fill(tab == t.id ? Color.accentColor.opacity(0.18) : Color.clear))
+                                        .foregroundStyle(tab == t.id ? Color.accentColor : Color.primary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 10)
+                    }
+                    Divider()
+                    page(tab).id(tab)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+            }
+        }
         .navigationTitle("Settings")
     }
 }

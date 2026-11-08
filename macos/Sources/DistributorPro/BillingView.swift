@@ -132,7 +132,8 @@ struct BillLine: Identifiable {
             Divider()
             bottomBar
         }
-        .navigationTitle(editingId != nil ? "Editing \(editingNo)" : "Billing")
+        // Billing stays alive (hidden) behind the other screens; on macOS 12 its title won over theirs ("Billing" above Settings)
+        .navigationTitle(app.section != .billing ? app.section.title : editingId != nil ? "Editing \(editingNo)" : "Billing")
         .toolbar {
             ToolbarItemGroup {
                 Button { clear() } label: { Label(editingId != nil ? "Cancel edit" : "New bill", systemImage: "doc.badge.plus") }
