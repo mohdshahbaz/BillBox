@@ -561,8 +561,9 @@ async function remote(cid) {
     for (const e of Object.values(last)) if (e && e.s) { const d = dev[slots[Number(e.s) - 1]]; used.add(mine.has(Number(e.s)) ? 'this device' : kind(String((d && d.name) || ''))); }
     out.push({
       key, name: info.name || 'Company', fy: info.fy || null, on_this_device: here.has(key), open: !!cid && m[cid] === key, used_by: [...used].sort(),
-      // the open company has the same name but syncs into another book (or none): it can be merged into this one
-      same_name: !!row && norm(info.name) === norm(row.name) && (info.fy || null) === (row.fy || null) && m[cid] !== key,
+      // the open company has the same name but syncs into another book (or none): it can be merged into this one;
+      // a copy with no year (set up before years were kept, or imported) still matches
+      same_name: !!row && norm(info.name) === norm(row.name) && (!info.fy || !row.fy || info.fy === row.fy) && m[cid] !== key,
     });
   }
   return { books: out, can_merge: !!(cid && m[cid]) };

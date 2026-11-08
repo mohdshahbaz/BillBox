@@ -635,7 +635,7 @@ public final class Sync {
                 used.insert(mine.contains(sl) ? "this device" : kind(n))
             }
             let fyR = (info["fy"] as? String) ?? "", fyL = row.map { JS.string(unwrap($0["fy"]) ?? "") } ?? ""
-            let same = row != nil && norm(info["name"]) == norm(row!["name"]) && fyR == fyL && m[String(cid ?? 0)] != key
+            let same = row != nil && norm(info["name"]) == norm(row!["name"]) && (fyR.isEmpty || fyL.isEmpty || fyR == fyL) && m[String(cid ?? 0)] != key
             out.append(["key": key, "name": (info["name"] as? String) ?? "Company", "fy": info["fy"] ?? NSNull(), "on_this_device": here.contains(key), "same_name": same,
                         "open": cid.map { m[String($0)] == key } ?? false, "used_by": used.sorted()])
         }
