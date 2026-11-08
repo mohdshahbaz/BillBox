@@ -23,7 +23,7 @@ import SwiftUI
     private var companyName: String { app.company?.str("name") ?? "this company" }
 
     var body: some View {
-        Form {
+        SettingsForm {
             Section {
                 HStack(spacing: 10) {
                     Image(systemName: s.bool("on") ? "arrow.triangle.2.circlepath.icloud.fill" : signedIn ? "icloud" : "icloud.slash")
@@ -91,7 +91,6 @@ import SwiftUI
                 Button("Copy rules") { Files.copy(s.str("rules")); app.notify("Rules copied.") }
             } header: { Text("One-time Firebase setup") }
         }
-        .settingsForm()
         .confirmationDialog("Bring that copy of \(companyName) into the open one?", isPresented: Binding(get: { mergeKey != nil }, set: { if !$0 { mergeKey = nil } }), titleVisibility: .visible) {
             Button("Merge") { if let k = mergeKey { Task { await merge(k) } } }
             Button("Cancel", role: .cancel) { mergeKey = nil }

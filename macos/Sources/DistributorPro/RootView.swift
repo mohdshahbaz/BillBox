@@ -78,7 +78,26 @@ import SwiftUI
         }
     }
 
-    private var sidebar: some View {
+    /// Company and year above the list. macOS 12 (Monterey) does not move a sidebar list down for a top inset, so the menus
+    /// covered "Sell"; there they sit above the list instead.
+    @ViewBuilder private var sidebar: some View {
+        if #available(macOS 13.0, *) {
+            sidebarList.safeAreaInset(edge: .top) { sidebarMenus }
+        } else {
+            VStack(spacing: 0) { sidebarMenus; sidebarList }
+                .frame(minWidth: 190, idealWidth: 210, maxWidth: 260)
+        }
+    }
+
+    private var sidebarMenus: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            CompanyMenu()
+            YearMenu()
+        }
+        .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 4)
+    }
+
+    private var sidebarList: some View {
         List(selection: selection) {
             SwiftUI.Section("Sell") {
                 row(.billing); row(.bills)
@@ -92,19 +111,12 @@ import SwiftUI
             SwiftUI.Section("Accounts") {
                 row(.dashboard); row(.reports)
             }
-            SwiftUI.Section {
+            SwiftUI.Section("App") {
                 row(.settings)
             }
         }
         .listStyle(.sidebar)
         .frame(minWidth: 190, idealWidth: 210, maxWidth: 260)
-        .safeAreaInset(edge: .top) {
-            VStack(spacing: 6) {
-                CompanyMenu()
-                YearMenu()
-            }
-            .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 4)
-        }
     }
 
     private var detailArea: some View {

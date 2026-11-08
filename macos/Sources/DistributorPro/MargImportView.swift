@@ -17,7 +17,7 @@ import UniformTypeIdentifiers
     @State private var errorText: String?
 
     var body: some View {
-        Form {
+        SettingsForm {
             Section {
                 Text("In Marg: Reports › Management Report › Data Transfer Utility › Export All Data › CSV. Pick the folder Marg wrote the CSV files to (or a .zip of it). Nothing is changed until you press Import.")
                     .font(.callout).foregroundStyle(.secondary)
@@ -30,7 +30,6 @@ import UniformTypeIdentifiers
             if let r = result ?? report { summary(r) }
             if let path { MargPriceFix(path: path) }
         }
-        .settingsForm()
         .confirmationDialog("Import this Marg backup into \(app.companyName)?", isPresented: $confirm, titleVisibility: .visible) {
             Button("Import") { Task { await run() } }
             Button("Cancel", role: .cancel) {}

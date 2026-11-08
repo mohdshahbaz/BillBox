@@ -125,7 +125,7 @@ import AppKit
     @State private var loaded = false
 
     var body: some View {
-        Form {
+        SettingsForm {
             Picker("Invoice layout", selection: $layout) {
                 ForEach(PrintLayout.allCases) { Text($0.label).tag($0) }
             }
@@ -151,7 +151,6 @@ import AppKit
                 .font(.caption).foregroundStyle(.secondary)
             HStack { Spacer(); Button("Save") { Task { await save() } }.buttonStyle(.borderedProminent) }
         }
-        .settingsForm()
         .onAppear {
             guard !loaded else { return }
             loaded = true
@@ -183,14 +182,13 @@ import AppKit
     @State private var loaded = false
 
     var body: some View {
-        Form {
+        SettingsForm {
             TextField("Low-stock warning at or below (pieces)", text: $low).frame(maxWidth: 360)
             SettingNumberField(title: "Warn about expiry this many days ahead", key: "expiry_days", placeholder: "30", range: 1...365).frame(maxWidth: 460)
             HStack { Spacer(); Button("Save") {
                 Task { await app.saveSettings(["low_stock_qty": low.trimmingCharacters(in: .whitespaces)]); app.notify("Saved.") }
             }.buttonStyle(.borderedProminent) }
         }
-        .settingsForm()
         .onAppear { if !loaded { loaded = true; low = Fmt.qty(app.lowStockQty) } }
     }
 }
@@ -424,7 +422,7 @@ func fyLabelFor(_ start: Int) -> String { "\(start)-" + String(String(start + 1)
     }
 
     var body: some View {
-        Form {
+        SettingsForm {
             Section {
                 Picker("Payment on a new bill", selection: setting("bill_pay_mode", "CREDIT")) {
                     Text("Credit").tag("CREDIT"); Text("Cash").tag("CASH"); Text("UPI").tag("UPI"); Text("Card").tag("CARD")
@@ -448,7 +446,6 @@ func fyLabelFor(_ start: Int) -> String { "\(start)-" + String(String(start + 1)
             } header: { Text("Dashboard") }
             NumberingSections()
         }
-        .settingsForm()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
@@ -519,7 +516,7 @@ func fyLabelFor(_ start: Int) -> String { "\(start)-" + String(String(start + 1)
     }
 
     var body: some View {
-        Form {
+        SettingsForm {
             Section {
                 Picker("Price tier", selection: setting("party_default_tier", "RETAIL")) {
                     Text("Retail price").tag("RETAIL"); Text("Wholesale price").tag("WHOLESALE"); Text("MRP").tag("MRP")
@@ -535,6 +532,5 @@ func fyLabelFor(_ start: Int) -> String { "\(start)-" + String(String(start + 1)
                 Toggle("Show “Payments from a photo” on Parties", isOn: $showPhotoCard)
             } header: { Text("Payments") }
         }
-        .settingsForm()
     }
 }

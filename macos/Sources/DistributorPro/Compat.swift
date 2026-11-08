@@ -49,6 +49,29 @@ extension View {
     func card(_ radius: CGFloat = 10) -> some View { self.modifier(CardBackground(radius: radius)) }
 }
 
+/// A Settings tab. macOS 13+: the grouped form. macOS 12 (Monterey): a Form inside a scroll view drew nothing on tabs with
+/// pickers and sections (Printing, Billing & Dashboard, Parties & Payments), so there the rows are a plain column with
+/// even spacing and margins instead.
+struct SettingsForm<Content: View>: View {
+    let content: Content
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
+    var body: some View {
+        if #available(macOS 13.0, *) {
+            Form { content }.formStyle(.grouped).scrollContentBackground(.hidden)
+        } else {
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 12) { content }
+                    .pickerStyle(.menu)
+                    .textFieldStyle(.roundedBorder)
+                    .controlSize(.regular)
+                    .frame(maxWidth: 640, alignment: .leading)
+                    .padding(.horizontal, 24).padding(.vertical, 18)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+        }
+    }
+}
+
 /// Replacement for `ContentUnavailableView` (macOS 14+).
 struct EmptyState: View {
     let title: String

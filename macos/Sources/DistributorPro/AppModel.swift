@@ -19,7 +19,7 @@ enum Page: String, CaseIterable, Identifiable, Hashable {
     }
     var symbol: String {
         switch self {
-        case .dashboard: return "gauge.with.dots.needle.67percent"
+        case .dashboard: return "speedometer"
         case .billing: return "cart"
         case .purchases: return "shippingbox"
         case .bills: return "doc.text"

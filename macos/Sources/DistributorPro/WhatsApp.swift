@@ -94,7 +94,7 @@ enum WhatsApp {
     @State private var loaded = false
 
     var body: some View {
-        Form {
+        SettingsForm {
             HStack(spacing: 8) {
                 Image(systemName: web.connected ? "checkmark.seal.fill" : "link.circle").foregroundColor(web.connected ? .green : .orange)
                 Text(web.status).font(.callout)
@@ -131,7 +131,6 @@ enum WhatsApp {
             if !web.lastResult.isEmpty { Text("Last send: \(web.lastResult)").font(.caption2).foregroundStyle(.secondary) }
             HStack { Spacer(); Button("Save") { Task { await save(quiet: false) } }.buttonStyle(.borderedProminent) }
         }
-        .settingsForm()
         .onAppear {
             guard !loaded else { return }
             loaded = true

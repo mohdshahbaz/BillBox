@@ -12,7 +12,7 @@ import SwiftUI
     private var state: String { s.str("state") }
 
     var body: some View {
-        Form {
+        SettingsForm {
             Section {
                 HStack(spacing: 12) {
                     Image(systemName: state == "licensed" || state == "unlimited" ? "checkmark.seal.fill" : state == "trial" ? "hourglass" : "lock.fill")
@@ -60,7 +60,6 @@ import SwiftUI
                 }
             }
         }
-        .settingsForm()
         .navigationTitle("Licence")
         .task { await load() }
     }
