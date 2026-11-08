@@ -88,7 +88,7 @@ object Engine {
         val js = "BillBox.handle($id, ${JSONObject.quote(req.toString())})"
         withContext(Dispatchers.Main) { web?.evaluateJavascript(js, null) }
         // never wait forever: one request that gets no answer would otherwise hold the lock and freeze every screen
-        val reply = kotlinx.coroutines.withTimeoutOrNull(if (req.optString("path").startsWith("/import") || req.has("op")) 600_000 else 120_000) { d.await() }
+        val reply = kotlinx.coroutines.withTimeoutOrNull(if (req.optString("path").let { it.startsWith("/import") || it == "/sync/merge" || it == "/sync/join" } || req.has("op")) 900_000 else 120_000) { d.await() }
         if (reply == null) {
             pending.remove(id)
             Log.e("BillBoxEngine", "no answer for ${req.optString("method")} ${req.optString("path")}")

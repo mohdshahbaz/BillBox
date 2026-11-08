@@ -676,6 +676,7 @@ public final class Sync {
         if key.isEmpty || key == tKey { throw HttpError(400, "Choose the other copy of this company.") }
         guard let row = try await inDB({ try self.engine.companyRow(cid) }) else { throw HttpError(404, "Company not found") }
         guard let srcInfo = (try await rtdb("GET", "books/\(key)/info")) as? [String: Any] else { throw HttpError(404, "That company is no longer in the sync account.") }
+        if srcInfo["merged_into"] != nil { throw HttpError(409, "That copy is already merged. Tap Look again.") }
         let srcCid = m.first(where: { $0.value == key }).flatMap { Int($0.key) }
         if let srcCid { try await syncCompany(srcCid) }            // that copy's last changes here are in its book first
         try await syncCompany(cid)

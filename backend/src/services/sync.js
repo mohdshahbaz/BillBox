@@ -603,6 +603,12 @@ async function mySlots() {
 }
 
 async function merge(cid, key) {
+  // one merge at a time: a second tap (or a retry after the app stopped waiting) would replay the same bills twice
+  if (state.merging) throw new HttpError(409, 'The merge is still running. Wait a minute, then tap Look again.');
+  state.merging = true;
+  try { return await mergeNow(cid, key); } finally { state.merging = false; }
+}
+async function mergeNow(cid, key) {
   const m = map();
   const tKey = m[cid];
   if (!tKey) throw new HttpError(400, 'Turn on sync for this company first, or use Bring here.');
@@ -610,6 +616,7 @@ async function merge(cid, key) {
   const row = db.companyRow(cid);
   const srcInfo = await rtdb('GET', `books/${key}/info`);
   if (!srcInfo) throw new HttpError(404, 'That company is no longer in the sync account.');
+  if (srcInfo.merged_into) throw new HttpError(409, 'That copy is already merged. Tap Look again.');
   const srcCid = Number((Object.entries(m).find(([, v]) => v === key) || [])[0]) || null;
   if (srcCid) await syncCompany(srcCid);                    // that copy's last changes here are in its book first
   await syncCompany(cid);
@@ -634,7 +641,7 @@ async function merge(cid, key) {
   await rtdb('PUT', `books/${key}/info/merged_at`, keys[keys.length - 1] || '');
   await rtdb('PUT', `books/${key}/info/merged_into`, tKey);
   if (srcCid) moved(srcCid, cid);
-  try { await syncCompany(cid); } catch (e) { state.lastError = e.message; }
+  syncCompany(cid).catch((e) => { state.lastError = e.message; });
   state.version++;
   return { company_id: cid, merged: entries.length, ...status(cid) };
 }
