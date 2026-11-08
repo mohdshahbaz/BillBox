@@ -620,18 +620,15 @@ async function merge(cid, key) {
   const entries = after.map((k) => log[k]).filter((e) => e && e.c);
   const snap = keys.filter((k) => !end || k <= end).map((k) => log[k]).filter((e) => e && e.c);
   const d = db.openCompany(cid);
-  // both copies must have started from the same books (same items and parties under the same ids)
+  // the same starting books (same items and parties under the same ids), or each made its own (two Marg imports):
+  // then the other copy's items, parties and batches are matched to these by name, and its new rows get ids here
   const probe = [];
   for (const e of snap) for (const c of [].concat(e.c || [])) if (c && c.r && (c.t === 'items' || c.t === 'parties')) probe.push(c);
-  if (probe.length) {
-    const same = probe.filter((c) => { const x = d.prepare(`SELECT name FROM ${c.t} WHERE id=?`).get(c.k); return x && x.name === c.r.name; }).length;
-    if (same / probe.length < 0.8) {
-      throw new HttpError(409, `The two copies of ${row.name} did not start from the same books (different items and parties), so they cannot be merged. `
-        + 'Keep one: stop syncing the other one on the device that uses it.');
-    }
-  }
+  const same = probe.filter((c) => { const x = d.prepare(`SELECT name FROM ${c.t} WHERE id=?`).get(c.k); return x && x.name === c.r.name; }).length;
+  let replay = entries;
+  if (probe.length && same / probe.length < 0.8) replay = db.withCompany(cid, () => d.transaction(() => crossTranslate(d, snap, entries))());
   require('./backup').backupNow({ reason: 'before-merge' });
-  replayInto(cid, d, entries);
+  replayInto(cid, d, replay);
   // the devices still on that copy move to this one by themselves on their next sync (follow, below)
   await rtdb('PUT', `books/${key}/info/merged_at`, keys[keys.length - 1] || '');
   await rtdb('PUT', `books/${key}/info/merged_into`, tKey);
@@ -639,6 +636,77 @@ async function merge(cid, key) {
   try { await syncCompany(cid); } catch (e) { state.lastError = e.message; }
   state.version++;
   return { company_id: cid, merged: entries.length, ...status(cid) };
+}
+
+// rows matched by what they are, when two copies were set up separately (their ids mean different things)
+const NATURAL = { items: ['name'], parties: ['name'], categories: ['name'], salesmen: ['name'], routes: ['name'], batches: ['item_id', 'batch_no'] };
+const norm = (v) => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
+
+/**
+ * The other copy was set up on its own (its starting rows have ids that mean other things here): its changes are
+ * rewritten for these books. Its starting items, parties, categories, salesmen, routes and batches are matched to these
+ * by name (batch: item and batch number); a starting row with no match is added here with a new id. Rows it made later
+ * keep their ids (each device has its own range). Its settings and counters stay out (this copy's numbering goes on).
+ */
+function crossTranslate(d, snap, entries) {
+  const info = Object.fromEntries(tables(d).map((t) => [t.name, t]));
+  const base = {};   // table → id → its starting row
+  for (const e of snap) for (const c of [].concat(e.c || []).filter(Boolean)) {
+    if (!c.r) continue;
+    const row = { ...c.r };
+    for (const z of String(c.z || '').split(',').filter(Boolean)) row[z] = null;
+    (base[c.t] = base[c.t] || {})[c.k] = row;
+  }
+  const map = {};    // table → their id → id here
+  const tr = (tbl, id) => {
+    if (id == null || !info[tbl] || !info[tbl].intId || Number(id) >= RANGE) return id;   // ids of later rows are the same everywhere
+    const m = (map[tbl] = map[tbl] || {});
+    if (m[id] != null) return m[id];
+    const row = base[tbl] && base[tbl][id];
+    const t = info[tbl];
+    const vals = {};
+    if (row) for (const [k, v] of Object.entries(row)) if (t.cols.includes(k) && k !== t.pk) vals[k] = typeof v === 'object' && v !== null ? JSON.stringify(v) : v;
+    for (const f of t.fks) if (vals[f.col] != null) vals[f.col] = tr(f.ref, vals[f.col]);
+    const keys = NATURAL[tbl];
+    if (row && keys && keys.every((k) => vals[k] != null)) {
+      const hit = d.prepare(`SELECT ${t.pk} AS id FROM ${tbl} WHERE ${keys.map((k) => (k === 'name' || k === 'batch_no' ? `lower(trim(${k}))=?` : `${k}=?`)).join(' AND ')}`)
+        .get(...keys.map((k) => (k === 'name' || k === 'batch_no' ? norm(vals[k]) : vals[k])));
+      if (hit) { m[id] = hit.id; return hit.id; }
+    }
+    // not here yet: added with an id of this device
+    const nid = d.nextId(tbl);
+    m[id] = nid;
+    if (row) {
+      const cols = Object.keys(vals);
+      d.prepare(`INSERT INTO ${tbl}(${[t.pk, ...cols].join(',')}) VALUES(${[t.pk, ...cols].map(() => '?').join(',')})`).run(nid, ...cols.map((k) => vals[k]));
+    }
+    return nid;
+  };
+  const out = [];
+  for (const e of entries) {
+    const list = [];
+    for (const c of [].concat(e.c || []).filter(Boolean)) {
+      const t = info[c.t];
+      if (!t || c.t === 'settings' || c.t === 'counters') continue;
+      if (!t.intId) { list.push(c); continue; }
+      const own = Number(c.k) >= RANGE;
+      if (!c.r) { if (own) list.push(c); continue; }   // a starting row deleted there stays here
+      const r = { ...c.r };
+      for (const f of t.fks) if (r[f.col] != null) r[f.col] = tr(f.ref, r[f.col]);
+      // a later row of a matched kind (a new party with a name already here) is that row
+      let k = c.k;
+      const keys = NATURAL[c.t];
+      if (own && keys && !t.uniq.length && keys.every((x) => r[x] != null)) {   // (a UNIQUE kind is folded by apply)
+        const hit = d.prepare(`SELECT ${t.pk} AS id FROM ${c.t} WHERE ${keys.map((x) => (x === 'name' || x === 'batch_no' ? `lower(trim(${x}))=?` : `${x}=?`)).join(' AND ')} AND ${t.pk}<>?`)
+          .get(...keys.map((x) => (x === 'name' || x === 'batch_no' ? norm(r[x]) : r[x])), c.k);
+        if (hit) { (map[c.t] = map[c.t] || {})[c.k] = hit.id; k = hit.id; }
+      } else if (!own) k = tr(c.t, c.k);
+      if (own && map[c.t] && map[c.t][c.k] != null) k = map[c.t][c.k];
+      list.push({ ...c, k, r });
+    }
+    if (list.length) out.push({ ...e, c: list });
+  }
+  return out;
 }
 
 /** Book changes replayed on company tid: applied, bill numbers used twice settled, and sent out to the other devices. */

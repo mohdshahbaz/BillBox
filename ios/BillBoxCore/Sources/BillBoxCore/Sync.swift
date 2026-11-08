@@ -699,11 +699,13 @@ public final class Sync {
                     if let x = try d.prepare("SELECT name FROM \(t) WHERE id=?").get(c["k"] ?? NSNull()), x.str("name") == JS.string(r["name"]) { same += 1 }
                 }
             }
-            if probe > 0 && Double(same) / Double(probe) < 0.8 {
-                throw HttpError(409, "The two copies of \(row.str("name")) did not start from the same books (different items and parties), so they cannot be merged. Keep one: stop syncing the other one on the device that uses it.")
-            }
             _ = try self.backup.backupNow(reason: "before-merge")
-            try self.replayInto(cid, d, entries)
+            // set up on its own (two Marg imports): its items, parties and batches are matched to these by name
+            var replay = entries
+            if probe > 0 && Double(same) / Double(probe) < 0.8 {
+                try d.transaction { replay = try self.crossTranslate(d, snap, entries) }
+            }
+            try self.replayInto(cid, d, replay)
         }
         // the devices still on that copy move to this one by themselves on their next sync (follow)
         _ = try await rtdb("PUT", "books/\(key)/info/merged_at", keys.last ?? "")
@@ -715,6 +717,79 @@ public final class Sync {
         r["company_id"] = cid
         r["merged"] = entries.count
         return r
+    }
+
+    // rows matched by what they are, when two copies were set up separately (their ids mean different things)
+    static let natural: [String: [String]] = ["items": ["name"], "parties": ["name"], "categories": ["name"], "salesmen": ["name"], "routes": ["name"], "batches": ["item_id", "batch_no"]]
+    static func intKey(_ v: Any?) -> Int? { let n = JS.number(v); return n.isFinite ? Int(n) : nil }
+    static func norm(_ v: Any?) -> String {
+        JS.string(unwrap(v) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased().split(whereSeparator: { $0 == " " || $0 == "\t" }).joined(separator: " ")
+    }
+
+    /// The other copy was set up on its own: its changes are rewritten for these books (backend sync.js crossTranslate).
+    func crossTranslate(_ d: Database, _ snap: [[String: Any]], _ entries: [[String: Any]]) throws -> [[String: Any]] {
+        let info = Dictionary(uniqueKeysWithValues: try tables(d).map { ($0.name, $0) })
+        var base: [String: [Int: [String: Any?]]] = [:]
+        for e in snap {
+            for case let c as [String: Any] in (e["c"] as? [Any] ?? []) {
+                guard let t = c["t"] as? String, let r = c["r"] as? [String: Any] else { continue }
+                var row: [String: Any?] = r.mapValues { $0 }
+                for z in (c["z"] as? String ?? "").split(separator: ",") { row[String(z)] = .some(nil) }
+                if let k = Sync.intKey(c["k"]) { base[t, default: [:]][k] = row }   // (settings and counters have text keys)
+            }
+        }
+        var map: [String: [Int: Int]] = [:]
+        func lookup(_ t: Table, _ keys: [String], _ vals: [String: Any?], except: Int?) throws -> Int? {
+            let wh = keys.map { $0 == "name" || $0 == "batch_no" ? "lower(trim(\($0)))=?" : "\($0)=?" }.joined(separator: " AND ")
+            var args: [Any?] = keys.map { k in k == "name" || k == "batch_no" ? Sync.norm(vals[k] ?? nil) : (vals[k] ?? nil) }
+            var sql = "SELECT \(t.pk) AS id FROM \(t.name) WHERE \(wh)"
+            if let except { sql += " AND \(t.pk)<>?"; args.append(except) }
+            return try d.prepare(sql).allArgs(args).first?.i("id")
+        }
+        func tr(_ tbl: String, _ idv: Any?) throws -> Any? {
+            guard let raw = unwrap(idv), let t = info[tbl], t.intId, let id = Sync.intKey(raw) else { return idv }
+            if id >= Sync.range { return id }   // ids of later rows are the same everywhere
+            if let hit = map[tbl]?[id] { return hit }
+            let row = base[tbl]?[id]
+            var vals: [String: Any?] = [:]
+            if let row { for (k, v) in row where t.cols.contains(k) && k != t.pk { vals[k] = (v is [Any] || v is [String: Any]) ? String(data: Sync.json(v!), encoding: .utf8) : v } }
+            for f in t.fks { if let v = vals[f.col], unwrap(v) != nil { vals[f.col] = try tr(f.ref, v) } }
+            if row != nil, let keys = Sync.natural[tbl], keys.allSatisfy({ unwrap(vals[$0] ?? nil) != nil }), let hit = try lookup(t, keys, vals, except: nil) {
+                map[tbl, default: [:]][id] = hit
+                return hit
+            }
+            // not here yet: added with an id of this device
+            let nid = try d.nextId(tbl)
+            map[tbl, default: [:]][id] = nid
+            if row != nil {
+                let cols = vals.keys.sorted()
+                try Statement(d, "INSERT INTO \(tbl)(\(([t.pk] + cols).joined(separator: ","))) VALUES(\(([t.pk] + cols).map { _ in "?" }.joined(separator: ",")))", raw: true)
+                    .runArgs([nid] + cols.map { vals[$0]! })
+            }
+            return nid
+        }
+        var out: [[String: Any]] = []
+        for e in entries {
+            var list: [Any] = []
+            for case let c as [String: Any] in (e["c"] as? [Any] ?? []) {
+                guard let tn = c["t"] as? String, let t = info[tn], tn != "settings", tn != "counters" else { continue }
+                if !t.intId { list.append(c); continue }
+                guard let kid = Sync.intKey(c["k"]) else { continue }
+                let own = kid >= Sync.range
+                guard var r = c["r"] as? [String: Any] else { if own { list.append(c) }; continue }   // a starting row deleted there stays here
+                for f in t.fks { if let v = r[f.col], unwrap(v) != nil { r[f.col] = try tr(f.ref, v) ?? NSNull() } }
+                var k: Any = kid
+                if own, t.uniq.isEmpty, let keys = Sync.natural[tn], keys.allSatisfy({ unwrap(r[$0]) != nil }),
+                   let hit = try lookup(t, keys, r.mapValues { $0 }, except: kid) {   // a later row of a matched kind is that row
+                    map[tn, default: [:]][kid] = hit; k = hit
+                } else if !own { k = try tr(tn, kid) ?? kid }
+                if own, let m = map[tn]?[kid] { k = m }
+                var c2 = c; c2["k"] = k; c2["r"] = r
+                list.append(c2)
+            }
+            if !list.isEmpty { var e2 = e; e2["c"] = list; out.append(e2) }
+        }
+        return out
     }
 
     /// Book changes replayed on company tid (inside the queue): applied, bill numbers used twice settled, sent out.

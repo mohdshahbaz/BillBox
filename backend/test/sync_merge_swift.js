@@ -33,6 +33,8 @@ if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_merge_sw
 
   const b = spawn(BIN, ['--serve', dirB], { env: env(dirB), stdio: ['pipe', 'pipe', 'inherit'] });
   let nb = 0; const wb = {};
+  // if the iPhone engine stops (a crash), every waiting step fails instead of waiting for ever
+  b.on('exit', (code) => { for (const k of Object.keys(wb)) { wb[k]({ id: k, status: 599, body: { error: `the iPhone engine stopped (${code})` } }); delete wb[k]; } });
   readline.createInterface({ input: b.stdout }).on('line', (l) => { let m; try { m = JSON.parse(l); } catch { return; } if (wb[m.id]) { wb[m.id](m); delete wb[m.id]; } });
   const B = (o) => new Promise((ok) => { const id = ++nb; wb[id] = ok; b.stdin.write(JSON.stringify({ id, ...o }) + '\n'); });
   let cB = 1;
@@ -58,11 +60,21 @@ if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_merge_sw
     await A(`return db.withCompany(1, () => billing.createInvoice({ pay_mode: 'CASH', lines: [{ item_id: ${bt.item_id}, batch_id: ${bt.id}, qty: 2 }] }))`);
     await api('POST', '/api/invoices', { pay_mode: 'CASH', lines: [{ item_id: bt.item_id, batch_id: bt.id, qty: 3 }] });
     await B({ sql: "INSERT INTO parties(name,type) VALUES('Only on iPhone','CUSTOMER')", company: 1 });
-    // a third device (Android) with a copy of its own too, which the iPhone also brought here
+    // a third device (Android) with a copy of its own too (set up on its own: other ids), which the iPhone also brought here
+    await C(`return db.withCompany(1, () => {
+      db.pragma('foreign_keys = OFF');
+      const shift = (t, by) => {
+        db.prepare(\`UPDATE \${t} SET id = id + \${by}\`).run();
+        for (const o of db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all())
+          for (const f of db.prepare(\`PRAGMA foreign_key_list(\${o.name})\`).all()) if (f.table === t) db.prepare(\`UPDATE \${o.name} SET \${f.from} = \${f.from} + \${by} WHERE \${f.from} IS NOT NULL\`).run();
+      };
+      shift('items', 1000); shift('parties', 2000); shift('batches', 3000);
+      db.pragma('foreign_keys = ON');
+    })`);
     await C(`db.registry.prepare("UPDATE companies SET name='AK Enterprises' WHERE id=1").run(); db.withCompany(1, () => db.prepare("UPDATE settings SET value='AK Enterprises' WHERE key='company_name'").run());
       await S.signIn({ email: 'm@x.in', password: 'secret1' }); db.registry.prepare("UPDATE companies SET name='tmp2' WHERE id=1").run(); await S.turnOn(1);
       db.registry.prepare("UPDATE companies SET name='AK Enterprises' WHERE id=1").run()`);
-    await C(`return db.withCompany(1, () => billing.createInvoice({ pay_mode: 'CASH', lines: [{ item_id: ${bt.item_id}, batch_id: ${bt.id}, qty: 4 }] }))`);
+    await C(`return db.withCompany(1, () => billing.createInvoice({ pay_mode: 'CASH', lines: [{ item_id: ${bt.item_id + 1000}, batch_id: ${bt.id + 3000}, qty: 4 }] }))`);
     await C("return S.tick()");
     const cKey = await C("return JSON.parse(db.registry.prepare(\"SELECT value FROM app_settings WHERE key='sync_map'\").get().value)['1']");
     const androidCopy = (await api('POST', '/api/sync/join', { key: cKey })).company_id;

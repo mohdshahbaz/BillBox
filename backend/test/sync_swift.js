@@ -26,6 +26,8 @@ if (!BIN || !fs.existsSync(BIN)) { console.error('usage: node test/sync_swift.js
   const dirB = fs.mkdtempSync(path.join(os.tmpdir(), 'syncsw-B-'));
   const b = spawn(BIN, ['--serve', dirB], { env: { ...env(dirB), HOME: dirB }, stdio: ['pipe', 'pipe', 'inherit'] });
   let nb = 0; const wb = {};
+  // if the iPhone engine stops (a crash), every waiting step fails instead of waiting for ever
+  b.on('exit', (code) => { for (const k of Object.keys(wb)) { wb[k]({ id: k, status: 599, body: { error: `the iPhone engine stopped (${code})` } }); delete wb[k]; } });
   readline.createInterface({ input: b.stdout }).on('line', (l) => { let m; try { m = JSON.parse(l); } catch { return; } if (wb[m.id]) { wb[m.id](m); delete wb[m.id]; } });
   const B = (o) => new Promise((ok) => { const id = ++nb; wb[id] = ok; b.stdin.write(JSON.stringify({ id, ...o }) + '\n'); });
   const api = async (method, p, body, company) => { const r = await B({ method, path: p, body: body || {}, company }); if (r.status >= 400) throw new Error(`B ${p}: ${JSON.stringify(r.body)}`); return r.body; };
