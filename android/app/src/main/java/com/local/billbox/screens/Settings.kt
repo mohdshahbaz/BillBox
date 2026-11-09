@@ -943,6 +943,13 @@ private fun PrintOptions() {
         if (id == null) app.notify("There is no sale bill yet to show.", true) else com.local.billbox.print.Printing.invoice(id, app, true)
     } }) { Text("Preview on my latest bill") }
     Hint("Every design uses the paper layout, copies, text size and everything else on this page. Marg, Busy and Bizom styles share the choices below (colour, typeface, columns…).")
+    if (style !in setOf("marg", "busy", "bizom")) {
+        SectionHeader("BillBox design")
+        val (face, setFace) = settingChoice("print_marg_font", "serif")
+        Choice("Typeface", listOf("serif" to "Classic serif (like Marg)", "sans" to "Modern"), face, setFace)
+        SwitchRow("“M/s” before the party's name", flag("print_marg_ms", true), { setFlag("print_marg_ms", it) })
+        Hint("Bill to prints as on a Marg bill; the tax summary is HSN-wise, with Total GST (or IGST for another state).")
+    }
     if (style in setOf("marg", "busy", "bizom")) {
         SectionHeader(when (style) { "busy" -> "Busy style"; "bizom" -> "Bizom style"; else -> "Marg style" })
         val (colour, setColour) = settingChoice("print_marg_colour", "blue")

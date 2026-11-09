@@ -35,6 +35,14 @@ import SwiftUI
         } header: { Text("Bill design") } footer: {
             Text("Every design uses the paper layout, copies, text size and everything else on this page. Marg, Busy and Bizom styles share the choices below (colour, typeface, columns…).")
         }
+        if !isMarg {
+            Section {
+                Picker("Typeface", selection: choice("print_marg_font", "serif")) { Text("Classic serif (like Marg)").tag("serif"); Text("Modern").tag("sans") }
+                Toggle("“M/s” before the party's name", isOn: flag("print_marg_ms", true))
+            } header: { Text("BillBox design") } footer: {
+                Text("Bill to prints as on a Marg bill; the tax summary is HSN-wise, with Total GST (or IGST for another state).")
+            }
+        }
         if isMarg {
             Section {
                 Picker("Colour", selection: choice("print_marg_colour", "blue")) { ForEach(margColours, id: \.key) { Text($0.title).tag($0.key) } }

@@ -268,6 +268,9 @@ object Platform {
     fun print(source: File, jobName: String) {
         val pdf = portraitForPrint(source)
         val pm = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
+        // half-sheet bills ask for A5 paper (one copy per sheet, the bill landscape across it); the rest A4
+        val a5 = pdf != source   // a landscape half sheet was turned onto portrait pages
+        val attrs = PrintAttributes.Builder().setMediaSize(if (a5) PrintAttributes.MediaSize.ISO_A5 else PrintAttributes.MediaSize.ISO_A4).build()
         pm.print(jobName, object : PrintDocumentAdapter() {
             override fun onLayout(old: PrintAttributes?, new: PrintAttributes?, cancel: CancellationSignal?, cb: LayoutResultCallback, extras: android.os.Bundle?) {
                 if (cancel?.isCanceled == true) { cb.onLayoutCancelled(); return }
@@ -279,7 +282,7 @@ object Platform {
                     cb.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
                 } catch (e: Exception) { cb.onWriteFailed(e.message) }
             }
-        }, null)
+        }, attrs)
     }
 
     fun bitmapOf(bytes: ByteArray): Bitmap? = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)

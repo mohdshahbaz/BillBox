@@ -6,9 +6,9 @@
 /// "continued" header, and the totals block goes only on the last sheet of each copy.
 ///
 /// Layouts:
-///   halfSheets : ORIGINAL pages, then DUPLICATE pages. Each copy sits at the TOP of its own A4 page (lower half blank)
+///   halfSheets : ORIGINAL pages, then DUPLICATE pages, each copy on its own A5 sheet (landscape)
 ///   a4TwoUp    : A4 sheets, ORIGINAL in the top half, DUPLICATE in the bottom half (same page number), cut line between
-///   single     : ORIGINAL only, at the top of an A4 page
+///   single     : ORIGINAL only, on an A5 sheet
 import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -20,9 +20,9 @@ enum PrintLayout { halfSheets, a4TwoUp, single }
 
 extension PrintLayoutInfo on PrintLayout {
   String get label => switch (this) {
-        PrintLayout.halfSheets => 'Half-A4 copies: Original on page 1, Duplicate on next page (both at top)',
+        PrintLayout.halfSheets => 'Half sheets (A5): Original on one A5 sheet, Duplicate on the next',
         PrintLayout.a4TwoUp => 'A4 sheet: Original on top, Duplicate below',
-        PrintLayout.single => 'Half-A4: Original copy only (at top of page)',
+        PrintLayout.single => 'Half sheet (A5): Original copy only',
       };
   static PrintLayout parse(String? s) => PrintLayout.values.firstWhere((l) => l.name == s, orElse: () => PrintLayout.halfSheets);
 }
@@ -31,7 +31,7 @@ const copyLabels = ['ORIGINAL FOR RECIPIENT', 'DUPLICATE FOR TRANSPORTER/SUPPLIE
 
 class Geo {
   static const double w = 595.276, h = 420.945; // half of A4 (portrait 595.276 x 841.89)
-  static const double m = 12; // sheet margin (narrow: more item rows)
+  static const double m = 5; // sheet margin (kept small: more of the sheet is bill)
   static const double rowH = 12, headFirst = 76, headNext = 30, tableHead = 14, foot = 22, totals = 92;
   static const double inner = h - 2 * m;
   static final halfFormat = PdfPageFormat(w, h, marginAll: 0);
@@ -172,9 +172,9 @@ pw.Widget _headFirst(Json inv, Json co, String copy) {
           child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
             pw.Expanded(
               child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text('Bill to: ${_cut('${inv['party_name'] ?? 'Cash customer'}', 55)}', style: _s(8.5, bold: true), maxLines: 1),
-                pw.Text(_cut('${inv['party_address'] ?? ''}', 95), style: _s(6.5), maxLines: 1),
-                pw.Text('${(inv['party_gstin'] ?? '') != '' ? 'GSTIN: ${inv['party_gstin']}   ' : ''}${(inv['party_state'] ?? '') != '' ? 'State code: ${inv['party_state']}' : ''}', style: _s(6.5), maxLines: 1),
+                // Bill to as on a Marg bill: "M/s" and the party in bold, then address, state code and phone, GSTIN
+                pw.Text(_cut(_partyTitle(inv, co), 55), style: _s(8.5, bold: true), maxLines: 1),
+                for (final l in _partyLines(inv).take(3)) pw.Text(_cut(l.$1, 95), style: _s(6.5, bold: l.$2), maxLines: 1),
               ]),
             ),
             pw.SizedBox(
@@ -191,6 +191,40 @@ pw.Widget _headFirst(Json inv, Json co, String copy) {
       _rule(),
     ]),
   );
+}
+
+String _partyTitle(Json inv, Json co) {
+  final name = '${inv['party_name'] ?? ''}';
+  if (name.isEmpty) return 'Cash customer';
+  return '${'${co['print_marg_ms'] ?? ''}' == '0' ? '' : 'M/s '}$name';
+}
+
+/// The party's details under the name, as on a Marg bill: (text, bold).
+List<(String, bool)> _partyLines(Json inv) {
+  String v(String k) => '${inv[k] ?? ''}'.trim();
+  final mob = <String>[];
+  for (final m in [v('party_phone'), ...v('party_mobiles').split(RegExp(r'[,;/]')), v('party_tel')]) {
+    final t = m.trim();
+    if (t.isNotEmpty && !mob.contains(t)) mob.add(t);
+  }
+  final out = <(String, bool)>[];
+  if (v('party_address').isNotEmpty) out.add((v('party_address'), false));
+  final sp = [if (v('party_state').isNotEmpty) 'State code : ${v('party_state')}', if (mob.isNotEmpty) 'Ph.No. : ${mob.join(', ')}'].join('   ');
+  if (sp.isNotEmpty) out.add((sp, false));
+  out.add(('GSTIN : ${v('party_gstin').isEmpty ? 'Unregistered' : v('party_gstin')}', true));
+  return out;
+}
+
+/// The bill's items grouped by HSN and GST rate, in the order they first appear: (hsn, rate, taxable, cgst, sgst, igst).
+List<({String hsn, num rate, num taxable, num cgst, num sgst, num igst})> _hsnGst(Json inv) {
+  final acc = <String, ({String hsn, num rate, num taxable, num cgst, num sgst, num igst})>{};
+  for (final l in (inv['lines'] as List).cast<Json>()) {
+    final h = '${l['hsn'] ?? ''}'.trim();
+    final k = '$h|${_n(l['gst_rate'])}';
+    final o = acc[k] ?? (hsn: h.isEmpty ? '-' : h, rate: _n(l['gst_rate']), taxable: 0, cgst: 0, sgst: 0, igst: 0);
+    acc[k] = (hsn: o.hsn, rate: o.rate, taxable: o.taxable + _n(l['taxable']), cgst: o.cgst + _n(l['cgst']), sgst: o.sgst + _n(l['sgst']), igst: o.igst + _n(l['igst']));
+  }
+  return acc.values.toList();
 }
 
 pw.Widget _headNext(Json inv, Json co, String copy) => pw.SizedBox(
@@ -275,16 +309,17 @@ pw.Widget _bankTab(Json co, int fit) {
 
 pw.Widget _totals(Json inv, Json co) {
   final intra = inv['supply'] != 'INTER';
-  final g = (inv['gst_summary'] as List).cast<Json>().take(6).toList();
+  final all = _hsnGst(inv);
+  final g = all.take(5).toList();
+  // HSN-wise: HSN, GST %, Taxable, then CGST, SGST and Total GST within the state, or IGST across states
   pw.Widget srow(List<String> v, {bool bold = false}) => pw.SizedBox(
         height: 9,
         child: pw.Row(children: [
-          _cell(v[0], 36, 9, bold: bold, size: 6.5),
-          _cell(v[1], 62, 9, bold: bold, right: true, size: 6.5),
-          _cell(v[2], 54, 9, bold: bold, right: true, size: 6.5),
-          if (v.length > 3) _cell(v[3], 54, 9, bold: bold, right: true, size: 6.5),
+          _cell(v[0], 44, 9, bold: bold, size: 6.5),
+          for (var i = 1; i < v.length; i++) _cell(v[i], i == 1 ? 28 : 48, 9, bold: bold, right: true, size: 6.5),
         ]),
       );
+  num sum(num Function(({String hsn, num rate, num taxable, num cgst, num sgst, num igst})) f) => all.fold<num>(0, (a, r) => a + f(r));
   pw.Widget kv(String a, String b, {bool big = false}) => pw.Container(
         height: big ? 16 : 9.5,
         margin: big ? const pw.EdgeInsets.symmetric(vertical: 1.5) : null,
@@ -297,7 +332,7 @@ pw.Widget _totals(Json inv, Json co) {
       );
   final due = _n(inv['total']) - _n(inv['paid']);
   // lines of the left column still free once the GST rows have their height (the bank rows may use all of it)
-  final bankFit = ((Geo.totals - 3 - 9.0 * (1 + g.length) - 3 - 2) / (7.2 * _bankSize(co).scale)).floor();
+  final bankFit = ((Geo.totals - 3 - 9.0 * (1 + g.length + (all.length > 1 ? 1 : 0)) - 3 - 2) / (7.2 * _bankSize(co).scale)).floor();
   return pw.SizedBox(
     height: Geo.totals,
     child: pw.Container(
@@ -306,8 +341,10 @@ pw.Widget _totals(Json inv, Json co) {
       child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
         pw.Expanded(
           child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            srow(['GST %', 'Taxable', intra ? 'CGST' : 'IGST', if (intra) 'SGST'], bold: true),
-            for (final x in g) srow(['${_n(x['rate'])}%', _m(x['taxable']), intra ? _m(x['cgst']) : _m(x['igst']), if (intra) _m(x['sgst'])]),
+            srow(['HSN', 'GST %', 'Taxable', if (intra) ...['CGST', 'SGST', 'Total GST'] else 'IGST'], bold: true),
+            for (final x in g) srow([x.hsn, '${x.rate}', _m(x.taxable), if (intra) ...[_m(x.cgst), _m(x.sgst), _m(x.cgst + x.sgst)] else _m(x.igst)]),
+            if (all.length > 1)
+              srow(['Total', '', _m(sum((r) => r.taxable)), if (intra) ...[_m(sum((r) => r.cgst)), _m(sum((r) => r.sgst)), _m(sum((r) => r.cgst + r.sgst))] else _m(sum((r) => r.igst))], bold: true),
             pw.SizedBox(height: 3),
             // "Amount in words" on the left, the bank details beside it (no extra height)
             pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
@@ -389,7 +426,10 @@ Future<Uint8List> buildInvoicePdf(Json inv, Json co, PrintLayout layout) async {
   final doc = pw.Document(
     title: 'Invoice ${inv['invoice_no']}',
     author: '${co['company_name']}',
-    theme: pw.ThemeData.withFont(base: pw.Font.helvetica(), bold: pw.Font.helveticaBold()),
+    // Settings › Printing › Typeface: classic serif (like Marg) unless Modern is chosen
+    theme: '${co['print_marg_font'] ?? ''}' == 'sans'
+        ? pw.ThemeData.withFont(base: pw.Font.helvetica(), bold: pw.Font.helveticaBold())
+        : pw.ThemeData.withFont(base: pw.Font.times(), bold: pw.Font.timesBold()),
   );
   final lines = (inv['lines'] as List).cast<Json>();
   final pages = paginate(lines.length);
@@ -414,7 +454,7 @@ Future<Uint8List> buildInvoicePdf(Json inv, Json co, PrintLayout layout) async {
     final copies = layout == PrintLayout.single ? [copyLabels[0]] : copyLabels;
     for (final copy in copies) {
       for (var p = 0; p < pages.length; p++) {
-        doc.addPage(a4TopPage(sheet(copy, p)));
+        doc.addPage(pw.Page(pageFormat: Geo.halfFormat, margin: pw.EdgeInsets.zero, build: (_) => sheet(copy, p)));
       }
     }
   }

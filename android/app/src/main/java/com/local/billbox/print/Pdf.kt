@@ -24,9 +24,9 @@ import kotlin.math.roundToInt
 // The bill layouts of the Mac and iPhone (Print.swift), drawn as vector PDF pages with Android's PdfDocument.
 
 enum class PrintLayout(val id: String, val label: String) {
-    HalfSheets("halfSheets", "Half sheets: Original on one A4 page, Duplicate on the next, each at the top of the page"),
+    HalfSheets("halfSheets", "Half sheets (A5): Original on one A5 sheet, Duplicate on the next"),
     A4TwoUp("a4TwoUp", "A4 sheet: Original on top, Duplicate below"),
-    Single("single", "Half sheet: Original copy only, at the top of an A4 page"),
+    Single("single", "Half sheet (A5): Original copy only"),
     A4Full("a4Full", "Full A4 page: Original + Duplicate, one copy per page"),
     A4FullOriginal("a4FullOriginal", "Full A4 page: Original copy only");
 
@@ -134,7 +134,7 @@ fun bankTabHeight(co: J, fs: Float): Float = bankTabRows(co).let { if (it.isEmpt
 fun leftTop(co: J, inv: J, f: Float): Float {
     fun on(k: String) = co.str(k).isEmpty() || co.str(k) != "0"
     var left = 8f
-    if (on("print_gst_table")) left += (maxOf(1, inv.list("gst_summary").size) + 1) * 8.5f * f + 1
+    if (on("print_gst_table")) { val n = hsnGst(inv).size; left += (maxOf(1, n) + 1 + (if (n > 1) 1 else 0)) * 8.5f * f + 1 }
     if (co.str("print_balance") == "1" && inv.has("party_prev_balance")) left += 10f * f
     return left
 }
@@ -152,6 +152,25 @@ fun bankTabPer(co: J, inv: J, g: Spec): Int {
 }
 /** True when the bank block fits in the totals band of this page design (otherwise the bank lines stay in the footer). */
 fun bankTabFits(co: J, inv: J, g: Spec): Boolean = bankTabHeight(co, g.fs) > 0f && leftOther(co, inv, g.fs) + 2 <= g.totals + 0.5f
+
+/** One row of the HSN-wise GST summary: an HSN code at one GST rate, its taxable value and tax. */
+data class HsnGst(val hsn: String, val rate: Double, val taxable: Double, val cgst: Double, val sgst: Double, val igst: Double) { val gst get() = cgst + sgst + igst }
+
+/** The bill's items grouped by HSN and GST rate, in the order they first appear. */
+fun hsnGst(inv: J): List<HsnGst> {
+    val acc = LinkedHashMap<String, HsnGst>()
+    for (l in inv.list("lines")) {
+        val h = l.str("hsn").trim()
+        val k = h + "|" + Fmt.amount(l.num("gst_rate"))
+        val o = acc[k] ?: HsnGst(h.ifEmpty { "-" }, l.num("gst_rate"), 0.0, 0.0, 0.0, 0.0)
+        acc[k] = o.copy(taxable = o.taxable + l.num("taxable"), cgst = o.cgst + l.num("cgst"), sgst = o.sgst + l.num("sgst"), igst = o.igst + l.num("igst"))
+    }
+    return acc.values.toList()
+}
+
+/** Settings › Printing › Typeface: classic serif (like Marg) or modern. The BillBox and Marg designs print in the serif until another
+ *  is chosen; Busy and Bizom in modern letters. */
+fun printSerif(co: J): Boolean = if (co.str("print_marg_font").isEmpty()) printStyle(co) in setOf("classic", "marg") else co.str("print_marg_font") != "sans"
 
 /** Splits n item rows into pages (always at least one page). */
 fun paginate(n: Int, g: Spec): List<IntRange> {
@@ -264,6 +283,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
     }
 
     fun draw(pen: Pen, ox: Float = 0f, oy: Float = 0f) {
+        pen.serif = printSerif(co)   // Settings › Printing › Typeface
         val x = ox + g.m; var y = oy + g.m; val w = g.w - 2 * g.m
         val head = if (first) g.headFirst else g.headNext
         val tableH = g.inner - head - g.foot - (if (last) g.totals else 0f)
@@ -276,6 +296,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         if (last) { pen.hLine(x, x + w, y + FRAME / 2, FRAME); y += FRAME; totals(pen, x, y, w); y += g.totals }
         pen.box(RectF(x, frameTop, x + w, y))
         footer(pen, x, y, w)
+        pen.serif = false
     }
 
     private fun firstHeader(pen: Pen, x: Float, y: Float, w: Float) {
@@ -293,17 +314,14 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         pen.vLine(x + half, y, y + g.sellerBand)
         val bx = x + half + 5; val bw = half - 10
         var by = y + 3
-        val lbl = hc(if (inv.str("doc_title") == "DEBIT NOTE") "Supplier:" else "Bill to:")
-        // the buyer stands out: "Bill to" and the party in bold, larger than the seller's details
-        val lw = pen.width(lbl, 7.5f * fs, 700)
-        val rowH = 15f * fs
-        pen.text(lbl, bx, by, lw + 1, rowH, 7.5f * fs, 700, minScale = 1f)
-        pen.text(hc(inv.str("party_name").ifEmpty { "Cash customer" }), bx + lw + 4, by, bw - lw - 4, rowH, 11.5f * fs, 700, minScale = 0.6f)
+        // Bill to as on a Marg bill: "M/s" and the party in bold, then address, state code and phone, GSTIN, PAN / FSSAI
+        val rowH = 13f * fs
+        pen.text(hc(partyTitle()), bx, by, bw, rowH, 10.5f * fs, 700, minScale = 0.6f)
         by += rowH
-        val lineH = 9.5f * fs
-        for (l in buyerLines()) {
+        val lineH = 9.2f * fs
+        for ((l, b) in buyerLines()) {
             if (by + lineH > y + g.sellerBand) break
-            pen.text(hc(l), bx, by, bw, lineH, 7.5f * fs, if (l.startsWith("GSTIN")) 700 else 600, minScale = 0.7f)
+            pen.text(hc(l), bx, by, bw, lineH, 7.5f * fs, if (b) 700 else 400, minScale = 0.65f)
             by += lineH
         }
         pen.hLine(x, x + w, y + g.sellerBand + RULE / 2)
@@ -313,14 +331,24 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
     /** Settings › Printing › "Company and Bill to in CAPITALS" */
     private fun hc(t: String) = if (co.str("print_caps_head") == "1") t.uppercase() else t
 
-    private fun buyerLines(): List<String> {
+    private fun partyTitle(): String {
+        val name = inv.str("party_name").ifEmpty { "Cash customer" }
+        if (inv.str("doc_title") == "DEBIT NOTE") return "Supplier: $name"
+        return (if (inv.str("party_name").isEmpty() || co.str("print_marg_ms") == "0") "" else "M/s ") + name
+    }
+
+    private fun buyerLines(): List<Pair<String, Boolean>> {
         if (!on("print_party")) return emptyList()   // Settings › Printing › party's address and numbers
         val mob = mutableListOf<String>()
         for (m in listOf(inv.str("party_phone")) + inv.str("party_mobiles").split(',', ';', '/')) { val t = m.trim(); if (t.isNotEmpty() && t !in mob) mob.add(t) }
         if (inv.str("party_tel").isNotEmpty()) mob.add(inv.str("party_tel"))
-        fun join(vararg parts: Pair<String, String>) = parts.filter { it.second.isNotBlank() }.joinToString("   ") { "${it.first}: ${it.second}" }
-        return listOf(inv.str("party_address"), join("GSTIN" to inv.str("party_gstin"), "State" to inv.str("party_state")), join("Phone" to mob.joinToString(", ")),
-            join("PAN" to inv.str("party_pan"), "Email" to inv.str("party_email"), "FSSAI" to inv.str("party_fssai"))).filter { it.isNotBlank() }
+        fun join(vararg parts: Pair<String, String>) = parts.filter { it.second.isNotBlank() }.joinToString("   ") { "${it.first} : ${it.second}" }
+        val out = mutableListOf<Pair<String, Boolean>>()
+        inv.str("party_address").trim().let { if (it.isNotEmpty()) out.add(it to false) }
+        join("State code" to inv.str("party_state"), "Ph.No." to mob.joinToString(", ")).let { if (it.isNotEmpty()) out.add(it to false) }
+        out.add("GSTIN : ${inv.str("party_gstin").ifEmpty { "Unregistered" }}" to true)
+        join("PAN" to inv.str("party_pan"), "FSSAI" to inv.str("party_fssai")).let { if (it.isNotEmpty()) out.add(it to false) }
+        return out.take(4)
     }
 
     private fun details(): List<Triple<String, String, Boolean>> {
@@ -396,19 +424,23 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         val lx = x + 6; var ly = y + 4
         val rowH = 8.5f * fs
         if (on("print_gst_table")) {
-            // the tax columns of the bill's supply: CGST and SGST within the state, IGST across states (never a column of zeros)
+            // HSN-wise, with the tax columns of the bill's supply: CGST, SGST and Total GST within the state, IGST across states
             val inter = inv.str("supply") == "INTER" || (inv.num("igst") > 0 && inv.num("cgst") == 0.0)
-            val heads = if (inter) listOf("GST %", "Items", "Taxable", "IGST") else listOf("GST %", "Items", "Taxable", "CGST", "SGST")
-            var cx = lx
-            for (hd in heads) { val cw = (if (hd == "Items") 32f else 50f) * g.cw; pen.text(hd, cx, ly, cw, rowH, 6.5f * fs, 700, 2); cx += cw }
+            val heads = if (inter) listOf("HSN", "GST %", "Taxable", "IGST") else listOf("HSN", "GST %", "Taxable", "CGST", "SGST", "Total GST")
+            fun cw(i: Int) = (if (i == 0) 52f else if (i == 1) 32f else 50f) * g.cw
+            fun line(v: List<String>, wt: Int) { var cx = lx; v.forEachIndexed { i, t -> pen.text(t, cx, ly, cw(i), rowH, 6.5f * fs, wt, if (i == 0) 0 else 2, minScale = 0.7f); cx += cw(i) } }
+            fun vals(r: HsnGst) = if (inter) listOf(r.hsn, Fmt.qty(r.rate), Fmt.amount(r.taxable), Fmt.amount(r.igst))
+                else listOf(r.hsn, Fmt.qty(r.rate), Fmt.amount(r.taxable), Fmt.amount(r.cgst), Fmt.amount(r.sgst), Fmt.amount(r.gst))
+            val tw = heads.indices.sumOf { cw(it).toDouble() }.toFloat()
+            line(heads, 700)
             ly += rowH + 1
-            pen.hLine(lx, cx, ly - 0.5f, 0.4f, MUTED)
-            for (s in inv.list("gst_summary")) {
-                cx = lx
-                val vals = listOf(Fmt.qty(s.num("rate")), "${s.num("rows").toInt()}", Fmt.amount(s.num("taxable"))) +
-                    if (inter) listOf(Fmt.amount(s.num("igst"))) else listOf(Fmt.amount(s.num("cgst")), Fmt.amount(s.num("sgst")))
-                vals.forEachIndexed { i, v -> val cw = (if (i == 1) 32f else 50f) * g.cw; pen.text(v, cx, ly, cw, rowH, 6.5f * fs, align = 2); cx += cw }
-                ly += rowH
+            pen.hLine(lx, lx + tw, ly - 0.5f, 0.4f, MUTED)
+            val rs = hsnGst(inv)
+            for (r in rs) { line(vals(r), 400); ly += rowH }
+            if (rs.size > 1) {
+                val tot = HsnGst("Total", 0.0, rs.sumOf { it.taxable }, rs.sumOf { it.cgst }, rs.sumOf { it.sgst }, rs.sumOf { it.igst })
+                pen.hLine(lx, lx + tw, ly, 0.4f, MUTED)
+                line(vals(tot).toMutableList().also { it[1] = "" }, 700); ly += rowH
             }
         }
         val wordsTop = y + g.totals - 4 - 8f * fs - 18f * fs
@@ -503,7 +535,7 @@ fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder
     val n = inv.list("lines").size
     val base = (if (layout.isFullPage) Spec.full else Spec.half).scaled(printScale(co))
     val marg = printStyle(co) != "classic"   // Marg, Busy and Bizom are drawn by MargSheet
-    val g = if (marg) margSpec(base, inv, co) else base.withBank(co, inv)
+    val g = if (marg) margSpec(base, inv, co) else base.copy(m = if (layout.isFullPage) 7f else 5f).withBank(co, inv)
     // one copy of one page, in the company's bill design (Settings › Printing › Bill design)
     fun sheet(pen: Pen, r: IntRange, i: Int, n2: Int, label: String, oy: Float = 0f) {
         val c = if (co.str("print_copy_label") == "0") "" else label   // Settings › Printing › ORIGINAL / DUPLICATE on each copy
@@ -529,16 +561,16 @@ fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder
 fun debitNotePdf(d: J, co: J, layout: PrintLayout): PdfBuilder {
     val raw = org.json.JSONObject(d.o.toString())
     raw.put("lines", d.o.optJSONArray("print_lines") ?: org.json.JSONArray())
-    return invoicePdf(J(raw), co, layout, topOfA4 = true)
+    return invoicePdf(J(raw), co, layout)
 }
 
-/** A receipt or payment voucher: one copy per A4 page, each at the top of the page. */
+/** A receipt or payment voucher: one copy per A5 sheet. */
 fun voucherPdf(v: J): PdfBuilder {
     val b = PdfBuilder()
     val g = Spec.half
     val co = v.obj("company"); val party = v.obj("party")
     val received = v.str("direction") == "RECEIVED"
-    for (copy in copyLabels) b.page(g.w, g.h * 2) { pen ->
+    for (copy in copyLabels) b.page(g.w, g.h) { pen ->
         val x = g.m; val w = g.w - 2 * g.m; var y = g.m
         val top = y
         val cw = pen.width(copy, 7f, 700) + 8

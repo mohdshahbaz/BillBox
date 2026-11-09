@@ -141,7 +141,7 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
     private var accent: Color { margInk(co).0 }
     private var band: Color { margInk(co).1 }
     /// Marg prints in a serif; Busy and Bizom in modern letters, until one is chosen
-    private var serif: Bool { co.str("print_marg_font").isEmpty ? printStyle(co) == "marg" : co.str("print_marg_font") != "sans" }
+    private var serif: Bool { printSerif(co) }
     private var isNote: Bool { inv.str("doc_title") == "DEBIT NOTE" }
     /// "marg", "busy" or "bizom"
     private var style: String { printStyle(co) }

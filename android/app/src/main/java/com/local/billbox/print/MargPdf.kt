@@ -118,7 +118,7 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
     private val L = 0.8f
 
     fun draw(pen: Pen, ox: Float = 0f, oy: Float = 0f) {
-        pen.serif = if (co.str("print_marg_font").isEmpty()) style == "marg" else co.str("print_marg_font") != "sans"
+        pen.serif = printSerif(co)
         val x = ox + g.m; var y = oy + g.m; val w = g.w - 2 * g.m
         val head = if (first) g.headFirst else g.headNext
         val tableH = g.inner - head - g.foot - (if (last) g.totals else 0f)

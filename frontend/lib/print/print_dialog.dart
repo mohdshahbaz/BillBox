@@ -74,7 +74,8 @@ Future<List<Printer>> _printers() async {
 }
 
 // Every layout is now built on A4 pages (half-sheet copies sit at the top of the page).
-PdfPageFormat _formatFor(PrintLayout l) => Geo.a4Format;
+/// Half sheets print on A5 paper, the bill landscape across it; the A4 two-up layout on A4.
+PdfPageFormat _formatFor(PrintLayout l) => l == PrintLayout.a4TwoUp ? Geo.a4Format : Geo.halfFormat;
 
 Future<void> _send(PrintJob job, Printer printer, PrintLayout layout) async {
   try {

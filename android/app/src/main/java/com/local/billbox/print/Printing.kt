@@ -82,7 +82,7 @@ object Printing {
 
     suspend fun invoice(id: Int, app: AppState, forcePreview: Boolean = false) = app.guarded {
         val inv = Api.get("/invoices/$id")
-        val b = withContext(Dispatchers.Default) { invoicePdf(inv, app.settings, PrintLayout.parse(app.setting("print_layout")), topOfA4 = true) }
+        val b = withContext(Dispatchers.Default) { invoicePdf(inv, app.settings, PrintLayout.parse(app.setting("print_layout"))) }
         show(app, "Invoice ${inv.str("invoice_no")}", "${safe(inv.str("invoice_no"))}.pdf", b, listOf(id), forcePreview)
     }
 
@@ -93,7 +93,7 @@ object Printing {
         app.guarded {
             val layout = PrintLayout.parse(app.setting("print_layout"))
             val b = PdfBuilder(); val nos = mutableListOf<String>()
-            for (id in ids) { val inv = Api.get("/invoices/$id"); withContext(Dispatchers.Default) { invoicePdf(inv, app.settings, layout, b, topOfA4 = true) }; nos.add(inv.str("invoice_no")) }
+            for (id in ids) { val inv = Api.get("/invoices/$id"); withContext(Dispatchers.Default) { invoicePdf(inv, app.settings, layout, b) }; nos.add(inv.str("invoice_no")) }
             if (b.pageCount == 0) throw Exception("Could not prepare the bills for printing")
             show(app, "${nos.size} bills (${nos.first()} … ${nos.last()})", "Bills-${nos.size}.pdf", b, ids, true)
         }

@@ -9,9 +9,9 @@ enum PrintLayout: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .halfSheets: return "Half sheets: Original on one A4 page, Duplicate on the next, each at the top of the page"
+        case .halfSheets: return "Half sheets (A5): Original on one A5 sheet, Duplicate on the next"
         case .a4TwoUp: return "A4 sheet: Original on top, Duplicate below"
-        case .single: return "Half sheet: Original copy only, at the top of an A4 page"
+        case .single: return "Half sheet (A5): Original copy only"
         case .a4Full: return "Full A4 page: Original + Duplicate, one copy per page"
         case .a4FullOriginal: return "Full A4 page: Original copy only"
         }
@@ -91,6 +91,12 @@ struct Spec {
                     strip: strip, sellerBand: sellerBand, buyerBand: buyerBand, headNext: headNext, fs: fs, cw: cw)
     }
 
+    /// The same page with another white margin all round (the BillBox design keeps it small, so more of the sheet is bill).
+    func withMargin(_ nm: CGFloat) -> Spec {
+        Spec(w: w, h: h, m: nm, rowH: rowH, tableHead: tableHead, foot: foot, totals: totals,
+             strip: strip, sellerBand: sellerBand, buyerBand: buyerBand, headNext: headNext, fs: fs, cw: cw)
+    }
+
     func withBankBlock(_ co: JSON) -> Spec {
         let rows = bankRows(co)
         guard !rows.isEmpty else { return self }
@@ -158,7 +164,7 @@ func bankTabHeight(_ co: JSON, _ fs: CGFloat) -> CGFloat { let n = bankTabRows(c
 func leftTop(_ co: JSON, _ inv: JSON, _ f: CGFloat) -> CGFloat {
     func on(_ k: String) -> Bool { co.str(k).isEmpty || co.str(k) != "0" }
     var left: CGFloat = 8
-    if on("print_gst_table") { left += CGFloat(max(1, inv.list("gst_summary").count) + 1) * 8.6 * f + 3 }
+    if on("print_gst_table") { let n = hsnGst(inv).count; left += CGFloat(max(1, n) + 1 + (n > 1 ? 1 : 0)) * 8.6 * f + 3 }
     if co.str("print_balance") == "1" && inv.has("party_prev_balance") { left += 9 * f }
     return left
 }
@@ -183,6 +189,28 @@ func bankRows(_ co: JSON) -> [(String, String)] {
         let v = co.str(f.key).trimmingCharacters(in: .whitespacesAndNewlines)
         return v.isEmpty ? nil : (f.label, v)
     }
+}
+
+/// One row of the HSN-wise GST summary: an HSN code at one GST rate, its taxable value and tax.
+struct HsnGst { let hsn: String; let rate, taxable, cgst, sgst, igst: Double; var gst: Double { cgst + sgst + igst } }
+
+/// The bill's items grouped by HSN and GST rate, in the order they first appear.
+func hsnGst(_ inv: JSON) -> [HsnGst] {
+    var keys: [String] = []
+    var acc: [String: (String, Double, Double, Double, Double, Double)] = [:]
+    for l in inv.list("lines") {
+        let h = l.str("hsn").trimmingCharacters(in: .whitespaces)
+        let k = "\(h)|\(Fmt.amount(l.num("gst_rate")))"
+        if acc[k] == nil { keys.append(k); acc[k] = (h, l.num("gst_rate"), 0, 0, 0, 0) }
+        acc[k]!.2 += l.num("taxable"); acc[k]!.3 += l.num("cgst"); acc[k]!.4 += l.num("sgst"); acc[k]!.5 += l.num("igst")
+    }
+    return keys.map { k in let a = acc[k]!; return HsnGst(hsn: a.0.isEmpty ? "-" : a.0, rate: a.1, taxable: a.2, cgst: a.3, sgst: a.4, igst: a.5) }
+}
+
+/// Settings › Printing › Typeface: the classic serif (like Marg) or modern letters. The BillBox and Marg designs print in the
+/// serif until another is chosen; Busy and Bizom in modern letters.
+func printSerif(_ co: JSON) -> Bool {
+    co.str("print_marg_font").isEmpty ? ["classic", "marg"].contains(printStyle(co)) : co.str("print_marg_font") != "sans"
 }
 
 /// Splits n item rows into pages (row index ranges, always at least one page).
@@ -215,12 +243,12 @@ private let shade = Color.black.opacity(0.09)
 private let widths: [CGFloat?] = [18, nil, 42, 82, 32, 40, 28, 48, 26, 54]
 private let headings = ["#", "Description of goods", "HSN", "Qty (box / pcs)", "MRP", "Rate", "Disc %", "Taxable", "GST %", "Amount"]
 
-private func cell(_ t: String, _ i: Int, _ g: Spec, bold: Bool = false) -> some View {
+private func cell(_ t: String, _ i: Int, _ g: Spec, bold: Bool = false, serif: Bool = false) -> some View {
     let right = [3, 4, 5, 6, 7, 8, 9].contains(i)
     let center = i == 0
     let align: Alignment = center ? .center : (right ? .trailing : .leading)
     let w = widths[i].map { $0 * g.cw }
-    return Text(t).font(.system(size: 7 * g.fs, weight: bold ? .semibold : .regular)).lineLimit(1).minimumScaleFactor(0.75)
+    return Text(t).font(.system(size: 7 * g.fs, weight: bold ? .semibold : .regular, design: serif ? .serif : .default)).lineLimit(1).minimumScaleFactor(0.75)
         .padding(.horizontal, 3)
         .frame(width: w, alignment: align)
         .frame(maxWidth: w == nil ? .infinity : nil, alignment: align)
@@ -238,9 +266,9 @@ func printedColumns(_ co: JSON) -> [Int] {
 }
 
 /// One table row. `height` nil = fill the remaining height (the empty part of the table, so the column lines run to the bottom).
-private func rowView(_ v: [String], _ g: Spec, height: CGFloat?, bold: Bool = false, cols: [Int] = Array(0..<10)) -> some View {
+private func rowView(_ v: [String], _ g: Spec, height: CGFloat?, bold: Bool = false, cols: [Int] = Array(0..<10), serif: Bool = false) -> some View {
     HStack(spacing: 0) {
-        ForEach(cols, id: \.self) { i in cell(v[i], i, g, bold: bold) }
+        ForEach(cols, id: \.self) { i in cell(v[i], i, g, bold: bold, serif: serif) }
     }
     .frame(height: height)
     .frame(maxHeight: height == nil ? .infinity : nil)
@@ -285,8 +313,10 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
     private func hc(_ s: String) -> String { co.str("print_caps_head") == "1" ? s.uppercased() : s }
     private var tableHeight: CGFloat { g.inner - (first ? g.headFirst : g.headNext) - g.foot - (last ? g.totals : 0) }
 
+    /// Settings › Printing › Typeface (classic serif like Marg unless Modern is chosen)
+    private var serif: Bool { printSerif(co) }
     private func t(_ s: String, _ size: CGFloat = 7, bold: Bool = false, weight: Font.Weight? = nil) -> Text {
-        Text(s).font(.system(size: size * g.fs, weight: weight ?? (bold ? .bold : .regular)))
+        Text(s).font(.system(size: size * g.fs, weight: weight ?? (bold ? .bold : .regular), design: serif ? .serif : .default))
     }
 
     var body: some View {
@@ -299,16 +329,16 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             hRule(frameLine)
             // the item table: shaded heading row, light rule under every item, column lines down to the bottom
             VStack(spacing: 0) {
-                rowView(headingsFor, g, height: g.tableHead, bold: true, cols: cols).background(shade)
+                rowView(headingsFor, g, height: g.tableHead, bold: true, cols: cols, serif: serif).background(shade)
                 ForEach(Array(rows), id: \.self) { i in
                     let l = lines[i]
                     rowView(["\(i + 1)", Fmt.cut(co.str("print_caps") == "1" ? l.str("item_name").uppercased() : l.str("item_name"), g.fs > 1 ? 52 : 56), l.str("hsn"),
                              qtyText(l, pieces: co.str("print_qty") == "pcs"),
                              l.num("mrp") > 0 ? Fmt.qty(l.num("mrp")) : "", Fmt.amount(l.num("rate")),
                              l.num("disc_pct") > 0 ? Fmt.qty(l.num("disc_pct")) : "", Fmt.amount(l.num("taxable")),
-                             Fmt.qty(l.num("gst_rate")), Fmt.amount(l.num("amount"))], g, height: g.rowH, cols: cols)
+                             Fmt.qty(l.num("gst_rate")), Fmt.amount(l.num("amount"))], g, height: g.rowH, cols: cols, serif: serif)
                 }
-                rowView(Array(repeating: "", count: 10), g, height: nil, cols: cols)
+                rowView(Array(repeating: "", count: 10), g, height: nil, cols: cols, serif: serif)
             }
             .frame(width: W, height: tableHeight, alignment: .top)
             .overlay(gridLines(rowCount: rows.count))
@@ -344,14 +374,11 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             .padding(.horizontal, 5).padding(.vertical, 3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             vRule()
-            VStack(alignment: .leading, spacing: 1) {
-                // the buyer stands out: "Bill to" and the party in bold, larger than the seller's details
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    t(hc(inv.str("doc_title") == "DEBIT NOTE" ? "Supplier:" : "Bill to:"), 7.5, bold: true)
-                    t(hc(inv.str("party_name").isEmpty ? "Cash customer" : inv.str("party_name")), 11.5, bold: true).lineLimit(1).minimumScaleFactor(0.6)
-                }
+            VStack(alignment: .leading, spacing: 0.5) {
+                // Bill to as on a Marg bill: "M/s" and the party in bold, then address, state code and phone, GSTIN, PAN / FSSAI
+                t(hc(partyTitle), 10.5, bold: true).lineLimit(1).minimumScaleFactor(0.6)
                 ForEach(Array(buyerLines.enumerated()), id: \.offset) { _, l in
-                    t(hc(l), 7.5, weight: l.hasPrefix("GSTIN") ? .bold : .semibold).lineLimit(1).minimumScaleFactor(0.7)
+                    t(hc(l.0), 7.5, weight: l.1 ? .bold : .regular).lineLimit(1).minimumScaleFactor(0.65)
                 }
             }
             .padding(.horizontal, 5).padding(.vertical, 3)
@@ -361,8 +388,15 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
         .clipped()
     }
 
-    /// Buyer details under the name, at most four short lines; empty details are left out.
-    private var buyerLines: [String] {
+    /// "M/s Party" (Settings › Printing › “M/s” before the party's name), or "Supplier: …" on a debit note.
+    private var partyTitle: String {
+        let name = inv.str("party_name").isEmpty ? "Cash customer" : inv.str("party_name")
+        if inv.str("doc_title") == "DEBIT NOTE" { return "Supplier: " + name }
+        return (inv.str("party_name").isEmpty || co.str("print_marg_ms") == "0" ? "" : "M/s ") + name
+    }
+
+    /// Buyer details under the name as on a Marg bill, at most four lines: (text, bold); empty details are left out.
+    private var buyerLines: [(String, Bool)] {
         if !on("print_party") { return [] }   // Settings › Printing › party's address and numbers
         var mob: [String] = []
         for m in ([inv.str("party_phone")] + inv.str("party_mobiles").split(whereSeparator: { ",;/".contains($0) }).map(String.init)) {
@@ -371,14 +405,17 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
         }
         if !inv.str("party_tel").isEmpty { mob.append(inv.str("party_tel")) }
         func join(_ parts: [(String, String)]) -> String {
-            parts.filter { !$0.1.trimmingCharacters(in: .whitespaces).isEmpty }.map { "\($0.0): \($0.1)" }.joined(separator: "   ")
+            parts.filter { !$0.1.trimmingCharacters(in: .whitespaces).isEmpty }.map { "\($0.0) : \($0.1)" }.joined(separator: "   ")
         }
-        return [
-            inv.str("party_address"),
-            join([("GSTIN", inv.str("party_gstin")), ("State", inv.str("party_state"))]),
-            join([("Phone", mob.joined(separator: ", "))]),
-            join([("PAN", inv.str("party_pan")), ("Email", inv.str("party_email")), ("FSSAI", inv.str("party_fssai"))]),
-        ].filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        var out: [(String, Bool)] = []
+        let addr = inv.str("party_address").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !addr.isEmpty { out.append((addr, false)) }
+        let sp = join([("State code", inv.str("party_state")), ("Ph.No.", mob.joined(separator: ", "))])
+        if !sp.isEmpty { out.append((sp, false)) }
+        out.append(("GSTIN : \(inv.str("party_gstin").isEmpty ? "Unregistered" : inv.str("party_gstin"))", true))
+        let more = join([("PAN", inv.str("party_pan")), ("FSSAI", inv.str("party_fssai"))])
+        if !more.isEmpty { out.append((more, false)) }
+        return Array(out.prefix(4))
     }
 
     /// One shaded line: title, number, date, salesman, payment (or a debit note's reference), and which copy it is.
@@ -546,31 +583,34 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
         }
     }
 
-    /// Rate-wise GST: one row per GST rate on the bill, with the tax columns of its supply: CGST and SGST within the state,
-    /// IGST across states (never a column of zeros).
+    /// HSN-wise GST: one row per HSN code and rate, with the tax columns of its supply: CGST, SGST and Total GST within the
+    /// state, IGST across states (never a column of zeros), then a total line.
     private var gstTable: some View {
             let inter = inv.str("supply") == "INTER" || (inv.num("igst") > 0 && inv.num("cgst") == 0)
-            let heads = inter ? ["GST %", "Items", "Taxable", "IGST"] : ["GST %", "Items", "Taxable", "CGST", "SGST"]
+            let heads = inter ? ["HSN", "GST %", "Taxable", "IGST"] : ["HSN", "GST %", "Taxable", "CGST", "SGST", "Total GST"]
+            let rows = hsnGst(inv)
+            func w(_ h: String) -> CGFloat { (h == "HSN" ? 52 : h == "GST %" ? 32 : 50) * g.cw }
+            func vals(_ r: HsnGst) -> [String] {
+                inter ? [r.hsn, Fmt.qty(r.rate), Fmt.amount(r.taxable), Fmt.amount(r.igst)]
+                      : [r.hsn, Fmt.qty(r.rate), Fmt.amount(r.taxable), Fmt.amount(r.cgst), Fmt.amount(r.sgst), Fmt.amount(r.gst)]
+            }
+            func line(_ v: [String], bold: Bool) -> AnyView {
+                AnyView(HStack(spacing: 0) {
+                    ForEach(Array(heads.enumerated()), id: \.offset) { i, h in
+                        t(v[i], 6.5, bold: bold).lineLimit(1).minimumScaleFactor(0.7).frame(width: w(h), alignment: i == 0 ? .leading : .trailing)
+                    }
+                })
+            }
+            let tot = HsnGst(hsn: "Total", rate: 0, taxable: rows.reduce(0) { $0 + $1.taxable }, cgst: rows.reduce(0) { $0 + $1.cgst },
+                             sgst: rows.reduce(0) { $0 + $1.sgst }, igst: rows.reduce(0) { $0 + $1.igst })
+            let tv = vals(tot).enumerated().map { $0.offset == 1 ? "" : $0.element }
             return VStack(alignment: .leading, spacing: 1.5) {
-                HStack(spacing: 0) {
-                    ForEach(heads, id: \.self) { h in
-                        t(h, 6.5, bold: true).frame(width: (h == "Items" ? 32 : 50) * g.cw, alignment: .trailing)
-                    }
-                }
-                .padding(.bottom, 1)
-                .overlay(alignment: .bottom) { Rectangle().fill(muted).frame(height: 0.4) }
-                ForEach(inv.list("gst_summary")) { s in
-                    HStack(spacing: 0) {
-                        t(Fmt.qty(s.num("rate")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
-                        t("\(Int(s.num("rows")))", 6.5).frame(width: 32 * g.cw, alignment: .trailing)
-                        t(Fmt.amount(s.num("taxable")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
-                        if inter {
-                            t(Fmt.amount(s.num("igst")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
-                        } else {
-                            t(Fmt.amount(s.num("cgst")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
-                            t(Fmt.amount(s.num("sgst")), 6.5).frame(width: 50 * g.cw, alignment: .trailing)
-                        }
-                    }
+                line(heads, bold: true)
+                    .padding(.bottom, 1)
+                    .overlay(alignment: .bottom) { Rectangle().fill(muted).frame(height: 0.4) }
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, r in line(vals(r), bold: false) }
+                if rows.count > 1 {
+                    line(tv, bold: true).overlay(alignment: .top) { Rectangle().fill(muted).frame(height: 0.4) }
                 }
             }
     }
@@ -636,7 +676,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
                 // the bank details, in three short lines in the footer: no room is taken from the items
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(bank.enumerated()), id: \.offset) { _, l in
-                        bankLineText(l, size: 6.3 * g.fs).lineLimit(1).minimumScaleFactor(0.65)
+                        bankLineText(l, size: 6.3 * g.fs, serif: serif).lineLimit(1).minimumScaleFactor(0.65)
                     }
                     if pages > 1 { t("Page \(page + 1) of \(pages)", 6).foregroundStyle(muted) }
                 }
@@ -702,7 +742,7 @@ func renderPDF(pages: [AnyView], size: CGSize) -> PDFDocument? {
 /// The page measurements for the company's bill design (Settings › Printing › Bill design) and text size.
 func billSpec(_ inv: JSON, _ co: JSON, full: Bool) -> Spec {
     let base = (full ? Spec.full : Spec.half).scaled(printScale(co))
-    return printStyle(co) != "classic" ? margSpec(base, inv, co) : base.withBank(co, inv)
+    return printStyle(co) != "classic" ? margSpec(base, inv, co) : base.withMargin(full ? 7 : 5).withBank(co, inv)
 }
 
 /// One copy of one page of a bill, in the company's bill design.
@@ -821,7 +861,7 @@ func printInvoices(_ ids: [Int], app: AppModel) async {
         var nos: [String] = []
         for id in ids {
             let inv = try await API.obj("GET", "/invoices/\(id)")
-            guard let pdf = invoicePDF(inv, company: app.settings, layout: layout, topOfA4: true) else { continue }
+            guard let pdf = invoicePDF(inv, company: app.settings, layout: layout, topOfA4: false) else { continue }
             for k in 0..<pdf.pageCount { if let pg = pdf.page(at: k) { all.insert(pg, at: all.pageCount) } }
             nos.append(inv.str("invoice_no"))
         }
@@ -922,7 +962,7 @@ func printInvoice(_ id: Int, app: AppModel, forcePreview: Bool = false) async {
     await app.guarded {
         let inv = try await API.obj("GET", "/invoices/\(id)")
         let layout = PrintLayout.parse(app.settings.str("print_layout"))
-        guard let pdf = invoicePDF(inv, company: app.settings, layout: layout, topOfA4: true) else { throw APIError(message: "Could not prepare the invoice for printing", status: 0, code: nil) }
+        guard let pdf = invoicePDF(inv, company: app.settings, layout: layout, topOfA4: false) else { throw APIError(message: "Could not prepare the invoice for printing", status: 0, code: nil) }
         if DevicePrinter.auto && !forcePreview && DevicePrinter.url != nil {
             let no = inv.str("invoice_no")
             runPrint(pdf, jobName: no, silent: true) { ok in
@@ -939,7 +979,7 @@ func printInvoice(_ id: Int, app: AppModel, forcePreview: Bool = false) async {
 func debitNotePDF(_ d: JSON, company: JSON, layout: PrintLayout) -> PDFDocument? {
     var raw = d.raw
     raw["lines"] = d.raw["print_lines"] ?? [Any]()
-    return invoicePDF(JSON(raw), company: company, layout: layout, topOfA4: true)
+    return invoicePDF(JSON(raw), company: company, layout: layout, topOfA4: false)
 }
 
 @MainActor
@@ -957,8 +997,8 @@ func printDebitNote(_ id: Int, app: AppModel) async {
 func printVoucher(_ no: String, app: AppModel) async {
     await app.guarded {
         let v = try await API.obj("GET", "/vouchers/\(API.seg(no))")
-        let pages = copyLabels.map { topOfA4Page(AnyView(VoucherSheetView(v: v, copy: $0))) }
-        guard let pdf = renderPDF(pages: pages, size: CGSize(width: Spec.half.w, height: Spec.half.h * 2)) else { return }
+        let pages = copyLabels.map { AnyView(VoucherSheetView(v: v, copy: $0)) }
+        guard let pdf = renderPDF(pages: pages, size: Spec.half.size) else { return }
         app.printJob = PrintJob(title: "Receipt \(no)", fileName: "\(no).pdf", document: pdf)
     }
 }
