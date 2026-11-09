@@ -69,20 +69,14 @@ jobs:
   mac:
     runs-on: macos-latest
     timeout-minutes: 60
-    # one app per kind of Mac (half the size of a universal app, which carried two copies of Node and of BillBox)
-    strategy:
-      matrix:
-        include:
-          - arch: arm64
-            label: arm64
-          - arch: x64
-            label: intel
+    # one app for Apple silicon and Intel Macs: per-kind apps made older BillBox updaters (which take the first Mac zip) install
+    # the Apple silicon app on Intel Macs, where macOS 12 refused to open it
     steps:
       - uses: actions/checkout@v5
-      - name: Build BillBox.app (${{ matrix.label }})
+      - name: Build BillBox.app (Apple silicon and Intel)
         working-directory: macos
         env:
-          ARCH: ${{ matrix.arch }}
+          ARCH: universal
           EDITION: ${{ inputs.edition }}
           VERSION: ${{ inputs.version }}
           BUILD_NUMBER: ${{ inputs.code }}
@@ -94,11 +88,11 @@ jobs:
             grep -E "error:|Error:" build.log | sort -u | head -20 | sed 's/^/::error::/'
             exit 1; }
           mkdir -p ../dist
-          OUT=../dist/BillBox-mac-${{ inputs.version }}-${{ matrix.label }}.dmg ./build_dmg.sh
-          ditto -c -k --sequesterRsrc --keepParent BillBox.app ../dist/BillBox-mac-${{ inputs.version }}-${{ matrix.label }}.zip
+          OUT=../dist/BillBox-mac-${{ inputs.version }}.dmg ./build_dmg.sh
+          ditto -c -k --sequesterRsrc --keepParent BillBox.app ../dist/BillBox-mac-${{ inputs.version }}.zip
       - uses: actions/upload-artifact@v6
         with:
-          name: mac-${{ matrix.label }}-${{ inputs.version }}
+          name: mac-${{ inputs.version }}
           path: |
             dist/*.dmg
             dist/*.zip
@@ -152,7 +146,7 @@ jobs:
 
           **Android (12 and newer)** — download \`BillBox-android-$V.apk\` on the phone and open it (allow "Install unknown apps" for your browser or Files app once). It updates an earlier BillBox from these releases and keeps its books.
 
-          **Mac** — download \`BillBox-mac-$V-arm64.dmg\` for an Apple silicon Mac (M1 and newer) or \`BillBox-mac-$V-intel.dmg\` for an Intel Mac, open it and drag **BillBox** onto Applications (the \`.zip\` files are the same apps). The first time: right-click › Open (on macOS 15: System Settings › Privacy & Security › Open Anyway). If macOS says it is damaged, run \`xattr -dr com.apple.quarantine /Applications/BillBox.app\` in Terminal once. Your books stay in ~/Library/Application Support/DistributorPro.
+          **Mac (macOS 12 Monterey and newer, Apple silicon and Intel)** — download \`BillBox-mac-$V.dmg\`, open it and drag **BillBox** onto Applications (\`BillBox-mac-$V.zip\` is the same app as a zip). The first time: right-click › Open (on macOS 15: System Settings › Privacy & Security › Open Anyway). If macOS says it is damaged, run \`xattr -dr com.apple.quarantine /Applications/BillBox.app\` in Terminal once. Your books stay in ~/Library/Application Support/DistributorPro.
 
           **Windows 10 / 11** — download \`BillBox-windows-$V-setup.exe\` and run it (if SmartScreen warns: More info › Run anyway). \`BillBox-windows-$V-x64.zip\` is the same app without an installer. Your books stay in %APPDATA%\\BillBox.
 

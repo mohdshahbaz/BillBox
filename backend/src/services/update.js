@@ -9,9 +9,8 @@ const { HttpError } = require('../utils/misc');
 const REPO = process.env.BILLBOX_REPO || 'mohdshahbaz/BillBox';
 const API = process.env.BILLBOX_RELEASES_API || `https://api.github.com/repos/${REPO}/releases?per_page=30`;
 const FILES = {
-  // Mac: one zip per kind of Mac; older apps ask for "mac" and get the Intel one (it also runs on Apple silicon)
-  android: /^BillBox-android-.*\.apk$/, mac: /^BillBox-mac-(?!.*-arm64\.zip$).*\.zip$/, 'mac-intel': /^BillBox-mac-(?!.*-arm64\.zip$).*\.zip$/,
-  'mac-arm64': /^BillBox-mac-.*-arm64\.zip$/, windows: /^BillBox-windows-.*-setup\.exe$/,
+  // Mac: one zip for Apple silicon and Intel (never a single-kind zip, which an Intel Mac cannot open)
+  android: /^BillBox-android-.*\.apk$/, mac: /^BillBox-mac-(?!.*-(arm64|intel)\.zip$).*\.zip$/, windows: /^BillBox-windows-.*-setup\.exe$/,
   linux: /^BillBox-linux-.*\.deb$/, 'linux-tar': /^BillBox-linux-.*\.tar\.gz$/, iphone: /^BillBox-iphone-.*\.ipa$/,
 };
 
