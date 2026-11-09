@@ -163,7 +163,10 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
         Text(s).font(.system(size: size * g.fs, weight: weight ?? (bold ? .bold : .regular), design: serif ? .serif : .default))
     }
     private func hLine(_ w: CGFloat = 0.8) -> some View { Rectangle().fill(Color.black).frame(height: w) }
-    private func vLine(_ w: CGFloat = 0.8) -> some View { Rectangle().fill(Color.black).frame(width: w) }
+    private func vLine(_ w: CGFloat = 0.8) -> some View {
+        // explicit height: a bare Rectangle in a row printed as a short tick or not at all on macOS 12
+        GeometryReader { p in Rectangle().fill(Color.black).frame(width: w, height: p.size.height) }.frame(width: w)
+    }
 
     var body: some View {
         VStack(spacing: 0) {

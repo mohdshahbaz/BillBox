@@ -283,7 +283,11 @@ private func qtyText(_ l: JSON, pieces: Bool = false) -> String {
 }
 
 private func hRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink).frame(height: w) }
-private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink).frame(width: w) }
+/// A vertical divider the full height of its row. Given its height explicitly: on macOS 12 (bitmap printing) a bare Rectangle
+/// in a row came out as a short tick or not at all.
+private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
+    GeometryReader { p in Rectangle().fill(color).frame(width: w, height: p.size.height) }.frame(width: w)
+}
 
 /// One copy of a bill (or debit note) on one page: everything inside a single ruled frame —
 /// title strip, seller and bill details, Bill to, item table, tax summary and totals — with terms and signature below it.
@@ -564,7 +568,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             }
         }
         .padding(.leading, 6)
-        .overlay(alignment: .leading) { Rectangle().fill(muted).frame(width: 0.5) }
+        .overlay(alignment: .leading) { vRule(0.5, color: muted) }
     }
 
     /// Bank details, one per line with the labels lined up (BANK NAME:, ACCOUNT NUMBER: …).
@@ -972,38 +976,43 @@ func printVoucher(_ no: String, app: AppModel) async {
 /// The paper follows the layout: A5 / half-A4 sheets for the half-sheet layouts, A4 for the rest.
 @MainActor
 @discardableResult
+/// The half-sheet pages for the printer: each A5-landscape bill upright at the top edge of a portrait A4 page, at its real size.
+/// An HP LaserJet 1020 (and most office laser printers) is fed the A5 sheet sideways, long edge first, and prints it as the top
+/// part of an A4 page: a bill turned onto portrait A5 came out enlarged and cut off at the HSN column.
+func halfSheetsOnA4(_ pdf: PDFDocument) -> PDFDocument? {
+    let data = NSMutableData()
+    var box = CGRect(origin: .zero, size: Paper.a4)
+    guard let consumer = CGDataConsumer(data: data as CFMutableData), let ctx = CGContext(consumer: consumer, mediaBox: &box, nil) else { return nil }
+    for i in 0..<pdf.pageCount {
+        guard let page = pdf.page(at: i) else { continue }
+        let b = page.bounds(for: .mediaBox)
+        ctx.beginPDFPage(nil)
+        ctx.saveGState()
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.fill(box)
+        // PDF y goes up: the bill's top edge on the page's top edge, centred across the width
+        ctx.translateBy(x: (Paper.a4.width - b.width) / 2 - b.minX, y: Paper.a4.height - b.height - b.minY)
+        page.draw(with: .mediaBox, to: ctx)
+        ctx.restoreGState()
+        ctx.endPDFPage()
+    }
+    ctx.closePDF()
+    return PDFDocument(data: data as Data)
+}
+
 func runPrint(_ pdf: PDFDocument, printer: String, silent: Bool) -> Bool {
     let info = (NSPrintInfo.shared.copy() as? NSPrintInfo) ?? NSPrintInfo()
     if !printer.isEmpty, let p = NSPrinter(name: printer) { info.printer = p }
     info.topMargin = 0; info.bottomMargin = 0; info.leftMargin = 0; info.rightMargin = 0
-    // Half-sheet bills go out on A5 paper, one copy per sheet, the bill kept landscape across the sheet; the A4 layouts on A4, portrait.
-    // The page carries its own white margin; it is fitted to the printable area so nothing is cut off at the edges.
+    // Everything goes out as portrait A4, never turned: a half-sheet bill sits upright at the top of the page, where the A5 sheet
+    // fed sideways (long edge first) catches it whole.
     var doc = pdf
-    let size = pdf.page(at: 0)?.bounds(for: .mediaBox).size ?? Paper.a4
-    if size.width > size.height {
-        // A landscape half sheet goes on portrait A5 with the page already turned a quarter (clockwise, as on Android), so the
-        // whole bill lands on the sheet. Leaving the turn to autoRotate printed it upright on some Macs/printers and cut off the
-        // right half of the bill (HSN onwards, Bill to, totals).
-        if let data = pdf.dataRepresentation(), let copy = PDFDocument(data: data) {
-            for i in 0..<copy.pageCount {
-                if let pg = copy.page(at: i) {
-                    let b = pg.bounds(for: .mediaBox).size
-                    if b.width > b.height { pg.rotation = (pg.rotation + 90) % 360 }
-                }
-            }
-            doc = copy
-        }
-        info.paperSize = Paper.a5
-        info.orientation = .portrait
-    } else {
-        info.paperSize = Paper.a4
-        info.orientation = .portrait
-    }
-    info.horizontalPagination = .fit
-    info.verticalPagination = .fit
+    if let size = pdf.page(at: 0)?.bounds(for: .mediaBox).size, size.width > size.height, let top = halfSheetsOnA4(pdf) { doc = top }
+    info.paperSize = Paper.a4
+    info.orientation = .portrait
     info.isHorizontallyCentered = true
-    info.isVerticallyCentered = true
-    guard let op = doc.printOperation(for: info, scalingMode: .pageScaleToFit, autoRotate: false) else { return false }
+    info.isVerticallyCentered = false
+    guard let op = doc.printOperation(for: info, scalingMode: .pageScaleDownToFit, autoRotate: false) else { return false }
     op.showsPrintPanel = !silent
     op.showsProgressPanel = !silent
     return op.run()

@@ -6,9 +6,9 @@
 /// "continued" header, and the totals block goes only on the last sheet of each copy.
 ///
 /// Layouts:
-///   halfSheets : ORIGINAL pages, then DUPLICATE pages, each copy on its own A5 sheet (landscape)
+///   halfSheets : ORIGINAL pages, then DUPLICATE pages, each copy upright at the top of its own A4 page (an A5 sheet fed sideways)
 ///   a4TwoUp    : A4 sheets, ORIGINAL in the top half, DUPLICATE in the bottom half (same page number), cut line between
-///   single     : ORIGINAL only, on an A5 sheet
+///   single     : ORIGINAL only, at the top of an A4 page (an A5 sheet fed sideways)
 import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -454,7 +454,7 @@ Future<Uint8List> buildInvoicePdf(Json inv, Json co, PrintLayout layout) async {
     final copies = layout == PrintLayout.single ? [copyLabels[0]] : copyLabels;
     for (final copy in copies) {
       for (var p = 0; p < pages.length; p++) {
-        doc.addPage(pw.Page(pageFormat: Geo.halfFormat, margin: pw.EdgeInsets.zero, build: (_) => sheet(copy, p)));
+        doc.addPage(a4TopPage(sheet(copy, p)));
       }
     }
   }

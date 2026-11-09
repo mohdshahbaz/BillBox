@@ -74,8 +74,9 @@ Future<List<Printer>> _printers() async {
 }
 
 // Every layout is now built on A4 pages (half-sheet copies sit at the top of the page).
-/// Half sheets print on A5 paper, the bill landscape across it; the A4 two-up layout on A4.
-PdfPageFormat _formatFor(PrintLayout l) => l == PrintLayout.a4TwoUp ? Geo.a4Format : Geo.halfFormat;
+/// Always portrait A4: a half sheet sits upright at the top of the page, where the A5 sheet fed sideways (long edge first, as on
+/// an HP LaserJet 1020) catches it whole.
+PdfPageFormat _formatFor(PrintLayout l) => Geo.a4Format;
 
 Future<void> _send(PrintJob job, Printer printer, PrintLayout layout) async {
   try {

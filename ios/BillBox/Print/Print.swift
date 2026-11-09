@@ -283,7 +283,11 @@ private func qtyText(_ l: JSON, pieces: Bool = false) -> String {
 }
 
 private func hRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink).frame(height: w) }
-private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink).frame(width: w) }
+/// A vertical divider the full height of its row. Given its height explicitly: on macOS 12 (bitmap printing) a bare Rectangle
+/// in a row came out as a short tick or not at all.
+private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
+    GeometryReader { p in Rectangle().fill(color).frame(width: w, height: p.size.height) }.frame(width: w)
+}
 
 /// One copy of a bill (or debit note) on one page: everything inside a single ruled frame —
 /// title strip, seller and bill details, Bill to, item table, tax summary and totals — with terms and signature below it.
@@ -564,7 +568,7 @@ private func vRule(_ w: CGFloat = ruleLine) -> some View { Rectangle().fill(ink)
             }
         }
         .padding(.leading, 6)
-        .overlay(alignment: .leading) { Rectangle().fill(muted).frame(width: 0.5) }
+        .overlay(alignment: .leading) { vRule(0.5, color: muted) }
     }
 
     /// Bank details, one per line with the labels lined up (BANK NAME:, ACCOUNT NUMBER: …).
@@ -916,7 +920,8 @@ final class PDFFitRenderer: UIPrintPageRenderer {
         ctx.saveGState()
         ctx.setFillColor(UIColor.white.cgColor)
         ctx.fill(paperRect)
-        ctx.translateBy(x: printableRect.midX, y: printableRect.midY)
+        // centred across, from the top edge down (a half sheet at the top of A4 must stay at the top)
+        ctx.translateBy(x: printableRect.midX, y: printableRect.minY + ch * scale / 2)
         if turn { ctx.rotate(by: .pi / 2) }
         ctx.scaleBy(x: scale, y: scale)
         // the print context has y going down; a PDF page has y going up from its bottom-left corner
@@ -928,19 +933,44 @@ final class PDFFitRenderer: UIPrintPageRenderer {
     }
 }
 
+/// The half-sheet pages for the printer: each A5-landscape bill upright at the top edge of a portrait A4 page, at its real size.
+/// An HP LaserJet 1020 (and most office laser printers) is fed the A5 sheet sideways, long edge first, and prints it as the top
+/// part of an A4 page: a bill turned onto portrait A5 came out enlarged and cut off at the HSN column.
+func halfSheetsOnA4(_ pdf: PDFDocument) -> PDFDocument? {
+    let data = NSMutableData()
+    var box = CGRect(origin: .zero, size: Paper.a4)
+    guard let consumer = CGDataConsumer(data: data as CFMutableData), let ctx = CGContext(consumer: consumer, mediaBox: &box, nil) else { return nil }
+    for i in 0..<pdf.pageCount {
+        guard let page = pdf.page(at: i) else { continue }
+        let b = page.bounds(for: .mediaBox)
+        ctx.beginPDFPage(nil)
+        ctx.saveGState()
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.fill(box)
+        // PDF y goes up: the bill's top edge on the page's top edge, centred across the width
+        ctx.translateBy(x: (Paper.a4.width - b.width) / 2 - b.minX, y: Paper.a4.height - b.height - b.minY)
+        page.draw(with: .mediaBox, to: ctx)
+        ctx.restoreGState()
+        ctx.endPDFPage()
+    }
+    ctx.closePDF()
+    return PDFDocument(data: data as Data)
+}
+
 /// Prints through AirPrint. `silent` prints straight to the saved printer without the print panel.
 /// Half-sheet bills go out on A5 / half-A4 paper (one copy per sheet), landscape; A4 layouts on A4.
 @MainActor
 func runPrint(_ pdf: PDFDocument, jobName: String, silent: Bool, done: ((Bool) -> Void)? = nil) {
     guard pdf.pageCount > 0 else { done?(false); return }
+    // a half-sheet bill goes out upright at the top of a portrait A4 page, where the A5 sheet fed sideways catches it whole
+    var pdf = pdf
+    if let s = pdf.page(at: 0)?.bounds(for: .mediaBox).size, s.width > s.height, let top = halfSheetsOnA4(pdf) { pdf = top }
     let size = pdf.page(at: 0)?.bounds(for: .mediaBox).size ?? Paper.a4
     let pc = UIPrintInteractionController.shared
     let info = UIPrintInfo(dictionary: nil)
     info.outputType = .general
     info.jobName = jobName
-    // always portrait: a half-sheet bill is turned a quarter onto the portrait A5 / half-A4 paper by PDFFitRenderer.
-    // Asking for landscape made many printers (and printers shared from a PC or Mac) print it upright and cut off the
-    // right half of the bill.
+    // always portrait A4: half sheets arrive here already placed at the top of an A4 page (see halfSheetsOnA4)
     info.orientation = .portrait
     pc.printInfo = info
     let chooser = PaperChooser(pageSize: size)

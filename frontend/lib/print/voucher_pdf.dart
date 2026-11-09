@@ -8,7 +8,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../state/app_state.dart' show Json;
 import '../widgets.dart' show dmy;
-import 'invoice_pdf.dart' show Geo, PrintLayout;
+import 'invoice_pdf.dart' show Geo, PrintLayout, a4TopPage;
 
 final _money = NumberFormat.decimalPatternDigits(locale: 'en_IN', decimalDigits: 2);
 num _n(dynamic v) => v is num ? v : (num.tryParse('${v ?? ''}') ?? 0);
@@ -119,7 +119,7 @@ Future<Uint8List> buildVoucherPdf(Json v, Json settings, PrintLayout layout) asy
   } else {
     final copies = layout == PrintLayout.single ? [_copyLabels[0]] : _copyLabels;
     for (final c in copies) {
-      doc.addPage(pw.Page(pageFormat: Geo.halfFormat, margin: pw.EdgeInsets.zero, build: (_) => _sheet(v, c)));
+      doc.addPage(a4TopPage(_sheet(v, c)));
     }
   }
   return doc.save();

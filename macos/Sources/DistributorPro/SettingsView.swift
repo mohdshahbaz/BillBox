@@ -64,6 +64,15 @@ import AppKit
             }
         }
         .navigationTitle("Settings")
+        // Clicking a tab must not leave a blinking text cursor in the page's first box (macOS made it the focused field
+        // whenever a tab opened); a box gets the cursor only when it is clicked.
+        .onAppear { dropTextFocus() }
+        .onChange(of: tab) { _ in dropTextFocus() }
+    }
+
+    private func dropTextFocus() {
+        DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { NSApp.keyWindow?.makeFirstResponder(nil) }
     }
 }
 

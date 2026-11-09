@@ -247,11 +247,13 @@ object Platform {
                 bmp.eraseColor(android.graphics.Color.WHITE)
                 pg.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                 pg.close()
-                val op = out.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(h, w, i + 1).create())
+                // upright at the top of a portrait A4 page: the A5 sheet is fed sideways (long edge first, as on an HP LaserJet 1020)
+                // and catches the top of the page; a bill turned onto portrait A5 came out enlarged and cut off
+                val aw = 595; val ah = 842
+                val op = out.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(aw, ah, i + 1).create())
                 val c = op.canvas
-                c.translate(h.toFloat(), 0f)
-                c.rotate(90f)
-                c.drawBitmap(bmp, android.graphics.Rect(0, 0, bmp.width, bmp.height), android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()), android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+                val left = (aw - w) / 2f
+                c.drawBitmap(bmp, android.graphics.Rect(0, 0, bmp.width, bmp.height), android.graphics.RectF(left, 0f, left + w, h.toFloat()), android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
                 out.finishPage(op)
                 bmp.recycle()
             }
@@ -268,9 +270,8 @@ object Platform {
     fun print(source: File, jobName: String) {
         val pdf = portraitForPrint(source)
         val pm = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
-        // half-sheet bills ask for A5 paper (one copy per sheet, the bill landscape across it); the rest A4
-        val a5 = pdf != source   // a landscape half sheet was turned onto portrait pages
-        val attrs = PrintAttributes.Builder().setMediaSize(if (a5) PrintAttributes.MediaSize.ISO_A5 else PrintAttributes.MediaSize.ISO_A4).build()
+        // portrait A4 always: half sheets sit upright at the top of the page, where the sideways-fed A5 sheet catches them
+        val attrs = PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build()
         pm.print(jobName, object : PrintDocumentAdapter() {
             override fun onLayout(old: PrintAttributes?, new: PrintAttributes?, cancel: CancellationSignal?, cb: LayoutResultCallback, extras: android.os.Bundle?) {
                 if (cancel?.isCanceled == true) { cb.onLayoutCancelled(); return }
