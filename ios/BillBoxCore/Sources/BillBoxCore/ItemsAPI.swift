@@ -69,6 +69,75 @@ extension Router {
         return .json(201, ["id": id, "name": name] as Row)
     }
 
+    // ---- Mix boxes (backend/src/routes/items.js): a box of N pieces made of `each` pieces of every matching item in stock ----
+
+    static let mixDefaults: [Row] = [
+        ["name": "₹10 Namkeen mix box", "match": "-CHIPS -PAPAD", "mrp": 10, "box": 300, "each": 12],
+        ["name": "₹5 Namkeen mix box", "match": "-CHIPS -PAPAD", "mrp": 5, "box": 432, "each": 12],
+        ["name": "₹5 Chips mix box", "match": "CHIPS", "mrp": 5, "box": 192, "each": 12],
+        ["name": "Chatpat papad mix box", "match": "CHATPAT", "mrp": 0, "box": 300, "each": 12],
+        ["name": "₹20 Namkeen mix box", "match": "-CHIPS -PAPAD", "mrp": 20, "box": 120, "each": 10],
+        ["name": "All namkeen in stock (12 pc each)", "match": "-CHIPS -PAPAD", "mrp": 0, "box": 0, "each": 12],
+    ]
+
+    func mixPresets(_ db: Database) throws -> [Row] {
+        if let r = try db.prepare("SELECT value FROM settings WHERE key='mix_boxes'").get(), let v = r.s("value"),
+           let d = v.data(using: .utf8), let a = (try? JSONSerialization.jsonObject(with: d)) as? [Row], !a.isEmpty { return a }
+        return Router.mixDefaults
+    }
+
+    static func mixMatch(_ name: String, _ match: String) -> Bool {
+        let n = name.uppercased()
+        let words = match.uppercased().split(whereSeparator: { $0 == " " || $0 == "," || $0 == "\n" || $0 == "\t" }).map(String.init)
+        let want = words.filter { !$0.hasPrefix("-") }
+        let not = words.filter { $0.hasPrefix("-") }.map { String($0.dropFirst()) }.filter { !$0.isEmpty }
+        return (want.isEmpty || want.contains { n.contains($0) }) && !not.contains { n.contains($0) }
+    }
+
+    func planMixBox(_ db: Database, _ b: Row) throws -> Row {
+        var p = b
+        if let i = b["index"] ?? nil {
+            let all = try mixPresets(db); let k = Int(JS.number(i))
+            guard k >= 0, k < all.count else { throw HttpError(404, "Mix box not found") }
+            p = all[k]
+        }
+        func num(_ k: String) -> Double { let x = JS.number(p[k] ?? nil); return x.isFinite ? x : 0 }
+        let each = max(1, Int(num("each") == 0 ? 12 : num("each")))
+        let box = max(0, Int(num("box")))
+        let mrp = num("mrp")
+        let match = (p["match"] as? String) ?? ""
+        let rows = try db.prepare("""
+        SELECT i.*, c.name category, COALESCE(s.stock,0) stock, s.next_expiry
+             FROM items i LEFT JOIN categories c ON c.id=i.category_id
+             LEFT JOIN (SELECT item_id, SUM(qty) stock, MIN(CASE WHEN qty>0 AND exp_date < '2099-01-01' THEN exp_date END) next_expiry
+                        FROM batches GROUP BY item_id) s ON s.item_id=i.id
+             WHERE i.active=1 AND COALESCE(s.stock,0) > 0 ORDER BY i.name
+        """).all().filter { it in
+            let name = it.s("name") ?? ""
+            let m0 = it.n("mrp"); let m = (m0.isFinite && m0 > 0) ? m0 : (PDFParser.mrpFromName(name) ?? 0)
+            return Router.mixMatch(name, match) && (mrp == 0 || abs(m - mrp) < 0.01)
+        }
+        var pcs: [Int: Int] = [:]
+        var left = box > 0 ? box : rows.count * each
+        var more = true
+        while left > 0 && more {
+            more = false
+            for (k, it) in rows.enumerated() {
+                if left <= 0 { break }
+                let have = pcs[k] ?? 0
+                let take = min(each, left, Int(it.n("stock").rounded(.down)) - have)
+                if take <= 0 { continue }
+                pcs[k] = have + take; left -= take; more = true
+            }
+            if box == 0 { break }
+        }
+        var lines: [Row] = []
+        for (k, it) in rows.enumerated() { if let q = pcs[k] { var l = Router.withMargins(it); l["pcs"] = q; lines.append(l) } }
+        let filled = lines.reduce(0) { $0 + (($1["pcs"] as? Int) ?? 0) }
+        return ["name": (p["name"] as? String) ?? "", "box": box, "each": each, "filled": filled,
+                "short": box > 0 ? max(0, box - filled) : 0, "items": lines.count, "lines": lines]
+    }
+
     func listItems(_ db: Database, _ q: [String: String]) throws -> Any {
         let like = "%\(JS.trim(q["q"] ?? ""))%"
         let cat: Any? = (q["category_id"].map { !$0.isEmpty } ?? false) ? JS.number(q["category_id"]!) : nil

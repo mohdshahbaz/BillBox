@@ -39,6 +39,8 @@ struct BillLine: Identifiable {
     @State private var routes: [JSON] = []
     @State private var newPartyOpen = false
     @State private var allItems: [JSON] = []
+    @State private var mixBoxes: [JSON] = []
+    @State private var mixEdit = false
     @StateObject private var model = BillModel()
     @State private var partyId = 0
     @State private var salesmanId = 0
@@ -201,12 +203,56 @@ struct BillLine: Identifiable {
     }
 
     private var searchField: some View {
-        TextField("Type an item name or scan a barcode", text: $query)
-            .textFieldStyle(.roundedBorder)
+        HStack(spacing: 8) {
+            TextField("Type an item name or scan a barcode", text: $query)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.large)
+                .focused($searchFocus)
+                .onSubmit { Task { await submitSearch() } }
+                .onChange(of: query) { _ in highlight = 0 }
+            // Mix box: a box of N pieces made of 12 (or 10) pieces of every matching item in stock, added in one click
+            Menu {
+                ForEach(Array(mixBoxes.enumerated()), id: \.offset) { i, m in
+                    Button(mixLabel(m)) { Task { await addMix(i) } }
+                }
+                Divider()
+                Button("Edit mix boxes…") { mixEdit = true }
+            } label: { Label("Mix box", systemImage: "shippingbox") }
+            .menuStyle(.borderedButton)
+            .fixedSize()
             .controlSize(.large)
-            .focused($searchFocus)
-            .onSubmit { Task { await submitSearch() } }
-            .onChange(of: query) { _ in highlight = 0 }
+        }
+        .sheet(isPresented: $mixEdit) { MixBoxEditor(boxes: mixBoxes) { await loadMix() } }
+    }
+
+    private func mixLabel(_ m: JSON) -> String {
+        let each = max(1, m.int("each"))
+        return m.int("box") > 0 ? "\(m.str("name"))  ·  \(m.int("box")) pc, \(each) pc each" : "\(m.str("name"))  ·  \(each) pc each"
+    }
+
+    private func loadMix() async {
+        if let m = try? await API.list("/mixboxes") { mixBoxes = m }
+    }
+
+    /// Adds the mix box's lines (pieces) to the bill; an item already on the bill gets the pieces added to it.
+    private func addMix(_ index: Int) async {
+        await app.guarded {
+            let plan = try await API.obj("POST", "/mixboxes/plan", body: ["index": index])
+            let rows = plan.list("lines")
+            if rows.isEmpty { app.notify("No item in stock matches \(plan.str("name")).", error: true); return }
+            for r in rows {
+                let q = r.int("pcs")
+                if let i = lines.firstIndex(where: { $0.itemId == r.id }) {
+                    lines[i].pcs += q
+                } else {
+                    var l = BillLine.fresh(r, disc: app.settings.str("bill_default_disc"), unit: "piece")
+                    l.boxes = 0; l.pcs = q
+                    lines.append(l)
+                }
+            }
+            let short = plan.int("short")
+            app.notify("\(plan.str("name")): \(plan.int("filled")) pc of \(plan.int("items")) items added" + (short > 0 ? " — \(short) pc short (not enough stock)." : "."), error: short > 0)
+        }
     }
 
     private var suggestionList: some View {
@@ -550,6 +596,7 @@ struct BillLine: Identifiable {
             allItems = try await i
             syncModel()
         }
+        await loadMix()
     }
 
     /// Hands the model the prices, party and tax state it needs; called whenever any of them changes.
@@ -708,5 +755,68 @@ private struct IntCell: View {
                     text = String(value)
                 }
             }
+    }
+}
+
+/// Bill screen › Mix box › Edit: the boxes offered (Settings key mix_boxes). Name words: the item name must contain one of
+/// them (none = every item); "-WORD" leaves out items whose name has it. MRP 0 = any; box 0 = one lot of every match.
+@MainActor struct MixBoxEditor: View {
+    @EnvironmentObject private var app: AppModel
+    @Environment(\.dismiss) private var dismiss
+    let boxes: [JSON]
+    let done: () async -> Void
+    struct Box: Identifiable { let id = UUID(); var name = "", match = "", mrp = "0", box = "0", each = "12" }
+    @State private var rows: [Box] = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Mix boxes").font(.title3.bold())
+            Text("Name words: the item name must have one of them (empty = every item); -WORD leaves out names with it. MRP 0 = any MRP. Box 0 = one lot of every item in stock. When stock is short, more lots of the same items fill the box.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack { Text("Name").frame(width: 220, alignment: .leading); Text("Name words").frame(width: 170, alignment: .leading)
+                Text("MRP ₹").frame(width: 60); Text("Box pc").frame(width: 60); Text("Each pc").frame(width: 60); Spacer() }
+                .font(.caption.bold()).foregroundStyle(.secondary)
+            ScrollView {
+                VStack(spacing: 6) {
+                    ForEach($rows) { $r in
+                        HStack {
+                            TextField("₹10 Namkeen mix box", text: $r.name).frame(width: 220)
+                            TextField("-CHIPS -PAPAD", text: $r.match).frame(width: 170)
+                            TextField("0", text: $r.mrp).frame(width: 60)
+                            TextField("0", text: $r.box).frame(width: 60)
+                            TextField("12", text: $r.each).frame(width: 60)
+                            Button(role: .destructive) { rows.removeAll { $0.id == r.id } } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless)
+                            Spacer()
+                        }
+                        .textFieldStyle(.roundedBorder)
+                    }
+                }
+            }
+            .frame(minHeight: 220)
+            HStack {
+                Button { rows.append(Box()) } label: { Label("Add a box", systemImage: "plus") }
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Save") { Task { await save() } }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 720, height: 460)
+        .onAppear {
+            rows = boxes.map { Box(name: $0.str("name"), match: $0.str("match"), mrp: Fmt.qty($0.num("mrp")), box: String($0.int("box")), each: String(max(1, $0.int("each")))) }
+        }
+    }
+
+    private func save() async {
+        let list: [[String: Any]] = rows.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }.map {
+            ["name": $0.name.trimmingCharacters(in: .whitespaces), "match": $0.match.trimmingCharacters(in: .whitespaces),
+             "mrp": Double($0.mrp) ?? 0, "box": Int($0.box) ?? 0, "each": max(1, Int($0.each) ?? 12)]
+        }
+        guard let d = try? JSONSerialization.data(withJSONObject: list), let json = String(data: d, encoding: .utf8) else { return }
+        await app.guarded {
+            _ = try await API.obj("PUT", "/settings", body: ["mix_boxes": json])
+            await done()
+            dismiss()
+        }
     }
 }

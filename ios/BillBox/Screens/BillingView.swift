@@ -32,6 +32,8 @@ struct BillLine: Identifiable {
     @State private var salesmen: [JSON] = []
     @State private var routes: [JSON] = []
     @State private var newPartyOpen = false
+    @State private var mixBoxes: [JSON] = []
+    @State private var mixEdit = false
     @State private var allItems: [JSON] = [] {
         didSet { searchIndex = allItems.map { (name: $0.str("name").lowercased(), item: $0) } }
     }
@@ -240,9 +242,49 @@ struct BillLine: Identifiable {
                 .onSubmit { Task { await submitSearch() } }
                 .onChange(of: query) { _ in highlight = 0 }
             if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.accessibilityLabel("Clear search") }
+            // Mix box: a box of N pieces made of 12 (or 10) pieces of every matching item in stock, added in one tap
+            Menu {
+                ForEach(Array(mixBoxes.enumerated()), id: \.offset) { i, m in
+                    Button(mixLabel(m)) { Task { await addMix(i) } }
+                }
+                Divider()
+                Button { mixEdit = true } label: { Label("Edit mix boxes…", systemImage: "slider.horizontal.3") }
+            } label: { Label("Mix box", systemImage: "shippingbox").labelStyle(.iconOnly).font(.title3) }
+            .accessibilityLabel("Mix box")
         }
         .padding(10)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 10))
+        .sheet(isPresented: $mixEdit) { MixBoxEditor(boxes: mixBoxes) { await loadMix() } }
+    }
+
+    private func mixLabel(_ m: JSON) -> String {
+        let each = max(1, m.int("each"))
+        return m.int("box") > 0 ? "\(m.str("name")) · \(m.int("box")) pc, \(each) each" : "\(m.str("name")) · \(each) each"
+    }
+
+    private func loadMix() async {
+        if let m = try? await API.list("/mixboxes") { mixBoxes = m }
+    }
+
+    /// Adds the mix box's lines (pieces) to the bill; an item already on the bill gets the pieces added to it.
+    private func addMix(_ index: Int) async {
+        await app.guarded {
+            let plan = try await API.obj("POST", "/mixboxes/plan", body: ["index": index])
+            let rows = plan.list("lines")
+            if rows.isEmpty { app.notify("No item in stock matches \(plan.str("name")).", error: true); return }
+            for r in rows {
+                let q = r.int("pcs")
+                if let i = lines.firstIndex(where: { $0.itemId == r.id }) {
+                    lines[i].pcs += q
+                } else {
+                    var l = BillLine.fresh(r, disc: app.settings.str("bill_default_disc"), unit: "piece")
+                    l.boxes = 0; l.pcs = q
+                    lines.append(l)
+                }
+            }
+            let short = plan.int("short")
+            app.notify("\(plan.str("name")): \(plan.int("filled")) pc of \(plan.int("items")) items added" + (short > 0 ? " — \(short) pc short (not enough stock)." : "."), error: short > 0)
+        }
     }
 
     /// Its own height when the suggestions fit over the bill; otherwise the bill's height, scrolling.
@@ -613,6 +655,7 @@ struct BillLine: Identifiable {
             suggestions = findSuggestions()
             syncModel()
         }
+        await loadMix()
     }
 
     private func syncModel() {
@@ -759,5 +802,57 @@ private struct IntCell: View {
                     text = String(value)
                 }
             }
+    }
+}
+
+/// Bill screen › Mix box › Edit: the boxes offered (Settings key mix_boxes). Name words: the item name must contain one of
+/// them (none = every item); "-WORD" leaves out items whose name has it. MRP 0 = any; box 0 = one lot of every match.
+@MainActor struct MixBoxEditor: View {
+    @EnvironmentObject private var app: AppModel
+    @Environment(\.dismiss) private var dismiss
+    let boxes: [JSON]
+    let done: () async -> Void
+    struct Box: Identifiable { let id = UUID(); var name = "", match = "", mrp = "0", box = "0", each = "12" }
+    @State private var rows: [Box] = []
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section { Text("Name words: the item name must have one of them (empty = every item); -WORD leaves out names with it. MRP 0 = any MRP. Box 0 = one lot of every item in stock. When stock is short, more lots of the same items fill the box.").font(.caption).foregroundStyle(.secondary) }
+                ForEach($rows) { $r in
+                    Section {
+                        TextField("Name (₹10 Namkeen mix box)", text: $r.name)
+                        TextField("Name words (-CHIPS -PAPAD)", text: $r.match).autocorrectionDisabled().textInputAutocapitalization(.characters)
+                        HStack { Text("MRP ₹"); TextField("0", text: $r.mrp).keyboardType(.decimalPad).multilineTextAlignment(.trailing) }
+                        HStack { Text("Box pieces"); TextField("0", text: $r.box).keyboardType(.numberPad).multilineTextAlignment(.trailing) }
+                        HStack { Text("Pieces of each item"); TextField("12", text: $r.each).keyboardType(.numberPad).multilineTextAlignment(.trailing) }
+                        Button("Remove this box", role: .destructive) { rows.removeAll { $0.id == r.id } }
+                    }
+                }
+                Button { rows.append(Box()) } label: { Label("Add a box", systemImage: "plus") }
+            }
+            .navigationTitle("Mix boxes")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } } }
+            }
+        }
+        .onAppear {
+            rows = boxes.map { Box(name: $0.str("name"), match: $0.str("match"), mrp: Fmt.qty($0.num("mrp")), box: String($0.int("box")), each: String(max(1, $0.int("each")))) }
+        }
+    }
+
+    private func save() async {
+        let list: [[String: Any]] = rows.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }.map {
+            ["name": $0.name.trimmingCharacters(in: .whitespaces), "match": $0.match.trimmingCharacters(in: .whitespaces),
+             "mrp": Double($0.mrp) ?? 0, "box": Int($0.box) ?? 0, "each": max(1, Int($0.each) ?? 12)]
+        }
+        guard let d = try? JSONSerialization.data(withJSONObject: list), let json = String(data: d, encoding: .utf8) else { return }
+        await app.guarded {
+            _ = try await API.obj("PUT", "/settings", body: ["mix_boxes": json])
+            await done()
+            dismiss()
+        }
     }
 }

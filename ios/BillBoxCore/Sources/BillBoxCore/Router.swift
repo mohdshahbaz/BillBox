@@ -166,6 +166,8 @@ public final class Router {
         case ("GET", 1, "categories"): return ok(try categories(db))
         case ("POST", 1, "categories"): return try addCategory(db, b)
         case ("GET", 1, "items"): return ok(try listItems(db, q))
+        case ("GET", 1, "mixboxes"): return ok(try mixPresets(db))
+        case ("POST", 2, "mixboxes") where s[1] == "plan": return ok(try planMixBox(db, b))
         case ("POST", 1, "items"): return try await addItem(db, b)
         case ("POST", 2, "items") where s[1] == "auto-categorize": return ok(try await autoCategorize(db))
         case ("POST", 2, "items") where s[1] == "auto-mrp": return ok(try autoMRP(db))

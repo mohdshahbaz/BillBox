@@ -354,5 +354,73 @@ router.delete('/schemes/:id', h((req, res) => {
   res.json({ ok: true });
 }));
 
+// ---- Mix boxes: a box of N pieces made of `each` pieces of every matching item in stock (bill screen › Mix box) ----
+
+/** The boxes offered until the owner changes them (Settings key mix_boxes, a JSON list). `match` is words the item name
+ *  must contain (any of them; none = every item), "-WORD" words it must not; `mrp` 0 = any MRP; `box` 0 = one lot of each. */
+const MIX_DEFAULTS = [
+  { name: '₹10 Namkeen mix box', match: '-CHIPS -PAPAD', mrp: 10, box: 300, each: 12 },
+  { name: '₹5 Namkeen mix box', match: '-CHIPS -PAPAD', mrp: 5, box: 432, each: 12 },
+  { name: '₹5 Chips mix box', match: 'CHIPS', mrp: 5, box: 192, each: 12 },
+  { name: 'Chatpat papad mix box', match: 'CHATPAT', mrp: 0, box: 300, each: 12 },
+  { name: '₹20 Namkeen mix box', match: '-CHIPS -PAPAD', mrp: 20, box: 120, each: 10 },
+  { name: 'All namkeen in stock (12 pc each)', match: '-CHIPS -PAPAD', mrp: 0, box: 0, each: 12 },
+];
+
+function mixPresets() {
+  const r = db.prepare("SELECT value FROM settings WHERE key='mix_boxes'").get();
+  try { const v = r && JSON.parse(r.value); if (Array.isArray(v) && v.length) return v; } catch (_) { /* bad setting: defaults */ }
+  return MIX_DEFAULTS;
+}
+
+/** Does the item name pass the preset's words? */
+function mixMatch(name, match) {
+  const n = String(name || '').toUpperCase();
+  const words = String(match || '').toUpperCase().split(/[\s,]+/).filter(Boolean);
+  const want = words.filter((w) => !w.startsWith('-')), not = words.filter((w) => w.startsWith('-')).map((w) => w.slice(1)).filter(Boolean);
+  return (!want.length || want.some((w) => n.includes(w))) && !not.some((w) => n.includes(w));
+}
+
+/** The lines of one box: `each` pieces of every matching item in stock (by name), then more lots of the same items, round
+ *  after round, until the box is full or the stock runs out (`short` then says how many pieces are missing). */
+function planMix(p) {
+  const each = Math.max(1, Math.floor(Number(p.each) || 12));
+  const box = Math.max(0, Math.floor(Number(p.box) || 0));
+  const mrp = Number(p.mrp) || 0;
+  const rows = db.prepare(
+    `SELECT i.*, c.name category, COALESCE(s.stock,0) stock, s.next_expiry
+     FROM items i LEFT JOIN categories c ON c.id=i.category_id
+     LEFT JOIN (SELECT item_id, SUM(qty) stock, MIN(CASE WHEN qty>0 AND exp_date < '2099-01-01' THEN exp_date END) next_expiry
+                FROM batches GROUP BY item_id) s ON s.item_id=i.id
+     WHERE i.active=1 AND COALESCE(s.stock,0) > 0 ORDER BY i.name`
+  ).all().filter((it) => mixMatch(it.name, p.match) && (!mrp || Math.abs((Number(it.mrp) || mrpFromName(it.name) || 0) - mrp) < 0.01));
+  const pcs = new Map();
+  let left = box || rows.length * each;
+  for (let more = true; left > 0 && more;) {
+    more = false;
+    for (const it of rows) {
+      if (left <= 0) break;
+      const have = pcs.get(it.id) || 0;
+      const take = Math.min(each, left, Math.floor(it.stock) - have);
+      if (take <= 0) continue;
+      pcs.set(it.id, have + take); left -= take; more = true;
+    }
+    if (!box) break;   // "one lot of each": a single round
+  }
+  const lines = rows.filter((it) => pcs.has(it.id)).map((it) => ({ ...withMargins(it), pcs: pcs.get(it.id) }));
+  const filled = lines.reduce((a, l) => a + l.pcs, 0);
+  return { name: p.name || '', box, each, filled, short: box ? Math.max(0, box - filled) : 0, items: lines.length, lines };
+}
+
+router.get('/mixboxes', h((req, res) => res.json(mixPresets())));
+router.post('/mixboxes/plan', h((req, res) => {
+  const b = req.body || {};
+  const p = b.index !== undefined ? mixPresets()[Number(b.index)] : b;
+  if (!p) throw new HttpError(404, 'Mix box not found');
+  res.json(planMix(p));
+}));
+
 module.exports = router;
 module.exports.fixPacks = fixPacks;
+module.exports.planMix = planMix;
+module.exports.mixMatch = mixMatch;

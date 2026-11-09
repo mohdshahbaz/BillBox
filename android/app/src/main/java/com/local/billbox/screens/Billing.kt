@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.NoteAdd
@@ -34,6 +35,9 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -80,6 +84,9 @@ import com.local.billbox.ui.DataTable
 import com.local.billbox.ui.DateField
 import com.local.billbox.ui.EditCell
 import com.local.billbox.ui.EmptyState
+import com.local.billbox.ui.Field
+import com.local.billbox.ui.FormDialog
+import com.local.billbox.ui.Kb
 import com.local.billbox.ui.Good
 import com.local.billbox.ui.Hint
 import com.local.billbox.ui.InfoLine
@@ -310,15 +317,49 @@ fun BillingScreen() {
         } finally { busy = false }
     }
 
+    // Mix box: a box of N pieces made of 12 (or 10) pieces of every matching item in stock, added in one tap
+    var mixBoxes by remember { mutableStateOf<List<J>>(emptyList()) }
+    var mixMenu by remember { mutableStateOf(false) }
+    var mixEdit by remember { mutableStateOf(false) }
+    suspend fun loadMix() { runCatching { Api.list("/mixboxes") }.getOrNull()?.let { mixBoxes = it } }
+    fun addMix(index: Int) = app.launch {
+        val plan = Api.obj("POST", "/mixboxes/plan", body = mapOf("index" to index))
+        val rows = plan.list("lines")
+        if (rows.isEmpty()) { app.notify("No item in stock matches ${plan.str("name")}.", true); return@launch }
+        for (r in rows) {
+            val q = r.int("pcs")
+            val i = st.lines.indexOfFirst { it.itemId == r.id }
+            if (i >= 0) st.lines[i] = st.lines[i].let { it.copy(pcs = it.pcs + q) }
+            else st.lines.add(BillLine.fresh(r, app.setting("bill_default_disc"), "piece").copy(boxes = 0, pcs = q))
+        }
+        val short = plan.int("short")
+        app.notify("${plan.str("name")}: ${plan.int("filled")} pc of ${plan.int("items")} items added" + (if (short > 0) " — $short pc short (not enough stock)." else "."), short > 0)
+    }
+
     LaunchedEffect(Unit) {
         reload()
+        loadMix()
         app.pendingEdit?.let { if (it.type == "INVOICE") { app.pendingEdit = null; loadForEdit(it.id) } }
     }
     LaunchedEffect(app.itemsVersion) { if (app.itemsVersion > 0) reload() }
     LaunchedEffect(key) { delay(200); recalc() }
 
+    if (mixEdit) MixBoxEditor(mixBoxes, onDismiss = { mixEdit = false }) { loadMix() }
+
     ScreenScaffold(if (st.editingId != null) "Editing ${st.editingNo}" else "Billing", actions = {
         IconButton(onClick = { runCatching { searchFocus.requestFocus() } }) { Icon(Icons.Default.Search, "Find item") }
+        Box {
+            IconButton(onClick = { mixMenu = true }) { Icon(Icons.Default.Inventory2, "Mix box") }
+            DropdownMenu(expanded = mixMenu, onDismissRequest = { mixMenu = false }) {
+                mixBoxes.forEachIndexed { i, m ->
+                    val each = maxOf(1, m.int("each"))
+                    DropdownMenuItem(text = { Text(if (m.int("box") > 0) "${m.str("name")} · ${m.int("box")} pc, $each each" else "${m.str("name")} · $each each") },
+                        onClick = { mixMenu = false; addMix(i) })
+                }
+                HorizontalDivider()
+                DropdownMenuItem(text = { Text("Edit mix boxes…") }, onClick = { mixMenu = false; mixEdit = true })
+            }
+        }
         IconButton(onClick = { st.clear(app) }) { Icon(if (st.editingId != null) Icons.Default.Cancel else Icons.Default.NoteAdd, if (st.editingId != null) "Cancel edit" else "New bill") }
     }) { mod ->
         Column(mod) {
@@ -500,4 +541,37 @@ private fun tierNote(party: J?, st: BillingState, items: List<J>): String? {
     if (same.isEmpty()) return null
     val n = same.size
     return "$n item${if (n == 1) " has" else "s have"} no separate wholesale price, so ${if (n == 1) "it is" else "they are"} billed at the retail price. Set wholesale prices in Stock › More › Set prices from MRP."
+}
+
+/** Bill screen › Mix box › Edit: the boxes offered (Settings key mix_boxes). Name words: the item name must have one of them
+ *  (empty = every item); "-WORD" leaves out names with it. MRP 0 = any; box 0 = one lot of every item in stock. */
+@Composable
+private fun MixBoxEditor(boxes: List<J>, onDismiss: () -> Unit, done: suspend () -> Unit) {
+    data class Box(val name: String = "", val match: String = "", val mrp: String = "0", val box: String = "0", val each: String = "12")
+    val rows = remember { androidx.compose.runtime.mutableStateListOf<Box>().apply {
+        addAll(boxes.map { Box(it.str("name"), it.str("match"), Fmt.qty(it.num("mrp")), it.int("box").toString(), maxOf(1, it.int("each")).toString()) })
+    } }
+    FormDialog("Mix boxes", onDismiss, onSave = {
+        val arr = org.json.JSONArray()
+        rows.filter { it.name.isNotBlank() }.forEach {
+            arr.put(org.json.JSONObject().put("name", it.name.trim()).put("match", it.match.trim()).put("mrp", it.mrp.toDoubleOrNull() ?: 0.0)
+                .put("box", it.box.toIntOrNull() ?: 0).put("each", maxOf(1, it.each.toIntOrNull() ?: 12)))
+        }
+        Api.obj("PUT", "/settings", body = mapOf("mix_boxes" to arr.toString()))
+        done()
+    }) {
+        Hint("Name words: the item name must have one of them (empty = every item); -WORD leaves out names with it. MRP 0 = any MRP. Box 0 = one lot of every item in stock. When stock is short, more lots of the same items fill the box.")
+        rows.forEachIndexed { i, r ->
+            HorizontalDivider()
+            Field("Name", r.name, { rows[i] = r.copy(name = it) })
+            Field("Name words", r.match, { rows[i] = r.copy(match = it) }, kb = Kb.Caps)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Field("MRP ₹", r.mrp, { rows[i] = r.copy(mrp = it) }, Modifier.weight(1f), kb = Kb.Decimal)
+                Field("Box pc", r.box, { rows[i] = r.copy(box = it) }, Modifier.weight(1f), kb = Kb.Number)
+                Field("Each pc", r.each, { rows[i] = r.copy(each = it) }, Modifier.weight(1f), kb = Kb.Number)
+            }
+            TextButton(onClick = { rows.removeAt(i) }) { Text("Remove this box", color = MaterialTheme.colorScheme.error) }
+        }
+        TextButton(onClick = { rows.add(Box()) }) { Text("+ Add a box") }
+    }
 }
