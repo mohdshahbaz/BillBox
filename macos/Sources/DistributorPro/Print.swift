@@ -974,7 +974,6 @@ func printVoucher(_ no: String, app: AppModel) async {
 
 /// Prints through the macOS print system. `silent` skips the print panel (used for the saved printer).
 /// The paper follows the layout: A5 / half-A4 sheets for the half-sheet layouts, A4 for the rest.
-@MainActor
 @discardableResult
 /// The half-sheet pages for the printer: each A5-landscape bill upright at the top edge of a portrait A4 page, at its real size.
 /// An HP LaserJet 1020 (and most office laser printers) is fed the A5 sheet sideways, long edge first, and prints it as the top
@@ -1000,6 +999,7 @@ func halfSheetsOnA4(_ pdf: PDFDocument) -> PDFDocument? {
     return PDFDocument(data: data as Data)
 }
 
+@MainActor
 func runPrint(_ pdf: PDFDocument, printer: String, silent: Bool) -> Bool {
     let info = (NSPrintInfo.shared.copy() as? NSPrintInfo) ?? NSPrintInfo()
     if !printer.isEmpty, let p = NSPrinter(name: printer) { info.printer = p }
