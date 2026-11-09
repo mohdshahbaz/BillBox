@@ -12,7 +12,7 @@
 
   // [data-dl="windows-setup"] etc. point straight at the file in the newest GitHub release
   const want = {
-    'mac': /BillBox-mac-.*\.dmg$/, 'mac-zip': /BillBox-mac-.*\.zip$/, 'windows-setup': /BillBox-windows-.*-setup\.exe$/, 'windows-zip': /BillBox-windows-.*\.zip$/,
+    'mac': /BillBox-mac-(?!.*-arm64\.dmg$).*\.dmg$/, 'mac-arm64': /BillBox-mac-.*-arm64\.dmg$/, 'mac-zip': /BillBox-mac-(?!.*-arm64\.zip$).*\.zip$/, 'windows-setup': /BillBox-windows-.*-setup\.exe$/, 'windows-zip': /BillBox-windows-.*\.zip$/,
     'linux-deb': /BillBox-linux-.*\.deb$/, 'linux-tar': /BillBox-linux-.*\.tar\.gz$/, 'android': /BillBox-android-.*\.apk$/, 'iphone': /BillBox-iphone-.*\.ipa$/,
   };
   const els = document.querySelectorAll('[data-dl]');

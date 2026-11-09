@@ -20,6 +20,33 @@ router.put('/salesmen/:id', h((req, res) => {
     .run(b.name, blank(b.phone), Number(b.monthly_target) || 0, b.active ? 1 : 0, cur.id);
   res.json({ ok: true });
 }));
+/** Delete: the salesman leaves the list and their routes are unassigned; bills and receipts keep the name (history). */
+router.delete('/salesmen/:id', h((req, res) => {
+  const cur = db.prepare('SELECT * FROM salesmen WHERE id=?').get(req.params.id);
+  if (!cur) throw new HttpError(404, 'Salesman not found');
+  db.transaction(() => {
+    db.prepare('UPDATE routes SET salesman_id=NULL WHERE salesman_id=?').run(cur.id);
+    db.prepare('UPDATE salesmen SET active=0 WHERE id=?').run(cur.id);
+  })();
+  res.json({ ok: true });
+}));
+
+/** Merge: this salesman's bills, receipts and routes move to `into`, then this salesman leaves the list. */
+router.post('/salesmen/:id/merge', h((req, res) => {
+  const from = db.prepare('SELECT * FROM salesmen WHERE id=?').get(req.params.id);
+  const into = db.prepare('SELECT * FROM salesmen WHERE id=?').get(req.body && req.body.into);
+  if (!from || !into) throw new HttpError(404, 'Salesman not found');
+  if (from.id === into.id) throw new HttpError(400, 'Choose another salesman to merge into');
+  const moved = {};
+  db.transaction(() => {
+    for (const t of ['invoices', 'receipts', 'routes']) {
+      moved[t] = db.prepare(`UPDATE ${t} SET salesman_id=? WHERE salesman_id=?`).run(into.id, from.id).changes;
+    }
+    if (!into.monthly_target && from.monthly_target) db.prepare('UPDATE salesmen SET monthly_target=? WHERE id=?').run(from.monthly_target, into.id);
+    db.prepare('UPDATE salesmen SET active=0 WHERE id=?').run(from.id);
+  })();
+  res.json({ ok: true, into: into.id, moved });
+}));
 
 router.get('/routes', h((req, res) => {
   res.json(db.prepare(

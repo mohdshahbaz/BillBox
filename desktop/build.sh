@@ -37,7 +37,10 @@ flutter analyze --no-fatal-infos --no-fatal-warnings lib
 
 say "Build ($OS, $EDITION edition)"
 NUM="${VERSION%%-*}"
+# --split-debug-info keeps Dart's debug symbols out of the app (a smaller download, same code); --tree-shake-icons keeps
+# only the icons BillBox uses
 flutter build "$OS" --release --build-name="$NUM" --build-number="$(echo "$NUM" | awk -F. '{print $1*10000+$2*100+$3}')" \
+  --split-debug-info="$FE/build/debug-info" --tree-shake-icons \
   --dart-define=BILLBOX_EDITION="$EDITION" --dart-define=BILLBOX_VERSION="$VERSION"
 if [ "$OS" = linux ]; then APP="$FE/build/linux/x64/release/bundle"; else APP="$FE/build/windows/x64/runner/Release"; fi
 
@@ -47,8 +50,11 @@ cp -R "$ROOT/backend/src" "$ENG/backend/src"
 cp "$ROOT/backend/package.json" "$ENG/backend/"
 [ -f "$ROOT/backend/package-lock.json" ] && cp "$ROOT/backend/package-lock.json" "$ENG/backend/"
 (cd "$ENG/backend" && npm install --omit=dev --no-audit --no-fund >/dev/null)
+# the libraries' docs, tests and type files are not needed to run
+find "$ENG/backend/node_modules" \( -iname "*.md" -o -iname "*.markdown" -o -iname "*.ts" -o -iname "*.map" -o -iname "CHANGELOG*" \) -type f -delete 2>/dev/null || true
+find "$ENG/backend/node_modules" -type d \( -name test -o -name tests -o -name docs -o -name example -o -name examples -o -name .github \) -prune -exec rm -rf {} + 2>/dev/null || true
 NODE_BIN="$(command -v node)"
-if [ "$OS" = windows ]; then cp "$(cygpath -u "$(node -p 'process.execPath')" 2>/dev/null || node -p 'process.execPath')" "$ENG/node.exe"; else cp "$NODE_BIN" "$ENG/node"; chmod +x "$ENG/node"; fi
+if [ "$OS" = windows ]; then cp "$(cygpath -u "$(node -p 'process.execPath')" 2>/dev/null || node -p 'process.execPath')" "$ENG/node.exe"; else cp "$NODE_BIN" "$ENG/node"; chmod +x "$ENG/node"; strip --strip-unneeded "$ENG/node" 2>/dev/null || true; fi
 cp "$ROOT/LICENSE" "$APP/" 2>/dev/null || true
 
 say "Package"

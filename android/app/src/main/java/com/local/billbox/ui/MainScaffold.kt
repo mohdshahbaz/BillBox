@@ -233,9 +233,12 @@ private fun MoreList(open: (Page) -> Unit) {
  * A screen with Android's top app bar: the screen's title over the company and financial year (tap to switch), the
  * screen's actions on the right, and a floating action button when it has a main action.
  */
+/** Room the lists leave free at their end so the last rows can scroll clear of a floating button (New item, New party…). */
+val LocalFabSpace = staticCompositionLocalOf { 0.dp }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScreenScaffold(title: String, actions: @Composable RowScope.() -> Unit = {}, fab: @Composable () -> Unit = {},
+fun ScreenScaffold(title: String, actions: @Composable RowScope.() -> Unit = {}, fab: (@Composable () -> Unit)? = null,
                    content: @Composable (Modifier) -> Unit) {
     val back = LocalBack.current
     Scaffold(
@@ -247,9 +250,13 @@ fun ScreenScaffold(title: String, actions: @Composable RowScope.() -> Unit = {},
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
         },
-        floatingActionButton = fab,
+        floatingActionButton = fab ?: {},
         contentWindowInsets = WindowInsets(0),
-    ) { pad -> Box(Modifier.fillMaxSize().padding(pad).imePadding()) { content(Modifier.fillMaxSize()) } }
+    ) { pad ->
+        CompositionLocalProvider(LocalFabSpace provides if (fab != null) 120.dp else 0.dp) {
+            Box(Modifier.fillMaxSize().padding(pad).imePadding()) { content(Modifier.fillMaxSize()) }
+        }
+    }
 }
 
 /** The screen title with the open company and financial year under it; tapping opens the company and year switcher. */

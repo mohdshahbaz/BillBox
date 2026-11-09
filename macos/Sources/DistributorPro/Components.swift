@@ -390,7 +390,12 @@ struct PDFPreview: NSViewRepresentable {
         v.displayMode = .singlePageContinuous
         return v
     }
-    func updateNSView(_ v: PDFView, context: Context) { v.document = document }
+    // the document is set only when it changes, and the view opens on page 1 (setting it on every redraw left it on the last page)
+    func updateNSView(_ v: PDFView, context: Context) {
+        guard v.document !== document else { return }
+        v.document = document
+        if let first = document?.page(at: 0) { v.go(to: first) }
+    }
 }
 
 /// Tab-separated text for pasting into Excel / Numbers.

@@ -212,6 +212,8 @@ public final class Router {
         case ("GET", 1, "salesmen"): return ok(try listSalesmen(db))
         case ("POST", 1, "salesmen"): return try addSalesman(db, b)
         case ("PUT", 2, "salesmen"): return ok(try updateSalesman(db, s[1], b))
+        case ("DELETE", 2, "salesmen"): return ok(try deleteSalesman(db, s[1]))
+        case ("POST", 3, "salesmen") where s[2] == "merge": return ok(try mergeSalesman(db, s[1], b))
         case ("GET", 3, "salesmen") where s[2] == "beat": return ok(try beat(db, s[1], q))
         case ("GET", 3, "salesmen") where s[2] == "performance": return ok(try performance(db, s[1], q))
         case ("GET", 1, "routes"): return ok(try listRoutes(db))

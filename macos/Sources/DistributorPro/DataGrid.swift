@@ -145,8 +145,15 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
         let total = w.reduce(0, +)
         if total < avail, !cols.isEmpty {
             let extra = avail - total
-            let flexIdx = cols.indices.filter { cols[$0].flex }
-            let targets = flexIdx.isEmpty ? [0] : flexIdx
+            // Spare width goes to the flexible columns; without any, to the widest text column (Item, Party, Outlet), never to
+            // S.No or a number column (the first column took it all and stretched across the table).
+            var targets = cols.indices.filter { cols[$0].flex }
+            if targets.isEmpty {
+                let text = cols.indices.filter { !cols[$0].isIndex && cols[$0].align != .trailing && layout.widths[cols[$0].id] == nil }
+                if let widest = text.max(by: { cols[$0].ideal < cols[$1].ideal }) { targets = [widest] }
+            }
+            if targets.isEmpty { targets = cols.indices.filter { !cols[$0].isIndex } }
+            if targets.isEmpty { targets = [cols.count - 1] }
             for i in targets { w[i] += extra / CGFloat(targets.count) }
         }
         return w

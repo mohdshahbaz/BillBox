@@ -58,12 +58,27 @@ enum API {
         req.setValue("application/json", forHTTPHeaderField: "content-type")
         if let id = company ?? companyId { req.setValue("\(id)", forHTTPHeaderField: "x-company-id") }
         if let body { req.httpBody = try JSONSerialization.data(withJSONObject: body) }
-        let data: Data
-        let resp: URLResponse
-        do {
-            (data, resp) = try await session.data(for: req)
-        } catch {
-            throw APIError(message: "Cannot reach the server. Start it from the screen that appears at launch, or run \"npm start\" in the backend folder.", status: 0, code: nil)
+        var data = Data()
+        var resp: URLResponse = URLResponse()
+        var attempt = 0
+        while true {
+            do {
+                (data, resp) = try await session.data(for: req)
+                break
+            } catch {
+                // A dropped idle connection or a moment when the server is busy starting is retried quietly; a change (POST…)
+                // only when it never reached the server, so a bill is never saved twice. If the server has stopped, it is
+                // started again.
+                let code = (error as? URLError)?.code
+                let notSent = code == .cannotConnectToHost || code == .cannotFindHost
+                let retry = attempt < 3 && (notSent || (method == "GET" && (code == .networkConnectionLost || code == .timedOut)))
+                if !retry {
+                    throw APIError(message: "Cannot reach the server. Start it from the screen that appears at launch, or run \"npm start\" in the backend folder.", status: 0, code: nil)
+                }
+                attempt += 1
+                if notSent && attempt >= 2 { _ = await Backend.shared.start() }
+                try? await Task.sleep(nanoseconds: UInt64(attempt) * 400_000_000)
+            }
         }
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
         let parsed: Any? = data.isEmpty ? nil : (try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]))

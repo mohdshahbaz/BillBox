@@ -9,6 +9,10 @@ import SwiftUI
     @State private var day = Calendar.current.component(.weekday, from: Date()) - 1
     @State private var newSalesman = false
     @State private var newRoute = false
+    @State private var editing: JSON?
+    @State private var merging: JSON?
+    @State private var deleting: JSON?
+    private var current: JSON? { people.first { $0.id == sel } }
 
     var body: some View {
         ScrollView {
@@ -30,6 +34,12 @@ import SwiftUI
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Button { newRoute = true } label: { Label("New route", systemImage: "point.topleft.down.curvedto.point.bottomright.up") }.disabled(people.isEmpty)
                 Button { newSalesman = true } label: { Label("New salesman", systemImage: "person.badge.plus") }
+                Menu {
+                    Button { editing = current } label: { Label("Edit salesman…", systemImage: "pencil") }
+                    Button { merging = current } label: { Label("Merge into another…", systemImage: "arrow.triangle.merge") }.disabled(people.count < 2)
+                    Button(role: .destructive) { deleting = current } label: { Label("Delete salesman…", systemImage: "trash") }
+                } label: { Label("Salesman", systemImage: "ellipsis.circle") }
+                .disabled(current == nil)
             }
         }
         .task { await load() }
@@ -37,6 +47,23 @@ import SwiftUI
         .onChange(of: sel) { _ in Task { await loadSelected() } }
         .onChange(of: day) { _ in Task { await loadSelected() } }
         .sheet(isPresented: $newSalesman) { SalesmanSheet { await load() } }
+        .sheet(item: $editing) { s in SalesmanSheet(existing: s) { await load() } }
+        .sheet(item: $merging) { s in MergeSalesmanSheet(from: s, people: people) { into in sel = into; await load() } }
+        .confirmationDialog("Delete \(deleting?.str("name") ?? "")?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                guard let d = deleting else { return }
+                Task {
+                    await app.guarded {
+                        _ = try await API.obj("DELETE", "/salesmen/\(d.id)")
+                        if sel == d.id { sel = nil }
+                        app.notify("\(d.str("name")) deleted.")
+                        await load()
+                    }
+                }
+            }
+        } message: {
+            Text("Their routes are left without a salesman. Bills and receipts keep the name. To move their bills to someone else, use Merge instead.")
+        }
         .sheet(isPresented: $newRoute) { RouteSheet(people: people) }
     }
 
@@ -106,19 +133,52 @@ import SwiftUI
 
 @MainActor struct SalesmanSheet: View {
     @EnvironmentObject private var app: AppModel
+    var existing: JSON? = nil
     let done: () async -> Void
     @State private var name = ""
     @State private var phone = ""
     @State private var target = "0"
 
     var body: some View {
-        FormSheet(title: "New salesman", width: 440, canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty, onSave: {
-            _ = try await API.obj("POST", "/salesmen", body: ["name": name, "phone": phone, "monthly_target": target])
+        FormSheet(title: existing == nil ? "New salesman" : "Edit salesman", width: 440, canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty, onSave: {
+            if let e = existing {
+                _ = try await API.obj("PUT", "/salesmen/\(e.id)", body: ["name": name.trimmingCharacters(in: .whitespaces), "phone": phone, "monthly_target": target, "active": true])
+            } else {
+                _ = try await API.obj("POST", "/salesmen", body: ["name": name, "phone": phone, "monthly_target": target])
+            }
             await done()
         }) {
             Field("Name", text: $name)
             Field("Phone", text: $phone).keyboardType(.phonePad)
             Field("Monthly sales target (₹)", text: $target).keyboardType(.decimalPad)
+        }
+        .onAppear {
+            if let e = existing { name = e.str("name"); phone = e.str("phone"); target = Fmt.qty(e.num("monthly_target")) }
+        }
+    }
+}
+
+/// Merge: one salesman's bills, receipts and routes move to the one chosen here, and the first leaves the list.
+@MainActor struct MergeSalesmanSheet: View {
+    @EnvironmentObject private var app: AppModel
+    let from: JSON
+    let people: [JSON]
+    let done: (Int) async -> Void
+    @State private var into = ""
+
+    var body: some View {
+        FormSheet(title: "Merge \(from.str("name"))", saveLabel: "Merge", width: 460, canSave: !into.isEmpty, onSave: {
+            let r = try await API.obj("POST", "/salesmen/\(from.id)/merge", body: ["into": into])
+            let m = r.obj("moved")
+            app.notify("Merged: \(m.int("invoices")) bills, \(m.int("receipts")) receipts and \(m.int("routes")) routes moved.")
+            await done(Int(into) ?? 0)
+        }) {
+            Picker("Keep", selection: $into) {
+                Text("Choose…").tag("")
+                ForEach(people.filter { $0.id != from.id }) { Text($0.str("name")).tag(String($0.id)) }
+            }
+            Text("All of \(from.str("name"))'s bills, receipts and routes move to the salesman you keep; \(from.str("name")) is then removed.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

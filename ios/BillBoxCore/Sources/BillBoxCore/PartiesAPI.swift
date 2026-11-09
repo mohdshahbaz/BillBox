@@ -173,6 +173,34 @@ extension Router {
         return ["ok": true] as Row
     }
 
+    /// Delete: the salesman leaves the list and their routes are unassigned; bills and receipts keep the name (history).
+    func deleteSalesman(_ db: Database, _ id: String) throws -> Any {
+        guard let cur = try db.prepare("SELECT * FROM salesmen WHERE id=?").get(id) else { throw HttpError(404, "Salesman not found") }
+        try db.transaction {
+            try db.prepare("UPDATE routes SET salesman_id=NULL WHERE salesman_id=?").run(cur.v("id"))
+            try db.prepare("UPDATE salesmen SET active=0 WHERE id=?").run(cur.v("id"))
+        }
+        return ["ok": true] as Row
+    }
+
+    /// Merge: this salesman's bills, receipts and routes move to `into`, then this salesman leaves the list.
+    func mergeSalesman(_ db: Database, _ id: String, _ b: Row) throws -> Any {
+        guard let from = try db.prepare("SELECT * FROM salesmen WHERE id=?").get(id),
+              let into = try db.prepare("SELECT * FROM salesmen WHERE id=?").get(b["into"] ?? nil) else { throw HttpError(404, "Salesman not found") }
+        if JS.number(from["id"] ?? nil) == JS.number(into["id"] ?? nil) { throw HttpError(400, "Choose another salesman to merge into") }
+        var moved: Row = [:]
+        try db.transaction {
+            for t in ["invoices", "receipts", "routes"] {
+                moved[t] = try db.prepare("UPDATE \(t) SET salesman_id=? WHERE salesman_id=?").run(into.v("id"), from.v("id")).changes
+            }
+            if JS.number(into["monthly_target"] ?? nil) == 0, JS.number(from["monthly_target"] ?? nil) > 0 {
+                try db.prepare("UPDATE salesmen SET monthly_target=? WHERE id=?").run(from.v("monthly_target"), into.v("id"))
+            }
+            try db.prepare("UPDATE salesmen SET active=0 WHERE id=?").run(from.v("id"))
+        }
+        return ["ok": true, "into": into.v("id"), "moved": moved] as Row
+    }
+
     func listRoutes(_ db: Database) throws -> Any {
         try db.prepare("""
         SELECT r.*, s.name salesman_name, (SELECT COUNT(*) FROM parties p WHERE p.route_id=r.id AND p.active=1) outlets

@@ -15,8 +15,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -38,6 +41,7 @@ import com.local.billbox.data.J
 import com.local.billbox.ui.Cell
 import com.local.billbox.ui.Choice
 import com.local.billbox.ui.Col
+import com.local.billbox.ui.Confirm
 import com.local.billbox.ui.DataTable
 import com.local.billbox.ui.DayPicker
 import com.local.billbox.ui.EmptyState
@@ -75,6 +79,11 @@ fun SalesmenScreen() {
     var day by remember { mutableIntStateOf(LocalDate.now().dayOfWeek.value % 7) }
     var newSalesman by remember { mutableStateOf(false) }
     var newRoute by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<J?>(null) }
+    var merging by remember { mutableStateOf<J?>(null) }
+    var deleting by remember { mutableStateOf<J?>(null) }
+    val current = people.firstOrNull { it.id == sel }
 
     suspend fun load() { app.guarded { people = Api.list("/salesmen"); if (sel == null) sel = people.firstOrNull()?.id } }
     LaunchedEffect(Unit) { load() }
@@ -87,6 +96,14 @@ fun SalesmenScreen() {
     ScreenScaffold("Salesmen and routes", actions = {
         IconButton(onClick = { newRoute = true }, enabled = people.isNotEmpty()) { Icon(Icons.Default.AltRoute, "New route") }
         IconButton(onClick = { newSalesman = true }) { Icon(Icons.Default.PersonAdd, "New salesman") }
+        androidx.compose.foundation.layout.Box {
+            IconButton(onClick = { menu = true }, enabled = current != null) { Icon(Icons.Default.MoreVert, "Salesman") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Edit salesman…") }, onClick = { menu = false; editing = current })
+                DropdownMenuItem(text = { Text("Merge into another…") }, enabled = people.size > 1, onClick = { menu = false; merging = current })
+                DropdownMenuItem(text = { Text("Delete salesman…", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; deleting = current })
+            }
+        }
     }) { mod ->
         Column(mod.verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             if (people.isNotEmpty()) Choice("Salesman", people.map { it.id to (it.str("name") + if (it.str("phone").isEmpty()) "" else " · ${it.str("phone")}") }, sel ?: 0, { sel = it })
@@ -139,6 +156,38 @@ fun SalesmenScreen() {
             Field("Phone", phone, { phone = it }, kb = Kb.Phone)
             Field("Monthly sales target (₹)", target, { target = it }, kb = Kb.Decimal)
         }
+    }
+    editing?.let { e ->
+        var name by remember(e.id) { mutableStateOf(e.str("name")) }
+        var phone by remember(e.id) { mutableStateOf(e.str("phone")) }
+        var target by remember(e.id) { mutableStateOf(Fmt.qty(e.num("monthly_target"))) }
+        FormDialog("Edit salesman", { editing = null }, canSave = name.isNotBlank(), onSave = {
+            Api.obj("PUT", "/salesmen/${e.id}", body = mapOf("name" to name.trim(), "phone" to phone, "monthly_target" to target, "active" to true)); load()
+        }) {
+            Field("Name", name, { name = it })
+            Field("Phone", phone, { phone = it }, kb = Kb.Phone)
+            Field("Monthly sales target (₹)", target, { target = it }, kb = Kb.Decimal)
+        }
+    }
+    merging?.let { m ->
+        val others = people.filter { it.id != m.id }
+        var into by remember(m.id) { mutableStateOf(others.firstOrNull()?.id?.toString() ?: "") }
+        FormDialog("Merge ${m.str("name")}", { merging = null }, saveLabel = "Merge", canSave = into.isNotEmpty(), onSave = {
+            val r = Api.obj("POST", "/salesmen/${m.id}/merge", body = mapOf("into" to into))
+            val mv = r.obj("moved")
+            app.notify("Merged: ${mv.int("invoices")} bills, ${mv.int("receipts")} receipts and ${mv.int("routes")} routes moved.")
+            sel = into.toIntOrNull(); load()
+        }) {
+            Choice("Keep", others.map { it.id.toString() to it.str("name") }, into, { into = it })
+            Hint("All of ${m.str("name")}'s bills, receipts and routes move to the salesman you keep; ${m.str("name")} is then removed.")
+        }
+    }
+    deleting?.let { d ->
+        Confirm("Delete ${d.str("name")}?", "Their routes are left without a salesman. Bills and receipts keep the name. To move their bills to someone else, use Merge instead.",
+            "Delete", onConfirm = {
+                deleting = null
+                app.launch { app.guarded { Api.obj("DELETE", "/salesmen/${d.id}"); if (sel == d.id) sel = null; app.notify("${d.str("name")} deleted."); load() } }
+            }, onDismiss = { deleting = null }, destructive = true)
     }
     if (newRoute) {
         var name by remember { mutableStateOf("") }

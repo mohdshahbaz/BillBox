@@ -8,7 +8,7 @@ import FoundationNetworking
 enum Update {
     static var api = "https://api.github.com/repos/mohdshahbaz/BillBox/releases?per_page=30"
     static let files: [String: String] = [
-        "android": #"^BillBox-android-.*\.apk$"#, "mac": #"^BillBox-mac-.*\.zip$"#, "windows": #"^BillBox-windows-.*-setup\.exe$"#,
+        "android": #"^BillBox-android-.*\.apk$"#, "mac": #"^BillBox-mac-(?!.*-arm64\.zip$).*\.zip$"#, "mac-intel": #"^BillBox-mac-(?!.*-arm64\.zip$).*\.zip$"#, "mac-arm64": #"^BillBox-mac-.*-arm64\.zip$"#, "windows": #"^BillBox-windows-.*-setup\.exe$"#,
         "linux": #"^BillBox-linux-.*\.deb$"#, "linux-tar": #"^BillBox-linux-.*\.tar\.gz$"#, "iphone": #"^BillBox-iphone-.*\.ipa$"#,
     ]
 

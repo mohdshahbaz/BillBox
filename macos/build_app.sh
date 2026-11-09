@@ -56,10 +56,15 @@ echo "3/4  Packing the server..."
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/runtime" "$APP/Contents/Resources/backend"
 cp "$BIN" "$APP/Contents/MacOS/DistributorPro"
+strip -x "$APP/Contents/MacOS/DistributorPro" 2>/dev/null || true   # debug symbols out: a smaller app, same code
 cp Icon/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp "$CACHE/node/bin/node" "$APP/Contents/Resources/runtime/node"
+strip -x "$APP/Contents/Resources/runtime/node" 2>/dev/null || true
 cp -R ../backend/src ../backend/package.json "$APP/Contents/Resources/backend/"
 ( cd "$APP/Contents/Resources/backend" && PATH="$CACHE/node/bin:$PATH" "$CACHE/node/bin/node" "$CACHE/node/lib/node_modules/npm/bin/npm-cli.js" install --omit=dev --no-audit --no-fund --loglevel=error )
+# the libraries' docs, tests and type files are not needed to run
+find "$APP/Contents/Resources/backend/node_modules" \( -iname "*.md" -o -iname "*.markdown" -o -iname "*.ts" -o -iname "*.map" -o -iname "LICENSE*" -o -iname "CHANGELOG*" \) -type f -delete 2>/dev/null || true
+find "$APP/Contents/Resources/backend/node_modules" -type d \( -name test -o -name tests -o -name docs -o -name example -o -name examples -o -name .github \) -prune -exec rm -rf {} + 2>/dev/null || true
 
 # keep the books from an earlier run of the project (backend/data) the first time
 DATA="$HOME/Library/Application Support/DistributorPro/data"

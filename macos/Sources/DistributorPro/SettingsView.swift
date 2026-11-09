@@ -51,8 +51,11 @@ import AppKit
                                         .padding(.horizontal, 10).padding(.vertical, 5)
                                         .background(RoundedRectangle(cornerRadius: 6).fill(tab == t.id ? Color.accentColor.opacity(0.18) : Color.clear))
                                         .foregroundStyle(tab == t.id ? Color.accentColor : Color.primary)
+                                    .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
+                                // the normal arrow over a tab, not the text cursor (macOS 12 showed an I-beam over the labels)
+                                .onHover { inside in if inside { NSCursor.arrow.push() } else { NSCursor.pop() } }
                             }
                         }
                         .padding(.horizontal, 16).padding(.vertical, 10)

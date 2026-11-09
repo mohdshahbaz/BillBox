@@ -8,6 +8,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -231,9 +233,11 @@ fun <R> DataTable(
         Divider()
     }
 
+    val fabSpace = LocalFabSpace.current
     Column(modifier.fillMaxSize()) {
         if (lazy) {
-            LazyColumn(Modifier.fillMaxSize()) {
+            // the end of the list scrolls clear of the floating button
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = fabSpace)) {
                 stickyHeader { header() }
                 itemsIndexed(rows) { i, r -> rowView(i, r) }
                 if (footer != null) item { footer() }
@@ -243,6 +247,7 @@ fun <R> DataTable(
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 rows.forEachIndexed { i, r -> androidx.compose.runtime.key(keyOf(r)) { rowView(i, r) } }
                 if (footer != null) footer()
+                Spacer(Modifier.height(fabSpace))
             }
         }
     }

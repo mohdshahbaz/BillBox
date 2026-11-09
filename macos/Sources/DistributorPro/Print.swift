@@ -738,7 +738,7 @@ private func renderVectorPDF(pages: [AnyView], size: CGSize) -> PDFDocument? {
     var box = CGRect(origin: .zero, size: size)
     guard let consumer = CGDataConsumer(data: data), let ctx = CGContext(consumer: consumer, mediaBox: &box, nil) else { return nil }
     for page in pages {
-        let r = ImageRenderer(content: page.frame(width: size.width, height: size.height))
+        let r = ImageRenderer(content: page.frame(width: size.width, height: size.height).environment(\.colorScheme, .light))
         r.proposedSize = ProposedViewSize(size)
         r.render { _, draw in
             ctx.beginPDFPage(nil)
@@ -755,9 +755,11 @@ private func renderBitmapPDF(pages: [AnyView], size: CGSize) -> PDFDocument? {
     let doc = PDFDocument()
     let scale: CGFloat = 4   // about 290 dpi
     for page in pages {
-        let host = NSHostingView(rootView: page.frame(width: size.width, height: size.height))
+        // light appearance as on the iPhone: in dark mode default text and lines would come out white
+        let host = NSHostingView(rootView: page.frame(width: size.width, height: size.height).environment(\.colorScheme, .light))
         host.frame = NSRect(origin: .zero, size: size)
         let win = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: true)
+        win.appearance = NSAppearance(named: .aqua)
         win.contentView = host
         host.layoutSubtreeIfNeeded()
         guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
@@ -1012,6 +1014,10 @@ func runPrint(_ pdf: PDFDocument, printer: String, silent: Bool) -> Bool {
     info.orientation = .portrait
     info.isHorizontallyCentered = true
     info.isVerticallyCentered = false
+    // all pages, and the print panel's preview opens on page 1
+    info.dictionary()[NSPrintInfo.AttributeKey.allPages.rawValue] = true
+    info.dictionary()[NSPrintInfo.AttributeKey.firstPage.rawValue] = 1
+    info.dictionary()[NSPrintInfo.AttributeKey.lastPage.rawValue] = max(1, doc.pageCount)
     guard let op = doc.printOperation(for: info, scalingMode: .pageScaleDownToFit, autoRotate: false) else { return false }
     op.showsPrintPanel = !silent
     op.showsProgressPanel = !silent

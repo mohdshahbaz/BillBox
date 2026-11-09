@@ -39,7 +39,6 @@ internal fun UpdatesPage() {
     var u by remember { mutableStateOf<J?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<Float?>(null) }
     suspend fun check() {
         busy = true; error = null
         try { u = Api.get("/update", mapOf("version" to Updater.version, "edition" to Edition.NAME, "platform" to "android")) }
@@ -56,23 +55,15 @@ internal fun UpdatesPage() {
             x.bool("available") -> {
                 Text("BillBox ${x.str("latest")} is available", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 if (x.str("notes").isNotEmpty()) Hint(x.str("notes").take(600))
-                progress?.let { LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth()) }
+                // The APK downloads in the browser and Android's installer opens it from there: BillBox itself does not ask to
+                // install apps (that permission made Play Protect warn that BillBox might be harmful).
                 Button(onClick = {
                     val f = x.obj("file")
-                    if (f.str("url").isEmpty()) { Platform.openUrl(x.str("page")); return@Button }
-                    if (!Updater.canInstall()) { app.notify("Allow BillBox to install apps, then press Update again.", true); return@Button }
-                    app.launch {
-                        busy = true; progress = 0f
-                        try {
-                            val apk = Updater.download(f.str("url"), f.str("name")) { progress = it }
-                            Updater.install(apk)
-                        } catch (e: Exception) { app.notify(e.message ?: "The download failed.", true) }
-                        finally { busy = false; progress = null }
-                    }
+                    Platform.openUrl(f.str("url").ifEmpty { x.str("page") })
                 }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                    Text(if (progress != null) "Downloading… ${((progress ?: 0f) * 100).toInt()} %" else "Download and install ${x.str("latest")}")
+                    Text("Download ${x.str("latest")}")
                 }
-                Hint("Android asks once to allow installing from BillBox. Your books stay as they are; back up first to be safe (Settings › Backup).")
+                Hint("The new version downloads in your browser; open it from the download notice to install. Your books stay as they are; back up first to be safe (Settings › Backup).")
             }
             else -> Hint("BillBox is up to date${if (x.str("latest").isNotEmpty()) " (newest: ${x.str("latest")})" else ""}.")
         }

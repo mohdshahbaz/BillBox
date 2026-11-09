@@ -44,10 +44,14 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 // Bind to localhost only: this is a single-machine desktop deployment.
-app.listen(PORT, '127.0.0.1', () => {
+const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`Distributor API on http://127.0.0.1:${PORT}`);
   backup.startScheduler();
 });
+// Keep idle connections open longer than the apps do: with Node's 5-second default, an app reusing a connection the server
+// had just closed got "Cannot reach the server" at random.
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 
 // The Linux and Windows apps start this server themselves and pass their process id: when the app has gone (closed,
 // crashed or killed), the server stops too, so it never keeps the books open in the background.

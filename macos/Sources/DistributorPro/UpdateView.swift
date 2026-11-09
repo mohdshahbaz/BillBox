@@ -11,8 +11,10 @@ import UIKit
 enum AppUpdate {
     static var version: String { (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "" }
     static var edition: String { (Bundle.main.object(forInfoDictionaryKey: "BillBoxEdition") as? String) ?? "public" }
-    #if os(macOS)
-    static let platform = "mac"
+    #if os(macOS) && arch(arm64)
+    static let platform = "mac-arm64"   // the zip built for this kind of Mac
+    #elseif os(macOS)
+    static let platform = "mac-intel"
     #else
     static let platform = "iphone"
     #endif
