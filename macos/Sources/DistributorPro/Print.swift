@@ -977,18 +977,33 @@ func runPrint(_ pdf: PDFDocument, printer: String, silent: Bool) -> Bool {
     if !printer.isEmpty, let p = NSPrinter(name: printer) { info.printer = p }
     info.topMargin = 0; info.bottomMargin = 0; info.leftMargin = 0; info.rightMargin = 0
     // Half-sheet bills go out on A5 paper, one copy per sheet, the bill kept landscape across the sheet; the A4 layouts on A4, portrait.
-    // The page already carries its own white margin, so it is printed at its real size.
+    // The page carries its own white margin; it is fitted to the printable area so nothing is cut off at the edges.
+    var doc = pdf
     let size = pdf.page(at: 0)?.bounds(for: .mediaBox).size ?? Paper.a4
     if size.width > size.height {
-        // portrait A5 with the bill turned onto it (autoRotate below): asking for landscape made some printers print the
-        // page upright and cut off the right half of the bill
+        // A landscape half sheet goes on portrait A5 with the page already turned a quarter (clockwise, as on Android), so the
+        // whole bill lands on the sheet. Leaving the turn to autoRotate printed it upright on some Macs/printers and cut off the
+        // right half of the bill (HSN onwards, Bill to, totals).
+        if let data = pdf.dataRepresentation(), let copy = PDFDocument(data: data) {
+            for i in 0..<copy.pageCount {
+                if let pg = copy.page(at: i) {
+                    let b = pg.bounds(for: .mediaBox).size
+                    if b.width > b.height { pg.rotation = (pg.rotation + 90) % 360 }
+                }
+            }
+            doc = copy
+        }
         info.paperSize = Paper.a5
         info.orientation = .portrait
     } else {
         info.paperSize = Paper.a4
         info.orientation = .portrait
     }
-    guard let op = pdf.printOperation(for: info, scalingMode: .pageScaleDownToFit, autoRotate: true) else { return false }
+    info.horizontalPagination = .fit
+    info.verticalPagination = .fit
+    info.isHorizontallyCentered = true
+    info.isVerticallyCentered = true
+    guard let op = doc.printOperation(for: info, scalingMode: .pageScaleToFit, autoRotate: false) else { return false }
     op.showsPrintPanel = !silent
     op.showsProgressPanel = !silent
     return op.run()
