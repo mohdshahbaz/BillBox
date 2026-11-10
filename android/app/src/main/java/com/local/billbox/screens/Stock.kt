@@ -81,6 +81,7 @@ fun StockScreen() {
     var forceTarget by remember { mutableStateOf<Pair<J, String>?>(null) }
     var confirmBulk by remember { mutableStateOf(false) }
     var confirmZero by remember { mutableStateOf(false) }
+    var confirmAll by remember { mutableStateOf(false) }
     var catMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
     val debounce = rememberDebouncer()
@@ -130,6 +131,7 @@ fun StockScreen() {
                     item("Merge selected items…", selection.size >= 2) { sheet = "merge" },
                     item("New category…") { sheet = "category" },
                     item("Delete items with zero/negative stock…", zero.isNotEmpty(), true) { confirmZero = true },
+                    item("Delete ALL items, even those in stock…", true, true) { confirmAll = true },
                 ).forEachIndexed { i, (m, run) ->
                     if (i == 3 || i == 6 || i == 7) HorizontalDivider()
                     DropdownMenuItem(text = { Text(m.first, color = if (m.third) MaterialTheme.colorScheme.error else Color.Unspecified) }, enabled = m.second, onClick = { moreMenu = false; run() })
@@ -204,4 +206,16 @@ fun StockScreen() {
     if (confirmZero) Confirm("Delete ${zero.size} item${if (zero.size == 1) "" else "s"} with zero or negative stock?", "Items that were ever bought or sold are archived instead, so history stays intact.", "Delete ${zero.size}", {
         app.launch { busy = true; bulkDelete(zero.map { it.id }, { m, e -> app.notify(m, e) }) { outcome(it) }; selection.clear(); busy = false; load() }
     }, { confirmZero = false }, destructive = true)
+    // every active item (all categories, not only the ones on screen), deleted even when it still has stock
+    if (confirmAll) Confirm("Delete ALL items, even those still in stock?", "Every item in every category is deleted, including items that still have stock. Items that were ever bought or sold are archived instead, so old bills stay intact. Back up first (Settings › Backup): this cannot be undone.", "Delete all items", {
+        app.launch {
+            busy = true
+            val all = Api.list("/items", mapOf("all" to "1"))
+            bulkDelete(all.map { it.id }, { m, e -> app.notify(m, e) }) { id ->
+                try { if (Api.obj("DELETE", "/items/$id", mapOf("force" to 1)).str("result") == "archived") BulkOutcome.Archived else BulkOutcome.Deleted }
+                catch (e: ApiError) { BulkOutcome.Failed(all.firstOrNull { it.id == id }?.str("name") ?: "#$id", e.message) }
+            }
+            selection.clear(); selecting = false; busy = false; load()
+        }
+    }, { confirmAll = false }, destructive = true)
 }

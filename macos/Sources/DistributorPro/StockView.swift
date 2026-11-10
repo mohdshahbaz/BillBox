@@ -26,6 +26,7 @@ import AppKit
     @State private var deleteTarget: JSON?
     @State private var confirmBulkDelete = false
     @State private var confirmZeroStockDelete = false
+    @State private var confirmDeleteAll = false
 
     private var zeroStockItems: [JSON] { items.filter { $0.num("stock") <= 0 } }
 
@@ -135,6 +136,7 @@ import AppKit
                     Button("New category…") { showCategory = true }
                     Divider()
                     Button("Delete items with zero/negative stock…") { confirmZeroStockDelete = true }.disabled(zeroStockItems.isEmpty)
+                    Button("Delete ALL items, even those in stock…") { confirmDeleteAll = true }
                 } label: { Label("More", systemImage: "ellipsis.circle") }
             }
         }
@@ -169,6 +171,11 @@ import AppKit
             Button("Delete \(zeroStockItems.count)", role: .destructive) { Task { await bulkDeleteZeroStock() } }
         } message: {
             Text("Items that were ever bought or sold are archived instead, so history stays intact.")
+        }
+        .confirmationDialog("Delete ALL items, even those still in stock?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
+            Button("Delete all items", role: .destructive) { Task { await bulkDeleteAll() } }
+        } message: {
+            Text("Every item in every category is deleted, including items that still have stock. Items that were ever bought or sold are archived instead, so old bills stay intact. Back up first (Settings › Backup): this cannot be undone.")
         }
     }
 
@@ -238,6 +245,24 @@ import AppKit
     private func bulkDeleteSelected() async {
         busy = true
         await bulkDelete(Array(selection), notify: { app.notify($0) }, delete: deleteOutcome)
+        selection = []
+        busy = false
+        await load()
+    }
+
+    /// Every active item (all categories, not only the ones on screen), deleted even when it still has stock.
+    private func bulkDeleteAll() async {
+        busy = true
+        let all = (try? await API.list("/items", query: ["all": "1"])) ?? []
+        await bulkDelete(all.map(\.id), notify: { app.notify($0) }) { id -> BulkOutcome in
+            let name = all.first { $0.id == id }?.str("name") ?? "#\(id)"
+            do {
+                let r = try await API.obj("DELETE", "/items/\(id)", query: ["force": 1])
+                return r.str("result") == "archived" ? .archived : .deleted
+            } catch {
+                return .failed(label: name, reason: error.localizedDescription)
+            }
+        }
         selection = []
         busy = false
         await load()
