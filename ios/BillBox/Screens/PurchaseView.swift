@@ -55,6 +55,8 @@ struct PLine: Identifiable {
     @State private var busy = false
     @State private var showText = false
     @State private var newItemFor: PLine?
+    @State private var editItem: JSON?
+    @State private var cats: [JSON] = []
     @State private var showSupplierSheet = false
     @State private var duplicateMessage: String?
 
@@ -67,7 +69,17 @@ struct PLine: Identifiable {
 
     var body: some View { dialogs(chrome(content)) }
 
+    /// The whole bill scrolls (the item table keeps its own height and scroll), so the totals and Save stay reachable with the
+    /// keyboard up; dragging the page down puts the keyboard away.
     private var content: some View {
+        ScrollView {
+            form
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Theme.page)
+    }
+
+    private var form: some View {
         VStack(alignment: .leading, spacing: 8) {
             if editingId != nil {
                 Banner(text: "Editing a saved bill. Updating reverses the old stock and ledger entries and writes the corrected bill under the same number.", symbol: "pencil.circle.fill")
@@ -87,10 +99,10 @@ struct PLine: Identifiable {
             }
             header
             linesTable
+                .frame(height: min(460, max(220, CGFloat(lines.count) * 56 + 46)))
             totals
         }
         .padding(12)
-        .background(Theme.page)
     }
 
     @ViewBuilder private func chrome<V: View>(_ v: V) -> some View {
@@ -107,6 +119,14 @@ struct PLine: Identifiable {
                     if parsed != nil { Button { showText = true } label: { Label("View PDF text", systemImage: "doc.plaintext") } }
                     Button(editingId != nil ? "Cancel edit" : "Clear", role: .destructive) { reset() }
                 } label: { Label("More", systemImage: "ellipsis.circle") }
+            }
+        }
+        // the number pad has no Return key: Done above it puts the keyboard away
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+                    .fontWeight(.semibold)
             }
         }
         .overlay { if scanning { ProgressView("Reading the bill and adding items…").padding(20).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
@@ -136,6 +156,7 @@ struct PLine: Identifiable {
                 await loadLists()
             }
         }
+        .sheet(item: $editItem) { it in ItemSheet(item: it, cats: cats) { await loadLists() } }
         .sheet(item: $newItemFor) { l in
             NewItemSheet(line: l) { id in
                 if let i = lines.firstIndex(where: { $0.id == l.id }) { lines[i].itemId = id; lines[i].matched = true }
@@ -215,12 +236,19 @@ struct PLine: Identifiable {
                             Button("Create this item") { newItemFor = l }.controlSize(.small)
                         }
                     }
-                    SearchPicker(title: "Item", placeholder: "Select item…", choices: itemChoices, selection: lb(l.id, \.itemId, 0)) { picked in
-                        guard let i = lines.firstIndex(where: { $0.id == l.id }), let it = item(picked) else { return }
-                        lines[i].matched = true
-                        if lines[i].hsn.isEmpty { lines[i].hsn = it.str("hsn") }
-                        if lines[i].rate.isEmpty, it.num("purchase_price") > 0 { lines[i].rate = it.str("purchase_price") }
-                        lines[i].autoAmount()
+                    HStack(spacing: 6) {
+                        SearchPicker(title: "Item", placeholder: "Select item…", choices: itemChoices, selection: lb(l.id, \.itemId, 0)) { picked in
+                            guard let i = lines.firstIndex(where: { $0.id == l.id }), let it = item(picked) else { return }
+                            lines[i].matched = true
+                            if lines[i].hsn.isEmpty { lines[i].hsn = it.str("hsn") }
+                            if lines[i].rate.isEmpty, it.num("purchase_price") > 0 { lines[i].rate = it.str("purchase_price") }
+                            lines[i].autoAmount()
+                        }
+                        // edit the stock item itself (name, HSN, pack, prices…), e.g. to fix a spelling
+                        if let it = item(l.itemId) {
+                            Button { editItem = it } label: { Image(systemName: "pencil.circle") }
+                                .buttonStyle(.borderless).accessibilityLabel("Edit item")
+                        }
                     }
                     let h = hint(l)
                     if !h.isEmpty { Text(h).font(.caption).foregroundStyle(l.created ? Color.teal : Color.secondary).lineLimit(1) }
@@ -325,8 +353,10 @@ struct PLine: Identifiable {
         await app.guarded {
             async let s = API.list("/parties", query: ["kind": "SUPPLIER"])
             async let i = API.list("/items")
+            async let c = API.list("/categories")
             suppliers = try await s
             items = try await i
+            cats = (try? await c) ?? []
             itemChoices = items.map { Choice(id: $0.id, label: $0.str("name"), detail: $0.str("hsn")) }
         }
     }

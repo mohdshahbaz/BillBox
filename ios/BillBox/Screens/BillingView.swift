@@ -812,17 +812,18 @@ private struct IntCell: View {
     @Environment(\.dismiss) private var dismiss
     let boxes: [JSON]
     let done: () async -> Void
-    struct Box: Identifiable { let id = UUID(); var name = "", match = "", mrp = "0", box = "0", each = "12" }
+    struct Box: Identifiable { let id = UUID(); var name = "", match = "", category = "", mrp = "0", box = "0", each = "12" }
     @State private var rows: [Box] = []
 
     var body: some View {
         NavigationStack {
             Form {
-                Section { Text("Name words: the item name must have one of them (empty = every item); -WORD leaves out names with it. MRP 0 = any MRP. Box 0 = one lot of every item in stock. When stock is short, more lots of the same items fill the box.").font(.caption).foregroundStyle(.secondary) }
+                Section { Text("Name words: the item name must have one of them (empty = every item); -WORD leaves out names with it. Category: only items in that category (empty = any). MRP 0 = any MRP. Box 0 = one lot of every item in stock. When stock is short, more lots of the same items fill the box.").font(.caption).foregroundStyle(.secondary) }
                 ForEach($rows) { $r in
                     Section {
                         TextField("Name (₹10 Namkeen mix box)", text: $r.name)
                         TextField("Name words (-CHIPS -PAPAD)", text: $r.match).autocorrectionDisabled().textInputAutocapitalization(.characters)
+                        TextField("Category (empty = any)", text: $r.category).autocorrectionDisabled()
                         HStack { Text("MRP ₹"); TextField("0", text: $r.mrp).keyboardType(.decimalPad).multilineTextAlignment(.trailing) }
                         HStack { Text("Box pieces"); TextField("0", text: $r.box).keyboardType(.numberPad).multilineTextAlignment(.trailing) }
                         HStack { Text("Pieces of each item"); TextField("12", text: $r.each).keyboardType(.numberPad).multilineTextAlignment(.trailing) }
@@ -839,13 +840,13 @@ private struct IntCell: View {
             }
         }
         .onAppear {
-            rows = boxes.map { Box(name: $0.str("name"), match: $0.str("match"), mrp: Fmt.qty($0.num("mrp")), box: String($0.int("box")), each: String(max(1, $0.int("each")))) }
+            rows = boxes.map { Box(name: $0.str("name"), match: $0.str("match"), category: $0.str("category"), mrp: Fmt.qty($0.num("mrp")), box: String($0.int("box")), each: String(max(1, $0.int("each")))) }
         }
     }
 
     private func save() async {
         let list: [[String: Any]] = rows.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }.map {
-            ["name": $0.name.trimmingCharacters(in: .whitespaces), "match": $0.match.trimmingCharacters(in: .whitespaces),
+            ["name": $0.name.trimmingCharacters(in: .whitespaces), "match": $0.match.trimmingCharacters(in: .whitespaces), "category": $0.category.trimmingCharacters(in: .whitespaces),
              "mrp": Double($0.mrp) ?? 0, "box": Int($0.box) ?? 0, "each": max(1, Int($0.each) ?? 12)]
         }
         guard let d = try? JSONSerialization.data(withJSONObject: list), let json = String(data: d, encoding: .utf8) else { return }

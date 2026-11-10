@@ -765,23 +765,24 @@ private struct IntCell: View {
     @Environment(\.dismiss) private var dismiss
     let boxes: [JSON]
     let done: () async -> Void
-    struct Box: Identifiable { let id = UUID(); var name = "", match = "", mrp = "0", box = "0", each = "12" }
+    struct Box: Identifiable { let id = UUID(); var name = "", match = "", category = "", mrp = "0", box = "0", each = "12" }
     @State private var rows: [Box] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Mix boxes").font(.title3.bold())
-            Text("Name words: the item name must have one of them (empty = every item); -WORD leaves out names with it. MRP 0 = any MRP. Box 0 = one lot of every item in stock. When stock is short, more lots of the same items fill the box.")
+            Text("Name words: the item name must have one of them (empty = every item); -WORD leaves out names with it. Category: only items in that category (empty = any). MRP 0 = any MRP. Box 0 = one lot of every item in stock. When stock is short, more lots of the same items fill the box.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            HStack { Text("Name").frame(width: 220, alignment: .leading); Text("Name words").frame(width: 170, alignment: .leading)
+            HStack { Text("Name").frame(width: 200, alignment: .leading); Text("Name words").frame(width: 150, alignment: .leading); Text("Category").frame(width: 110, alignment: .leading)
                 Text("MRP ₹").frame(width: 60); Text("Box pc").frame(width: 60); Text("Each pc").frame(width: 60); Spacer() }
                 .font(.caption.bold()).foregroundStyle(.secondary)
             ScrollView {
                 VStack(spacing: 6) {
                     ForEach($rows) { $r in
                         HStack {
-                            TextField("₹10 Namkeen mix box", text: $r.name).frame(width: 220)
-                            TextField("-CHIPS -PAPAD", text: $r.match).frame(width: 170)
+                            TextField("₹10 Namkeen mix box", text: $r.name).frame(width: 200)
+                            TextField("-CHIPS -PAPAD", text: $r.match).frame(width: 150)
+                            TextField("any", text: $r.category).frame(width: 110)
                             TextField("0", text: $r.mrp).frame(width: 60)
                             TextField("0", text: $r.box).frame(width: 60)
                             TextField("12", text: $r.each).frame(width: 60)
@@ -801,15 +802,15 @@ private struct IntCell: View {
             }
         }
         .padding(20)
-        .frame(width: 720, height: 460)
+        .frame(width: 800, height: 460)
         .onAppear {
-            rows = boxes.map { Box(name: $0.str("name"), match: $0.str("match"), mrp: Fmt.qty($0.num("mrp")), box: String($0.int("box")), each: String(max(1, $0.int("each")))) }
+            rows = boxes.map { Box(name: $0.str("name"), match: $0.str("match"), category: $0.str("category"), mrp: Fmt.qty($0.num("mrp")), box: String($0.int("box")), each: String(max(1, $0.int("each")))) }
         }
     }
 
     private func save() async {
         let list: [[String: Any]] = rows.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }.map {
-            ["name": $0.name.trimmingCharacters(in: .whitespaces), "match": $0.match.trimmingCharacters(in: .whitespaces),
+            ["name": $0.name.trimmingCharacters(in: .whitespaces), "match": $0.match.trimmingCharacters(in: .whitespaces), "category": $0.category.trimmingCharacters(in: .whitespaces),
              "mrp": Double($0.mrp) ?? 0, "box": Int($0.box) ?? 0, "each": max(1, Int($0.each) ?? 12)]
         }
         guard let d = try? JSONSerialization.data(withJSONObject: list), let json = String(data: d, encoding: .utf8) else { return }

@@ -547,24 +547,25 @@ private fun tierNote(party: J?, st: BillingState, items: List<J>): String? {
  *  (empty = every item); "-WORD" leaves out names with it. MRP 0 = any; box 0 = one lot of every item in stock. */
 @Composable
 private fun MixBoxEditor(boxes: List<J>, onDismiss: () -> Unit, done: suspend () -> Unit) {
-    data class Box(val name: String = "", val match: String = "", val mrp: String = "0", val box: String = "0", val each: String = "12")
+    data class Box(val name: String = "", val match: String = "", val category: String = "", val mrp: String = "0", val box: String = "0", val each: String = "12")
     val rows = remember { androidx.compose.runtime.mutableStateListOf<Box>().apply {
-        addAll(boxes.map { Box(it.str("name"), it.str("match"), Fmt.qty(it.num("mrp")), it.int("box").toString(), maxOf(1, it.int("each")).toString()) })
+        addAll(boxes.map { Box(it.str("name"), it.str("match"), it.str("category"), Fmt.qty(it.num("mrp")), it.int("box").toString(), maxOf(1, it.int("each")).toString()) })
     } }
     FormDialog("Mix boxes", onDismiss, onSave = {
         val arr = org.json.JSONArray()
         rows.filter { it.name.isNotBlank() }.forEach {
-            arr.put(org.json.JSONObject().put("name", it.name.trim()).put("match", it.match.trim()).put("mrp", it.mrp.toDoubleOrNull() ?: 0.0)
+            arr.put(org.json.JSONObject().put("name", it.name.trim()).put("match", it.match.trim()).put("category", it.category.trim()).put("mrp", it.mrp.toDoubleOrNull() ?: 0.0)
                 .put("box", it.box.toIntOrNull() ?: 0).put("each", maxOf(1, it.each.toIntOrNull() ?: 12)))
         }
         Api.obj("PUT", "/settings", body = mapOf("mix_boxes" to arr.toString()))
         done()
     }) {
-        Hint("Name words: the item name must have one of them (empty = every item); -WORD leaves out names with it. MRP 0 = any MRP. Box 0 = one lot of every item in stock. When stock is short, more lots of the same items fill the box.")
+        Hint("Name words: the item name must have one of them (empty = every item); -WORD leaves out names with it. Category: only items in that category (empty = any). MRP 0 = any MRP. Box 0 = one lot of every item in stock. When stock is short, more lots of the same items fill the box.")
         rows.forEachIndexed { i, r ->
             HorizontalDivider()
             Field("Name", r.name, { rows[i] = r.copy(name = it) })
             Field("Name words", r.match, { rows[i] = r.copy(match = it) }, kb = Kb.Caps)
+            Field("Category (empty = any)", r.category, { rows[i] = r.copy(category = it) })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Field("MRP ₹", r.mrp, { rows[i] = r.copy(mrp = it) }, Modifier.weight(1f), kb = Kb.Decimal)
                 Field("Box pc", r.box, { rows[i] = r.copy(box = it) }, Modifier.weight(1f), kb = Kb.Number)

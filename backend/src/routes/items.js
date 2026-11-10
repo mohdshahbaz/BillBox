@@ -357,7 +357,8 @@ router.delete('/schemes/:id', h((req, res) => {
 // ---- Mix boxes: a box of N pieces made of `each` pieces of every matching item in stock (bill screen › Mix box) ----
 
 /** The boxes offered until the owner changes them (Settings key mix_boxes, a JSON list). `match` is words the item name
- *  must contain (any of them; none = every item), "-WORD" words it must not; `mrp` 0 = any MRP; `box` 0 = one lot of each. */
+ *  must contain (any of them; none = every item), "-WORD" words it must not; `category` (optional) the category name, or
+ *  part of it; `mrp` 0 = any MRP; `box` 0 = one lot of each. */
 const MIX_DEFAULTS = [
   { name: '₹10 Namkeen mix box', match: '-CHIPS -PAPAD', mrp: 10, box: 300, each: 12 },
   { name: '₹5 Namkeen mix box', match: '-CHIPS -PAPAD', mrp: 5, box: 432, each: 12 },
@@ -365,6 +366,7 @@ const MIX_DEFAULTS = [
   { name: 'Chatpat papad mix box', match: 'CHATPAT', mrp: 0, box: 300, each: 12 },
   { name: '₹20 Namkeen mix box', match: '-CHIPS -PAPAD', mrp: 20, box: 120, each: 10 },
   { name: 'All namkeen in stock (12 pc each)', match: '-CHIPS -PAPAD', mrp: 0, box: 0, each: 12 },
+  { name: 'Makhana mix box', match: 'MAKHANA MAKANNA', mrp: 0, box: 120, each: 10 },
 ];
 
 function mixPresets() {
@@ -381,6 +383,12 @@ function mixMatch(name, match) {
   return (!want.length || want.some((w) => n.includes(w))) && !not.some((w) => n.includes(w));
 }
 
+/** Is the item in the preset's category? Empty = any category; otherwise the category name contains it (any case). */
+function catMatch(cat, want) {
+  const w = String(want || '').trim().toUpperCase();
+  return !w || String(cat || '').toUpperCase().includes(w);
+}
+
 /** The lines of one box: `each` pieces of every matching item in stock (by name), then more lots of the same items, round
  *  after round, until the box is full or the stock runs out (`short` then says how many pieces are missing). */
 function planMix(p) {
@@ -393,7 +401,7 @@ function planMix(p) {
      LEFT JOIN (SELECT item_id, SUM(qty) stock, MIN(CASE WHEN qty>0 AND exp_date < '2099-01-01' THEN exp_date END) next_expiry
                 FROM batches GROUP BY item_id) s ON s.item_id=i.id
      WHERE i.active=1 AND COALESCE(s.stock,0) > 0 ORDER BY i.name`
-  ).all().filter((it) => mixMatch(it.name, p.match) && (!mrp || Math.abs((Number(it.mrp) || mrpFromName(it.name) || 0) - mrp) < 0.01));
+  ).all().filter((it) => mixMatch(it.name, p.match) && catMatch(it.category, p.category) && (!mrp || Math.abs((Number(it.mrp) || mrpFromName(it.name) || 0) - mrp) < 0.01));
   const pcs = new Map();
   let left = box || rows.length * each;
   for (let more = true; left > 0 && more;) {

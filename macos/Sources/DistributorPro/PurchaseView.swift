@@ -55,6 +55,8 @@ struct PLine: Identifiable {
     @State private var busy = false
     @State private var showText = false
     @State private var newItemFor: PLine?
+    @State private var editItem: JSON?
+    @State private var cats: [JSON] = []
     @State private var showSupplierSheet = false
 
     private var inter: Bool { preview?.str("supply") == "INTER" }
@@ -127,6 +129,7 @@ struct PLine: Identifiable {
             pendingSupplier = nil
             await loadLists()
         } }
+        .sheet(item: $editItem) { it in ItemSheet(item: it, cats: cats) { await loadLists() } }
         .sheet(item: $newItemFor) { l in NewItemSheet(line: l) { id in
             if let i = lines.firstIndex(where: { $0.id == l.id }) { lines[i].itemId = id; lines[i].matched = true }
             await loadLists()
@@ -195,12 +198,19 @@ struct PLine: Identifiable {
                             Button("Create this item") { newItemFor = l }.controlSize(.small)
                         }
                     }
-                    SearchPicker(title: "Item", placeholder: "Select item…", choices: itemChoices, selection: lb(l.id, \.itemId, 0)) { picked in
-                        guard let i = lines.firstIndex(where: { $0.id == l.id }), let it = item(picked) else { return }
-                        lines[i].matched = true
-                        if lines[i].hsn.isEmpty { lines[i].hsn = it.str("hsn") }
-                        if lines[i].rate.isEmpty, it.num("purchase_price") > 0 { lines[i].rate = it.str("purchase_price") }
-                        lines[i].autoAmount()
+                    HStack(spacing: 6) {
+                        SearchPicker(title: "Item", placeholder: "Select item…", choices: itemChoices, selection: lb(l.id, \.itemId, 0)) { picked in
+                            guard let i = lines.firstIndex(where: { $0.id == l.id }), let it = item(picked) else { return }
+                            lines[i].matched = true
+                            if lines[i].hsn.isEmpty { lines[i].hsn = it.str("hsn") }
+                            if lines[i].rate.isEmpty, it.num("purchase_price") > 0 { lines[i].rate = it.str("purchase_price") }
+                            lines[i].autoAmount()
+                        }
+                        // edit the stock item itself (name, HSN, pack, prices…), e.g. to fix a spelling
+                        if let it = item(l.itemId) {
+                            Button { editItem = it } label: { Image(systemName: "pencil.circle") }
+                                .buttonStyle(.borderless).help("Edit this item")
+                        }
                     }
                     let h = hint(l)
                     if !h.isEmpty { Text(h).font(.caption).foregroundStyle(l.created ? Color.teal : Color.secondary).lineLimit(1) }
@@ -298,8 +308,10 @@ struct PLine: Identifiable {
         await app.guarded {
             async let s = API.list("/parties", query: ["kind": "SUPPLIER"])
             async let i = API.list("/items")
+            async let c = API.list("/categories")
             suppliers = try await s
             items = try await i
+            cats = (try? await c) ?? []
             itemChoices = items.map { Choice(id: $0.id, label: $0.str("name"), detail: $0.str("hsn")) }
         }
     }

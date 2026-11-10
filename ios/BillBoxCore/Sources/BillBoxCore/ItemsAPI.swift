@@ -78,6 +78,7 @@ extension Router {
         ["name": "Chatpat papad mix box", "match": "CHATPAT", "mrp": 0, "box": 300, "each": 12],
         ["name": "₹20 Namkeen mix box", "match": "-CHIPS -PAPAD", "mrp": 20, "box": 120, "each": 10],
         ["name": "All namkeen in stock (12 pc each)", "match": "-CHIPS -PAPAD", "mrp": 0, "box": 0, "each": 12],
+        ["name": "Makhana mix box", "match": "MAKHANA MAKANNA", "mrp": 0, "box": 120, "each": 10],
     ]
 
     func mixPresets(_ db: Database) throws -> [Row] {
@@ -106,6 +107,7 @@ extension Router {
         let box = max(0, Int(num("box")))
         let mrp = num("mrp")
         let match = (p["match"] as? String) ?? ""
+        let wantCat = ((p["category"] as? String) ?? "").trimmingCharacters(in: .whitespaces).uppercased()
         let rows = try db.prepare("""
         SELECT i.*, c.name category, COALESCE(s.stock,0) stock, s.next_expiry
              FROM items i LEFT JOIN categories c ON c.id=i.category_id
@@ -115,7 +117,8 @@ extension Router {
         """).all().filter { it in
             let name = it.s("name") ?? ""
             let m0 = it.n("mrp"); let m = (m0.isFinite && m0 > 0) ? m0 : (PDFParser.mrpFromName(name) ?? 0)
-            return Router.mixMatch(name, match) && (mrp == 0 || abs(m - mrp) < 0.01)
+            let inCat = wantCat.isEmpty || (it.s("category") ?? "").uppercased().contains(wantCat)
+            return Router.mixMatch(name, match) && inCat && (mrp == 0 || abs(m - mrp) < 0.01)
         }
         var pcs: [Int: Int] = [:]
         var left = box > 0 ? box : rows.count * each
