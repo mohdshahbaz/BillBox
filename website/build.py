@@ -153,7 +153,14 @@ FOOT = f"""</main>
 </body></html>
 """
 
+def asset_version(m):
+    """/assets/x.js → /assets/x.js?v=<content hash>: browsers keep /assets/* for a day (_headers), so a changed file gets a new address."""
+    import hashlib, re
+    with open(os.path.join(OUT, "assets", m.group(1)), "rb") as f: return f'/assets/{m.group(1)}?v={hashlib.sha1(f.read()).hexdigest()[:10]}"'
+
 def write(path, text):
+    import re
+    text = re.sub(r'/assets/([a-z0-9_-]+\.(?:js|css))"', asset_version, text)
     full = os.path.join(OUT, path.lstrip("/"))
     if full.endswith("/"): full += "index.html"
     os.makedirs(os.path.dirname(full), exist_ok=True)
