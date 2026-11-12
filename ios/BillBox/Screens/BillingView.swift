@@ -413,7 +413,7 @@ struct BillLine: Identifiable {
 
     private var linesTable: some View {
         let calc = lineCalcs()   // worked out once per redraw, not once per cell
-        return DataGrid(lines, layoutKey: "billing", rowHeight: 44, lazy: false) {
+        return DataGrid(lines, layoutKey: "billing", rowHeight: 44, lazy: false, sortable: false) {
             GridColumn("S.No", id: "sno", min: 36, ideal: 44) { (l: BillLine) in
                 Text("\((lines.firstIndex(where: { $0.id == l.id }) ?? 0) + 1)").monospacedDigit().foregroundStyle(.secondary)
             }

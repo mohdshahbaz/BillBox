@@ -181,10 +181,15 @@ struct Choice: Identifiable, Hashable {
     var body: some View {
         HStack(spacing: 6) {
             Button { open = true } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar")
-                    Text(iso.isEmpty ? (title ?? "Choose date") : (title.map { "\($0)  " } ?? "") + Fmt.dmy(iso)).lineLimit(1).monospacedDigit()
+                HStack(spacing: 5) {
+                    Image(systemName: "calendar").font(.callout)
+                    if let title, !iso.isEmpty { Text(title).font(.caption.weight(.medium)).foregroundStyle(.secondary) }
+                    Text(iso.isEmpty ? (title ?? "Choose date") : Fmt.dmy(iso)).font(.callout.weight(.medium)).monospacedDigit()
                 }
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(Theme.accent.opacity(0.10), in: Capsule())
             }
             .accessibilityLabel((title ?? "Date") + ": " + (iso.isEmpty ? "not set" : Fmt.dmy(iso)))
             .popover(isPresented: $open) {
@@ -281,6 +286,30 @@ func bulkDelete<ID>(_ ids: [ID], notify: (String) -> Void, delete: (ID) async ->
 }
 
 enum BulkOutcome { case deleted, archived, failed(label: String, reason: String) }
+
+/// Totals under a table: label above, figure below, as many per line as fit; one figure can be marked as the main one.
+@MainActor struct SummaryCard: View {
+    struct Item { let label: String; let value: String; var strong = false; var tint: Color? = nil }
+    let items: [Item]
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 10, alignment: .leading)], alignment: .leading, spacing: 8) {
+            ForEach(items.indices, id: \.self) { i in
+                let it = items[i]
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(it.label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(it.value).font(it.strong ? .callout.weight(.bold) : .callout.weight(.medium)).monospacedDigit()
+                        .foregroundStyle(it.tint ?? Color.primary).lineLimit(1).minimumScaleFactor(0.7)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(14)
+        .padding(.horizontal, 10).padding(.bottom, 8)
+    }
+}
 
 /// A small coloured label for a status in a table or list: Sale, Purchase, Not yet, Retailer …
 @MainActor struct StatusPill: View {

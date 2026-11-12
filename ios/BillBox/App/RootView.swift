@@ -184,7 +184,7 @@ extension View {
                         .foregroundStyle(app.isCurrentFY ? Color.secondary : Color.orange).lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
-            .frame(maxWidth: 180, alignment: .leading)
+            .frame(maxWidth: 150, alignment: .leading)
         }
         .accessibilityLabel("Company \(app.companyName), financial year \(app.fyLabel)\(app.isCurrentFY ? "" : ", past year, view and edit")")
         .accessibilityHint("Switch company or financial year")

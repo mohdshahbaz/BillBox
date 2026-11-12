@@ -95,8 +95,8 @@ import SwiftUI
                 Button(role: .destructive) { confirmBulkDelete = true } label: { Label("Delete \(selection.count) selected…", systemImage: "trash") }
             }
         }) }) {
-            GridColumn("Date", id: "date", min: 86, ideal: 96) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
-            GridColumn("Type", id: "type", min: 70, ideal: 80) { (r: JSON) in
+            GridColumn("Date", id: "date", min: 104, ideal: 108) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
+            GridColumn("Type", id: "type", min: 70, ideal: 80, sort: { (r: JSON) -> Any? in r.str("type") }) { (r: JSON) in
                 StatusPill(text: billTypeName(r), tint: billTypeColor(r))
             }
             GridColumn("Bill no", id: "no", min: 110, ideal: 130) { (r: JSON) in Text(r.str("no")).monospacedDigit() }
@@ -104,10 +104,10 @@ import SwiftUI
             GridColumn("Party", id: "party", min: 140, ideal: 200) { (r: JSON) in Text(r.str("party")).lineLimit(2) }
             GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).monospacedDigit() }
             GridColumn("Paid", id: "paid", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "paid")).monospacedDigit() }
-            GridColumn("Printed", id: "printed", min: 70, ideal: 84) { (r: JSON) in
+            GridColumn("Printed", id: "printed", min: 70, ideal: 84, sort: { (r: JSON) -> Any? in r.str("type") == "SALE" ? r.int("printed") : nil }) { (r: JSON) in
                 StatusPill(text: r.str("type") != "SALE" ? "" : r.int("printed") == 1 ? "Yes" : "Not yet", tint: r.int("printed") == 1 ? Color.secondary : Color.orange)
             }
-            GridColumn("Due", id: "due", min: 90, ideal: 110, align: .trailing) { (r: JSON) in
+            GridColumn("Due", id: "due", min: 90, ideal: 110, align: .trailing, sort: { (r: JSON) -> Any? in r.num("total") - r.num("paid") }) { (r: JSON) in
                 let due = r.num("total") - r.num("paid")
                 Text(Fmt.money(due)).monospacedDigit().fontWeight(.semibold).foregroundStyle(due > 0.5 ? Color.red : Color.primary)
             }
@@ -139,22 +139,14 @@ import SwiftUI
     }
 
     private var footer: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 16) { footerItems }
-            VStack(alignment: .leading, spacing: 2) { footerItems }
-        }
-        .font(.callout)
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card)
-    }
-
-    @ViewBuilder private var footerItems: some View {
-        Text("\(rows.count) bills").foregroundStyle(.secondary)
-        Text("Sales \(Fmt.money(totals, "sales"))").monospacedDigit()
-        Text("Purchases \(Fmt.money(totals, "purchases"))").monospacedDigit()
-        if totals.num("debit_notes") > 0 { Text("Debit notes \(Fmt.money(totals, "debit_notes"))").monospacedDigit() }
-        Text("Due \(Fmt.money(totals, "due"))").monospacedDigit().fontWeight(.bold)
+        var items: [SummaryCard.Item] = [
+            .init(label: "Bills", value: "\(rows.count)"),
+            .init(label: "Sales", value: Fmt.money(totals, "sales")),
+            .init(label: "Purchases", value: Fmt.money(totals, "purchases")),
+        ]
+        if totals.num("debit_notes") > 0 { items.append(.init(label: "Debit notes", value: Fmt.money(totals, "debit_notes"))) }
+        items.append(.init(label: "Due", value: Fmt.money(totals, "due"), strong: true, tint: totals.num("due") > 0.5 ? .red : nil))
+        return SummaryCard(items: items)
     }
 
     private func delete(_ r: JSON) async {
@@ -276,13 +268,13 @@ import SwiftUI
                     .foregroundStyle(.secondary).font(.callout)
                 DataGrid(b.list("lines"), layoutKey: "billdetail") {
                     GridColumn("S.No", id: "sno", min: 44, ideal: 48, align: .trailing) { (l: JSON) in Text("\(l.rid)").monospacedDigit().foregroundStyle(.secondary) }
-                    GridColumn("Item", id: "item", min: 150, ideal: 240) { (l: JSON) in Text(l.str("item_name")).lineLimit(2) }
-                    GridColumn("Qty (box + pcs)", id: "qty", min: 90, ideal: 120, align: .trailing) { (l: JSON) in // a purchase line's qty is in its unit (boxes for BOX); pcs_qty is the pieces
+                    GridColumn("Item", id: "item", min: 150, ideal: 240, sort: { (l: JSON) -> Any? in l.str("item_name") }) { (l: JSON) in Text(l.str("item_name")).lineLimit(2) }
+                    GridColumn("Qty (box + pcs)", id: "qty", min: 90, ideal: 120, align: .trailing, sort: { (l: JSON) -> Any? in l.has("pcs_qty") ? l.int("pcs_qty") : l.int("qty") }) { (l: JSON) in // a purchase line's qty is in its unit (boxes for BOX); pcs_qty is the pieces
                         Text(Fmt.boxPcs(l.has("pcs_qty") ? l.int("pcs_qty") : l.int("qty"), l.int("pcs_per_box"))).monospacedDigit() }
-                    GridColumn("Free pcs", id: "free", min: 44, ideal: 60, align: .trailing) { (l: JSON) in Text(l.str("free_qty")).monospacedDigit() }
+                    GridColumn("Free pcs", id: "free", min: 44, ideal: 60, align: .trailing, sort: { (l: JSON) -> Any? in l.num("free_qty") }) { (l: JSON) in Text(l.str("free_qty")).monospacedDigit() }
                     GridColumn("Rate", id: "rate", min: 70, ideal: 90, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "rate")).monospacedDigit() }
                     GridColumn("Taxable", id: "taxable", min: 80, ideal: 100, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "taxable")).monospacedDigit() }
-                    GridColumn("GST", id: "gst", min: 44, ideal: 55, align: .trailing) { (l: JSON) in Text("\(l.str("gst_rate"))%").monospacedDigit() }
+                    GridColumn("GST", id: "gst", min: 44, ideal: 55, align: .trailing, sort: { (l: JSON) -> Any? in l.num("gst_rate") }) { (l: JSON) in Text("\(l.str("gst_rate"))%").monospacedDigit() }
                     GridColumn("Amount", id: "amount", min: 90, ideal: 110, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "amount")).monospacedDigit().fontWeight(.semibold) }
                 }
             }

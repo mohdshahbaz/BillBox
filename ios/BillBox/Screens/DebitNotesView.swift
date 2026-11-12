@@ -64,13 +64,13 @@ struct DNLine: Identifiable, Equatable {
             Divider()
             Button(role: .destructive) { deleting = r } label: { Label("Delete…", systemImage: "trash") }
         }) }) {
-            GridColumn("Date", id: "date", min: 86, ideal: 96) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
-            GridColumn("Note no", id: "no", min: 120, ideal: 140) { (r: JSON) in Text(r.str("note_no")).monospacedDigit() }
+            GridColumn("Date", id: "date", min: 104, ideal: 108) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
+            GridColumn("Note no", id: "no", min: 120, ideal: 140, sort: { (r: JSON) -> Any? in r.str("note_no") }) { (r: JSON) in Text(r.str("note_no")).monospacedDigit() }
             GridColumn("Supplier", id: "party", min: 140, ideal: 200) { (r: JSON) in Text(r.str("party")).lineLimit(2) }
-            GridColumn("Against bill", id: "ref", min: 90, ideal: 120) { (r: JSON) in Text(r.str("against_bill")) }
+            GridColumn("Against bill", id: "ref", min: 90, ideal: 120, sort: { (r: JSON) -> Any? in r.str("against_bill") }) { (r: JSON) in Text(r.str("against_bill")) }
             GridColumn("Reason", id: "reason", min: 90, ideal: 140) { (r: JSON) in Text(r.str("reason")).lineLimit(2) }
             GridColumn("Taxable", id: "taxable", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "taxable")).monospacedDigit() }
-            GridColumn("GST", id: "gst", min: 80, ideal: 100, align: .trailing) { (r: JSON) in Text(Fmt.money(r.num("cgst") + r.num("sgst") + r.num("igst"))).monospacedDigit() }
+            GridColumn("GST", id: "gst", min: 80, ideal: 100, align: .trailing, sort: { (r: JSON) -> Any? in r.num("cgst") + r.num("sgst") + r.num("igst") }) { (r: JSON) in Text(Fmt.money(r.num("cgst") + r.num("sgst") + r.num("igst"))).monospacedDigit() }
             GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).monospacedDigit().fontWeight(.semibold) }
         }
         .overlay {
@@ -422,13 +422,13 @@ struct DNEdit: Identifiable {
                       "Total \(Fmt.money(n, "total"))"].filter { !$0.isEmpty }.joined(separator: "   ·   "))
                     .foregroundStyle(.secondary).font(.callout)
                 DataGrid(n.list("lines"), layoutKey: "debitnotedetail") {
-                    GridColumn("Item", id: "item", min: 150, ideal: 240) { (l: JSON) in Text(l.str("item_name")).lineLimit(2) }
-                    GridColumn("Qty", id: "qty", min: 90, ideal: 120, align: .trailing) { (l: JSON) in Text(Fmt.boxPcs(l.int("pcs_qty"), l.int("pcs_per_box"))).monospacedDigit() }
+                    GridColumn("Item", id: "item", min: 150, ideal: 240, sort: { (l: JSON) -> Any? in l.str("item_name") }) { (l: JSON) in Text(l.str("item_name")).lineLimit(2) }
+                    GridColumn("Qty", id: "qty", min: 90, ideal: 120, align: .trailing, sort: { (l: JSON) -> Any? in l.int("pcs_qty") }) { (l: JSON) in Text(Fmt.boxPcs(l.int("pcs_qty"), l.int("pcs_per_box"))).monospacedDigit() }
                     GridColumn("Rate", id: "rate", min: 80, ideal: 100, align: .trailing) { (l: JSON) in Text("\(Fmt.money(l, "rate")) / \(l.str("unit") == "BOX" ? "box" : "pc")").monospacedDigit() }
-                    GridColumn("Batch", id: "batch", min: 80, ideal: 110) { (l: JSON) in Text(l.str("batch_no")).lineLimit(2) }
+                    GridColumn("Batch", id: "batch", min: 80, ideal: 110, sort: { (l: JSON) -> Any? in l.str("batch_no") }) { (l: JSON) in Text(l.str("batch_no")).lineLimit(2) }
                     GridColumn("Taxable", id: "taxable", min: 80, ideal: 100, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "taxable")).monospacedDigit() }
-                    GridColumn("GST", id: "gst", min: 44, ideal: 55, align: .trailing) { (l: JSON) in Text("\(Fmt.qty(l.num("gst_rate")))%").monospacedDigit() }
-                    GridColumn("Tax", id: "tax", min: 70, ideal: 90, align: .trailing) { (l: JSON) in Text(Fmt.money(l.num("cgst") + l.num("sgst") + l.num("igst"))).monospacedDigit() }
+                    GridColumn("GST", id: "gst", min: 44, ideal: 55, align: .trailing, sort: { (l: JSON) -> Any? in l.num("gst_rate") }) { (l: JSON) in Text("\(Fmt.qty(l.num("gst_rate")))%").monospacedDigit() }
+                    GridColumn("Tax", id: "tax", min: 70, ideal: 90, align: .trailing, sort: { (l: JSON) -> Any? in l.num("cgst") + l.num("sgst") + l.num("igst") }) { (l: JSON) in Text(Fmt.money(l.num("cgst") + l.num("sgst") + l.num("igst"))).monospacedDigit() }
                 }
                 HStack(spacing: 16) {
                     Text("Taxable \(Fmt.money(n, "taxable"))")

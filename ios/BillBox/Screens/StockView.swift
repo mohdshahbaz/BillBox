@@ -47,7 +47,7 @@ import SwiftUI
 
     private var grid: some View {
         DataGrid(items, layoutKey: "stock", selection: $selection, selecting: $selecting, onOpen: { editing = $0 }, menu: { AnyView(itemMenu($0)) }) {
-            GridColumn("Item", id: "item", min: 160, ideal: 260) { (it: JSON) in Text(it.str("name")).lineLimit(2) }
+            GridColumn("Item", id: "item", min: 160, ideal: 260, sort: { (it: JSON) -> Any? in it.str("name") }) { (it: JSON) in Text(it.str("name")).lineLimit(2) }
             GridColumn("Category", id: "category", min: 90, ideal: 140) { (it: JSON) in
                 Text(it.str("category")).foregroundStyle(it.str("category").isEmpty ? .secondary : .primary).lineLimit(1)
             }
@@ -56,22 +56,22 @@ import SwiftUI
                 Text(stockText(it)).monospacedDigit().fontWeight(.semibold)
                     .foregroundStyle(it.num("stock") <= app.lowStockQty ? Color.orange : Color.primary)
             }
-            GridColumn("Pcs per box", id: "box", min: 70, ideal: 90) { (it: JSON) in Text(it.int("pcs_per_box") > 1 ? "\(it.int("pcs_per_box"))" : "–") }
-            GridColumn("Total pcs", id: "pcs", min: 70, ideal: 90, align: .trailing, hidden: true) { (it: JSON) in Text(it.str("stock")).monospacedDigit() }
+            GridColumn("Pcs per box", id: "box", min: 70, ideal: 90, sort: { (it: JSON) -> Any? in it.int("pcs_per_box") }) { (it: JSON) in Text(it.int("pcs_per_box") > 1 ? "\(it.int("pcs_per_box"))" : "–") }
+            GridColumn("Total pcs", id: "pcs", min: 70, ideal: 90, align: .trailing, hidden: true, sort: { (it: JSON) -> Any? in it.num("stock") }) { (it: JSON) in Text(it.str("stock")).monospacedDigit() }
             GridColumn("MRP", id: "mrp", min: 70, ideal: 90) { (it: JSON) in Text(Fmt.money(it, "mrp")).monospacedDigit() }
-            GridColumn("Retail / pc (ex-GST)", id: "retail", min: 90, ideal: 120, align: .trailing) { (it: JSON) in Text(Fmt.rate(it.num("retail_price"))).monospacedDigit() }
-            GridColumn("Wholesale / pc (ex-GST)", id: "wholesale", min: 90, ideal: 120, align: .trailing) { (it: JSON) in Text(Fmt.rate(it.num("wholesale_price"))).monospacedDigit() }
+            GridColumn("Retail / pc (ex-GST)", id: "retail", min: 90, ideal: 120, align: .trailing, sort: { (it: JSON) -> Any? in it.num("retail_price") }) { (it: JSON) in Text(Fmt.rate(it.num("retail_price"))).monospacedDigit() }
+            GridColumn("Wholesale / pc (ex-GST)", id: "wholesale", min: 90, ideal: 120, align: .trailing, sort: { (it: JSON) -> Any? in it.num("wholesale_price") }) { (it: JSON) in Text(Fmt.rate(it.num("wholesale_price"))).monospacedDigit() }
             // what one whole box sells for, GST included: shows at once if a stored piece price was rounded
-            GridColumn("Retail / box (incl. GST)", id: "retailbox", min: 130, ideal: 150, align: .trailing) { (it: JSON) in
+            GridColumn("Retail / box (incl. GST)", id: "retailbox", min: 130, ideal: 150, align: .trailing, sort: { (it: JSON) -> Any? in it.num("retail_price") * Double(max(1, it.int("pcs_per_box"))) * (1 + it.num("gst_rate") / 100) }) { (it: JSON) in
                 Text(it.int("pcs_per_box") > 1 ? Fmt.money(it.num("retail_price") * Double(it.int("pcs_per_box")) * (1 + it.num("gst_rate") / 100)) : "–").monospacedDigit()
             }
-            GridColumn("Wholesale / box (incl. GST)", id: "wholesalebox", min: 140, ideal: 160, align: .trailing) { (it: JSON) in
+            GridColumn("Wholesale / box (incl. GST)", id: "wholesalebox", min: 140, ideal: 160, align: .trailing, sort: { (it: JSON) -> Any? in it.num("wholesale_price") * Double(max(1, it.int("pcs_per_box"))) * (1 + it.num("gst_rate") / 100) }) { (it: JSON) in
                 Text(it.int("pcs_per_box") > 1 ? Fmt.money(it.num("wholesale_price") * Double(it.int("pcs_per_box")) * (1 + it.num("gst_rate") / 100)) : "–").monospacedDigit()
             }
-            GridColumn("Cost", id: "cost", min: 70, ideal: 90) { (it: JSON) in Text(Fmt.money(it, "purchase_price")).monospacedDigit() }
-            GridColumn("GST", id: "gst", min: 44, ideal: 55) { (it: JSON) in Text("\(Fmt.qty(it.num("gst_rate")))%").monospacedDigit() }
-            GridColumn("Your margin", id: "margin", min: 70, ideal: 90) { (it: JSON) in Text("\(it.str("dist_margin_pct"))%").monospacedDigit() }
-            GridColumn("Retailer margin", id: "rmargin", min: 80, ideal: 110) { (it: JSON) in Text("\(it.str("retailer_margin_pct"))%").monospacedDigit() }
+            GridColumn("Cost", id: "cost", min: 70, ideal: 90, sort: { (it: JSON) -> Any? in it.num("purchase_price") }) { (it: JSON) in Text(Fmt.money(it, "purchase_price")).monospacedDigit() }
+            GridColumn("GST", id: "gst", min: 44, ideal: 55, sort: { (it: JSON) -> Any? in it.num("gst_rate") }) { (it: JSON) in Text("\(Fmt.qty(it.num("gst_rate")))%").monospacedDigit() }
+            GridColumn("Your margin", id: "margin", min: 70, ideal: 90, sort: { (it: JSON) -> Any? in it.num("dist_margin_pct") }) { (it: JSON) in Text("\(it.str("dist_margin_pct"))%").monospacedDigit() }
+            GridColumn("Retailer margin", id: "rmargin", min: 80, ideal: 110, sort: { (it: JSON) -> Any? in it.num("retailer_margin_pct") }) { (it: JSON) in Text("\(it.str("retailer_margin_pct"))%").monospacedDigit() }
         }
         .overlay {
             if loading { ProgressView() }

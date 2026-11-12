@@ -98,9 +98,9 @@ import SwiftUI
                 Text("No outlets on \(dayNames[day]). Create a route for this day and assign parties to it.").foregroundStyle(.secondary)
             } else {
                 DataGrid(outlets, layoutKey: "beat") {
-                    GridColumn("Outlet", id: "outlet", min: 150, ideal: 220) { (o: JSON) in Text(o.str("name")).lineLimit(2) }
-                    GridColumn("Route", id: "route", min: 100, ideal: 150) { (o: JSON) in Text(o.str("route_name")) }
-                    GridColumn("Last order", id: "last", min: 90, ideal: 110) { (o: JSON) in Text(o.has("last_order") ? Fmt.dmy(o.str("last_order")) : "Never") }
+                    GridColumn("Outlet", id: "outlet", min: 150, ideal: 220, sort: { (o: JSON) -> Any? in o.str("name") }) { (o: JSON) in Text(o.str("name")).lineLimit(2) }
+                    GridColumn("Route", id: "route", min: 100, ideal: 150, sort: { (o: JSON) -> Any? in o.str("route_name") }) { (o: JSON) in Text(o.str("route_name")) }
+                    GridColumn("Last order", id: "last", min: 90, ideal: 110, sort: { (o: JSON) -> Any? in o.str("last_order") }) { (o: JSON) in Text(o.has("last_order") ? Fmt.dmy(o.str("last_order")) : "Never") }
                     GridColumn("Outstanding to collect", id: "outstanding", min: 140, ideal: 170, align: .trailing) { (o: JSON) in
                         Text(Fmt.money(o, "outstanding")).monospacedDigit().fontWeight(.semibold)
                             .foregroundStyle(o.num("outstanding") > 0 ? Color.orange : Color.primary)

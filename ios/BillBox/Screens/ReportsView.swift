@@ -45,12 +45,12 @@ import SwiftUI
                     Files.copy(tsv(["Date", "No", "Supplier bill", "Party", "GSTIN", "Taxable", "CGST", "SGST", "IGST", "Round off", "Total"],
                                    rows.map { [Fmt.dmy($0.str("date")), $0.str("no"), $0.str("ref"), $0.str("party"), $0.str("gstin"), $0.str("taxable"), $0.str("cgst"), $0.str("sgst"), $0.str("igst"), $0.str("round_off"), $0.str("total")] }))
                     app.notify("Copied. Paste into Excel or Numbers.")
-                } label: { Label("Copy", systemImage: "doc.on.doc") }
+                } label: { Label("Copy", systemImage: "doc.on.doc").labelStyle(.iconOnly).font(.title3) }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             DataGrid(rows, layoutKey: "book-\(type)") {
-                GridColumn("Date", id: "date", min: 80, ideal: 95) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
+                GridColumn("Date", id: "date", min: 104, ideal: 108) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
                 GridColumn(sales ? "Invoice" : type == "debit" ? "Note no" : "Our ref", id: "no", min: 90, ideal: 120) { (r: JSON) in Text(r.str("no")).mono() }
                 GridColumn(type == "debit" ? "Against bill" : "Supplier bill", id: "ref", min: 80, ideal: 110) { (r: JSON) in Text(r.str("ref")) }
                 GridColumn("Party", id: "party", min: 140, ideal: 220) { (r: JSON) in Text(r.str("party")).lineLimit(2) }
@@ -59,7 +59,7 @@ import SwiftUI
                 GridColumn("CGST", id: "cgst", min: 80, ideal: 100, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "cgst")).mono() }
                 GridColumn("SGST", id: "sgst", min: 80, ideal: 100, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "sgst")).mono() }
                 GridColumn("IGST", id: "igst", min: 80, ideal: 100, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "igst")).mono() }
-                GridColumn("Round off", id: "round", min: 70, ideal: 90, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "round_off")).mono() }
+                GridColumn("Round off", id: "round", min: 70, ideal: 90, align: .trailing, sort: { (r: JSON) -> Any? in r.num("round_off") }) { (r: JSON) in Text(Fmt.money(r, "round_off")).mono() }
                 GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).mono().fw(.semibold) }
             }
             .overlay {
@@ -67,17 +67,14 @@ import SwiftUI
                 else if rows.isEmpty { EmptyState(title: "No entries in this period", symbol: "books.vertical") }
             }
             // totals wrap onto as many lines as the screen needs
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), alignment: .leading)], alignment: .leading, spacing: 2) {
-                Text("\(tot.int("count")) entries").foregroundStyle(.secondary)
-                Text("Taxable \(Fmt.money(tot, "taxable"))")
-                Text("CGST \(Fmt.money(tot, "cgst"))")
-                Text("SGST \(Fmt.money(tot, "sgst"))")
-                Text("IGST \(Fmt.money(tot, "igst"))")
-                Text("Total \(Fmt.money(tot, "total"))").fw(.bold)
-            }
-            .font(.callout).mono()
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(Theme.card)
+            SummaryCard(items: [
+                .init(label: "Entries", value: "\(tot.int("count"))"),
+                .init(label: "Taxable", value: Fmt.money(tot, "taxable")),
+                .init(label: "CGST", value: Fmt.money(tot, "cgst")),
+                .init(label: "SGST", value: Fmt.money(tot, "sgst")),
+                .init(label: "IGST", value: Fmt.money(tot, "igst")),
+                .init(label: "Total", value: Fmt.money(tot, "total"), strong: true),
+            ])
         }
         .task(id: "\(from)|\(to)") {
             if from.isEmpty {

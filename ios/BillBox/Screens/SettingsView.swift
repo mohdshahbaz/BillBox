@@ -428,10 +428,10 @@ import UniformTypeIdentifiers
                 GridColumn("Backup", id: "name", min: 200, ideal: 250) { (b: JSON) in
                     Text(b.str("name")).fontWeight(sel.contains(b.id) && !selecting ? .semibold : .regular)
                 }
-                GridColumn("Companies", id: "companies", min: 160, ideal: 220) { (b: JSON) in Text(b.strings("companies").joined(separator: ", ")).lineLimit(2) }
+                GridColumn("Companies", id: "companies", min: 160, ideal: 220, sort: { (b: JSON) -> Any? in b.strings("companies").joined(separator: ", ") }) { (b: JSON) in Text(b.strings("companies").joined(separator: ", ")).lineLimit(2) }
                 GridColumn("Created", id: "created", min: 140, ideal: 170) { (b: JSON) in Text(Fmt.ist(b.str("created"))) }
                 GridColumn("Company files", id: "files", min: 80, ideal: 100, align: .trailing) { (b: JSON) in Text(b.str("files")) }
-                GridColumn("Size", id: "size", min: 80, ideal: 100, align: .trailing) { (b: JSON) in Text(ByteCountFormatter.string(fromByteCount: Int64(b.num("bytes")), countStyle: .file)) }
+                GridColumn("Size", id: "size", min: 80, ideal: 100, align: .trailing, sort: { (b: JSON) -> Any? in b.num("bytes") }) { (b: JSON) in Text(ByteCountFormatter.string(fromByteCount: Int64(b.num("bytes")), countStyle: .file)) }
             }
             .frame(height: min(420, CGFloat(max(backups.count, 3)) * 40 + 60))
             .listRowInsets(EdgeInsets())

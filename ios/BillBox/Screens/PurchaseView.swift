@@ -224,7 +224,7 @@ struct PLine: Identifiable {
     }
 
     private var linesTable: some View {
-        DataGrid(lines, layoutKey: "purchase", rowHeight: 56) {
+        DataGrid(lines, layoutKey: "purchase", rowHeight: 56, sortable: false) {
             GridColumn("S.No", id: "sno", min: 36, ideal: 44) { (l: PLine) in
                 Text("\((lines.firstIndex(where: { $0.id == l.id }) ?? 0) + 1)").monospacedDigit().foregroundStyle(.secondary)
             }
