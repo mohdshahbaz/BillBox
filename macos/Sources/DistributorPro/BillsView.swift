@@ -250,7 +250,8 @@ import AppKit
                 DataGrid(b.list("lines"), layoutKey: "billdetail") {
                     GridColumn("S.No", id: "sno", min: 44, ideal: 48, align: .trailing) { (l: JSON) in Text("\(l.rid)").mono().foregroundStyle(.secondary) }
                     GridColumn("Item", id: "item", min: 160, ideal: 300) { (l: JSON) in Text(l.str("item_name")).lineLimit(1) }
-                    GridColumn("Qty (box + pcs)", id: "qty", min: 90, ideal: 120, align: .trailing) { (l: JSON) in Text(Fmt.boxPcs(l.int("qty"), l.int("pcs_per_box"))).mono() }
+                    GridColumn("Qty (box + pcs)", id: "qty", min: 90, ideal: 120, align: .trailing) { (l: JSON) in // a purchase line's qty is in its unit (boxes for BOX); pcs_qty is the pieces
+                        Text(Fmt.boxPcs(l.has("pcs_qty") ? l.int("pcs_qty") : l.int("qty"), l.int("pcs_per_box"))).mono() }
                     GridColumn("Free pcs", id: "free", min: 40, ideal: 55, align: .trailing) { (l: JSON) in Text(l.str("free_qty")).mono() }
                     GridColumn("Rate", id: "rate", min: 70, ideal: 90, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "rate")).mono() }
                     GridColumn("Taxable", id: "taxable", min: 80, ideal: 100, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "taxable")).mono() }

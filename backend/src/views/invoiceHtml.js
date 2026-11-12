@@ -45,7 +45,7 @@ ${intra ? '<br><small>Intra-state supply: CGST + SGST</small>' : '<br><small>Int
 <table style="flex:1" class="tot"><tr><td>Items total</td><td class="r">${money(inv.subtotal)}</td></tr>
 <tr><td>Discount</td><td class="r">- ${money(inv.discount)}</td></tr><tr><td>Taxable value</td><td class="r">${money(inv.taxable)}</td></tr>
 ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SGST</td><td class="r">${money(inv.sgst)}</td></tr>` : `<tr><td>IGST</td><td class="r">${money(inv.igst)}</td></tr>`}
-<tr><td>Round off</td><td class="r">${money(inv.round_off)}</td></tr><tr><td>Invoice total</td><td class="r">₹ ${money(inv.total)}</td></tr>
+<tr><td>Invoice total</td><td class="r">₹ ${money(inv.total)}</td></tr>
 <tr><td>Paid</td><td class="r">${money(inv.paid)}</td></tr><tr><td>Balance due on this bill</td><td class="r">${money(due)}</td></tr></table></div>
 <p><b>Amount in words:</b> Rupees ${words(Math.round(inv.total))} Only</p>
 <p><small>${esc(co.invoice_terms)}</small></p>

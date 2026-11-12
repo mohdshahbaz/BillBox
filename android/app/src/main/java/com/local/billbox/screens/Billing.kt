@@ -106,7 +106,7 @@ private val lineIds = AtomicLong(1)
 
 /** One line of the bill being typed. */
 data class BillLine(val itemId: Int, val name: String, val ppb: Int, val stock: Double, val boxes: Int = 0, val pcs: Int = 1,
-                    val disc: String = "", val rate: String = "", val id: Long = lineIds.getAndIncrement()) {
+                    val disc: String = "", val rate: String = "", val boxRate: String? = null, val id: Long = lineIds.getAndIncrement()) {
     val totalPcs: Int get() = BillMath.totalPcs(boxes, ppb, pcs)
 
     companion object {
@@ -483,16 +483,24 @@ private fun BillTable(st: BillingState, totals: Totals?) {
             Col("Total pcs", "total", 70, end = true) { l -> Cell("${l.totalPcs}", MaterialTheme.colorScheme.onSurfaceVariant, end = true) },
             Col("Disc %", "disc", 66) { l -> EditCell(l.disc, { v -> upd(l) { it.copy(disc = v) } }, placeholder = "0") },
             Col("Rate / pc (ex-GST)", "rate", 112, end = true) { l ->
-                EditCell(l.rate, { v -> upd(l) { it.copy(rate = v) } }, placeholder = calc[l.id]?.let { Fmt.rate(it.rate) } ?: "rate",
+                EditCell(if (l.boxRate != null) l.rate.toDoubleOrNull()?.let { Fmt.rate(it) } ?: l.rate else l.rate, { v -> upd(l) { it.copy(rate = v, boxRate = null) } }, placeholder = calc[l.id]?.let { Fmt.rate(it.rate) } ?: "rate",
                     color = if (l.rate.isEmpty()) Color.Unspecified else Warn)
             },
             Col("Rate / box", "boxrate", 104, end = true) { l ->
                 if (l.ppb > 1) {
                     val shown = l.rate.toDoubleOrNull() ?: (calc[l.id]?.rate ?: 0.0)
-                    val text = if (l.rate.isEmpty()) "" else Fmt.qty(Math.round((l.rate.toDoubleOrNull() ?: 0.0) * l.ppb * 100) / 100.0)
+                    // the box rate is shown as typed ("25.", "2499.5"): rebuilding it from the piece rate rewrote the field after every key
+                    val text = l.boxRate ?: if (l.rate.isEmpty()) "" else Fmt.qty(Math.round((l.rate.toDoubleOrNull() ?: 0.0) * l.ppb * 100) / 100.0)
                     EditCell(text, { v ->
-                        val d = v.trim().toDoubleOrNull()
-                        upd(l) { it.copy(rate = if (d != null && d >= 0) String.format(java.util.Locale.US, "%.8f", d / l.ppb) else "") }
+                        val t = v.replace(",", "").trim()
+                        val d = t.toDoubleOrNull()
+                        upd(l) {
+                            when {
+                                d != null && d >= 0 -> it.copy(rate = String.format(java.util.Locale.US, "%.8f", d / l.ppb), boxRate = v)
+                                t.isEmpty() -> it.copy(rate = "", boxRate = null)
+                                else -> it.copy(boxRate = v)
+                            }
+                        }
                     }, placeholder = Fmt.amount(shown * l.ppb), color = if (l.rate.isEmpty()) Color.Unspecified else Warn)
                 } else Cell("–")
             },

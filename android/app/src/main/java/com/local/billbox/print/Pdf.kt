@@ -75,7 +75,6 @@ data class Spec(val w: Float, val h: Float, val m: Float, val rowH: Float, val t
         if (inv.num("discount") > 0) n += 2
         if (inv.num("cgst") > 0) n += 2
         if (inv.num("igst") > 0) n += 1
-        if (abs(inv.num("round_off")) > 0) n += 1
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) n += 1
         val right = 4 + n * 9f * f + 4 + 19f * f
         val left = leftOther(co, inv, f)
@@ -484,7 +483,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         if (!compactPrint(co) || inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005) sum("Taxable value", inv.num("taxable"))
         if (inv.num("cgst") > 0) { sum("CGST", inv.num("cgst")); sum("SGST", inv.num("sgst")) }
         if (inv.num("igst") > 0) sum("IGST", inv.num("igst"))
-        if (abs(inv.num("round_off")) > 0) sum("Round off", inv.num("round_off"))
+        // the total stays rounded; the round-off line is not printed
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) sum("Paid", inv.num("paid"))
         val gh = 19f * fs
         val gy = y + g.totals - gh

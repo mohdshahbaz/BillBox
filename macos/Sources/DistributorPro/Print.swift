@@ -82,7 +82,6 @@ struct Spec {
         if inv.num("discount") > 0 { n += 2 }                                   // less discount, taxable value
         if inv.num("cgst") > 0 { n += 2 }
         if inv.num("igst") > 0 { n += 1 }
-        if abs(inv.num("round_off")) > 0 { n += 1 }
         if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { n += 1 }
         let right = CGFloat(n) * 9 * f + 6 + 17 * f
         let left = leftOther(co, inv, f)
@@ -629,7 +628,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                     if !compactPrint(co) || inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005 { sumRow("Taxable value", inv.num("taxable")) }
                     if inv.num("cgst") > 0 { sumRow("CGST", inv.num("cgst")); sumRow("SGST", inv.num("sgst")) }
                     if inv.num("igst") > 0 { sumRow("IGST", inv.num("igst")) }
-                    if abs(inv.num("round_off")) > 0 { sumRow("Round off", inv.num("round_off")) }
+                    // the total stays rounded; the round-off line is not printed
                     if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { sumRow("Paid", inv.num("paid")) }
                 }
                 .padding(.horizontal, 6).padding(.vertical, 4)

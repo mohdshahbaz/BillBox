@@ -86,7 +86,7 @@ fun margSpec(base: Spec, inv: J, co: J): Spec {
     var totals = max(classH + bankH, 9 * 8.6f * f) + 13 * f + 1.2f
     if (compact) {
         val inter = inv.num("igst") > 0
-        var n = 2 + (if (inter) 1 else 2)
+        var n = 1 + (if (inter) 1 else 2)   // round off is not printed
         if (inv.num("discount") > 0) n += 1
         if (inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005) n += 1
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) n += 1
@@ -427,7 +427,7 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         if (inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005) sums.add(lab("TAXABLE VALUE", "Taxable Value", "Taxable Value") to inv.num("taxable"))
         if (inter) sums.add(lab("IGST PAYABLE", "Add : IGST", "IGST") to inv.num("igst"))
         else { sums.add(lab("SGST PAYABLE", "Add : SGST", "SGST") to inv.num("sgst")); sums.add(lab("CGST PAYABLE", "Add : CGST", "CGST") to inv.num("cgst")) }
-        sums.add(lab("ROUND OFF", "Rounded Off", "Round off") to inv.num("round_off"))
+        // the total stays rounded; the round-off line is not printed
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) sums.add("PAID" to inv.num("paid"))
         val gh = 17 * fs
         var sy = y + 2

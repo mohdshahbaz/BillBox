@@ -274,7 +274,7 @@ fun BillDetail(row: J, onDismiss: () -> Unit, onEdit: () -> Unit, onEway: () -> 
         Box(Modifier.weight(1f)) {
             if (bill == null) Loading() else DataTable(b.list("lines"), "billdetail", columns = listOf(
                 Col("Item", "item", 220) { l -> Cell(l.str("item_name"), lines = 2) },
-                Col("Qty (box + pcs)", "qty", 120, end = true) { l -> Cell(Fmt.boxPcs(l.int("qty"), l.int("pcs_per_box")), end = true) },
+                Col("Qty (box + pcs)", "qty", 120, end = true) { l -> Cell(Fmt.boxPcs(if (l.has("pcs_qty")) l.int("pcs_qty") else l.int("qty"), l.int("pcs_per_box")), end = true) },   // purchase qty is in its unit; pcs_qty is pieces
                 Col("Free pcs", "free", 60, end = true) { l -> Cell(l.str("free_qty"), end = true) },
                 Col("Rate", "rate", 90, end = true) { l -> Cell(Fmt.money(l, "rate"), end = true) },
                 Col("Taxable", "taxable", 100, end = true) { l -> Cell(Fmt.money(l, "taxable"), end = true) },

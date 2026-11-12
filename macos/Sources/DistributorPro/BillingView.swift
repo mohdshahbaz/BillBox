@@ -12,6 +12,8 @@ struct BillLine: Identifiable {
     var disc = ""
     /// Typed selling rate per piece (ex-GST). Blank = the party's price list rate.
     var rate = ""
+    /// The box rate exactly as typed ("25.", "2499.5"), so the field never rewrites itself while typing; nil once the piece rate is typed.
+    var boxRate: String?
     var totalPcs: Int { BillMath.totalPcs(boxes: boxes, ppb: ppb, pcs: pcs) }
 
     /// A new line starts as ONE BOX when the item is packed in boxes (and a full box is in stock); otherwise one loose piece.
@@ -368,7 +370,15 @@ struct BillLine: Identifiable {
             }
 
             GridColumn("Rate / pc (ex-GST)", id: "rate", min: 100, ideal: 120, align: .trailing) { (l: BillLine) in
-                TextField("", text: lb(l.id, \.rate, ""), prompt: Text(pc(l).map { Fmt.rate($0.rate) } ?? "rate"))
+                TextField("", text: Binding(
+                    get: {
+                        guard let x = lines.first(where: { $0.id == l.id }) else { return "" }
+                        // worked out from a typed box rate: 4 decimals, not the 8 it is kept to
+                        if x.boxRate != nil, let r = Double(x.rate) { return Fmt.rate(r) }
+                        return x.rate
+                    },
+                    set: { v in if let i = lines.firstIndex(where: { $0.id == l.id }) { lines[i].boxRate = nil; lines[i].rate = v } }),
+                    prompt: Text(pc(l).map { Fmt.rate($0.rate) } ?? "rate"))
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(l.rate.isEmpty ? Color.primary : Color.orange)
                     .help("Type a different rate to override the price list for this line. Clear it to go back to the price list.")
@@ -376,13 +386,22 @@ struct BillLine: Identifiable {
 
             GridColumn("Rate / box", id: "boxrate", min: 90, ideal: 110, align: .trailing) { (l: BillLine) in
                 if l.ppb > 1 {
-                    // typing a box rate sets the piece rate to box rate / pieces per box (kept to 4 decimals)
+                    // typing a box rate sets the piece rate to box rate / pieces per box (kept to 8 decimals). The typed text is shown
+                    // as typed, and the getter reads the live line: reading the line captured at render time sent the old value back
+                    // into the field after every key, so the number jumped while typing.
                     let shown = Double(l.rate) ?? (pc(l)?.rate ?? 0)
                     TextField("", text: Binding(
-                        get: { l.rate.isEmpty ? "" : Fmt.qty(((Double(l.rate) ?? 0) * Double(l.ppb) * 100).rounded() / 100) },
+                        get: {
+                            guard let x = lines.first(where: { $0.id == l.id }) else { return "" }
+                            if let t = x.boxRate { return t }
+                            guard let r = Double(x.rate) else { return "" }
+                            return Fmt.qty((r * Double(x.ppb) * 100).rounded() / 100)
+                        },
                         set: { v in
                             guard let i = lines.firstIndex(where: { $0.id == l.id }) else { return }
-                            if let d = Double(v.trimmingCharacters(in: .whitespaces)), d >= 0 { lines[i].rate = String(format: "%.8f", d / Double(l.ppb)) } else { lines[i].rate = "" }
+                            lines[i].boxRate = v
+                            let t = v.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
+                            if let d = Double(t), d >= 0 { lines[i].rate = String(format: "%.8f", d / Double(lines[i].ppb)) } else if t.isEmpty { lines[i].rate = ""; lines[i].boxRate = nil }
                         }), prompt: Text(Fmt.amount(shown * Double(l.ppb))))
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(l.rate.isEmpty ? Color.primary : Color.orange)

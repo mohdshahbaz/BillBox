@@ -361,7 +361,6 @@ pw.Widget _totals(Json inv, Json co) {
             kv('Discount', '- ${_m(inv['discount'])}'),
             kv('Taxable value', _m(inv['taxable'])),
             if (intra) ...[kv('CGST', _m(inv['cgst'])), kv('SGST', _m(inv['sgst']))] else kv('IGST', _m(inv['igst'])),
-            kv('Round off', _m(inv['round_off'])),
             kv('Invoice total (Rs.)', _m(inv['total']), big: true),
             kv('Paid ${_m(inv['paid'])}', 'Balance ${_m(due)}'),
           ]),

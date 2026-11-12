@@ -112,7 +112,7 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
     if compact {
         // the summary beside the classes: its lines plus GRAND TOTAL
         let inter = inv.num("igst") > 0
-        var n = 2 + (inter ? 1 : 2)                                          // sub total, round off, the GST lines
+        var n = 1 + (inter ? 1 : 2)                                          // sub total, the GST lines (round off is not printed)
         if inv.num("discount") > 0 { n += 1 }
         if inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005 { n += 1 }
         if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { n += 1 }
@@ -632,7 +632,7 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
         if inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005 { rows.append((busy || bizom ? "Taxable Value" : "TAXABLE VALUE", inv.num("taxable"))) }
         if inter { rows.append((busy ? "Add : IGST" : bizom ? "IGST" : "IGST PAYABLE", inv.num("igst"))) }
         else { rows.append((busy ? "Add : SGST" : bizom ? "SGST" : "SGST PAYABLE", inv.num("sgst"))); rows.append((busy ? "Add : CGST" : bizom ? "CGST" : "CGST PAYABLE", inv.num("cgst"))) }
-        rows.append((busy ? "Rounded Off" : bizom ? "Round off" : "ROUND OFF", inv.num("round_off")))
+        // the total stays rounded; the round-off line is not printed
         if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { rows.append(("PAID", inv.num("paid"))) }
         return VStack(spacing: 0) {
             VStack(spacing: 0) {

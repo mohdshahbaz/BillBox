@@ -214,8 +214,12 @@ function getPurchase(id) {
   ).get(id);
   if (!p) return null;
   p.lines = db.prepare(
-    `SELECT l.*, it.name item_name, COALESCE(it.hsn,'') hsn FROM purchase_lines l JOIN items it ON it.id=l.item_id WHERE l.purchase_id=? ORDER BY l.id`).all(id);
-  p.lines.forEach((l, i) => { l.sno = i + 1; if (l.exp_date >= '2099-01-01') l.exp_date = null; if (!l.unit) l.unit = 'PCS'; });
+    `SELECT l.*, it.name item_name, COALESCE(it.hsn,'') hsn, MAX(1, COALESCE(it.pcs_per_box,1)) pcs_per_box FROM purchase_lines l JOIN items it ON it.id=l.item_id WHERE l.purchase_id=? ORDER BY l.id`).all(id);
+  p.lines.forEach((l, i) => {
+    l.sno = i + 1; if (l.exp_date >= '2099-01-01') l.exp_date = null; if (!l.unit) l.unit = 'PCS';
+    // pieces into stock (older lines have none saved): a BOX line's qty is boxes, so screens can show boxes and pieces
+    if (l.pcs_qty == null) l.pcs_qty = BOX_UNIT.test(l.unit) ? l.qty * l.pcs_per_box : l.qty;
+  });
   return p;
 }
 

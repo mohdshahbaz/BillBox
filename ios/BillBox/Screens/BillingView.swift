@@ -11,6 +11,8 @@ struct BillLine: Identifiable {
     var disc = ""
     /// Typed selling rate per piece (ex-GST). Blank = the party's price list rate.
     var rate = ""
+    /// The box rate exactly as typed, so the field never rewrites itself while typing; nil once the piece rate is typed.
+    var boxRate: String?
     var totalPcs: Int { BillMath.totalPcs(boxes: boxes, ppb: ppb, pcs: pcs) }
 
     /// A new line starts as ONE BOX when the item is packed in boxes; otherwise one loose piece.
@@ -378,11 +380,30 @@ struct BillLine: Identifiable {
 
     private func boxRateBinding(_ l: BillLine) -> Binding<String> {
         Binding(
-            get: { l.rate.isEmpty ? "" : Fmt.qty(((Double(l.rate) ?? 0) * Double(l.ppb) * 100).rounded() / 100) },
+            // the live line, and the box rate as typed: the line captured at render time sent the old value back after every key
+            get: {
+                guard let x = lines.first(where: { $0.id == l.id }) else { return "" }
+                if let t = x.boxRate { return t }
+                guard let r = Double(x.rate) else { return "" }
+                return Fmt.qty((r * Double(x.ppb) * 100).rounded() / 100)
+            },
             set: { v in
                 guard let i = lines.firstIndex(where: { $0.id == l.id }) else { return }
-                if let d = Double(v.trimmingCharacters(in: .whitespaces)), d >= 0 { lines[i].rate = String(format: "%.8f", d / Double(l.ppb)) } else { lines[i].rate = "" }
+                lines[i].boxRate = v
+                let t = v.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
+                if let d = Double(t), d >= 0 { lines[i].rate = String(format: "%.8f", d / Double(lines[i].ppb)) } else if t.isEmpty { lines[i].rate = ""; lines[i].boxRate = nil }
             })
+    }
+
+    /// Piece rate: 4 decimals when it was worked out from a typed box rate; typing here replaces the box rate.
+    private func pieceRateBinding(_ l: BillLine) -> Binding<String> {
+        Binding(
+            get: {
+                guard let x = lines.first(where: { $0.id == l.id }) else { return "" }
+                if x.boxRate != nil, let r = Double(x.rate) { return Fmt.rate(r) }
+                return x.rate
+            },
+            set: { v in if let i = lines.firstIndex(where: { $0.id == l.id }) { lines[i].boxRate = nil; lines[i].rate = v } })
     }
 
     private var linesTable: some View {
@@ -413,7 +434,7 @@ struct BillLine: Identifiable {
                     .accessibilityLabel("Discount percent for \(l.name)")
             }
             GridColumn("Rate / pc (ex-GST)", id: "rate", min: 100, ideal: 116, align: .trailing) { (l: BillLine) in
-                TextField("", text: lb(l.id, \.rate, ""), prompt: Text(calc[l.id].map { Fmt.rate($0.rate) } ?? "rate"))
+                TextField("", text: pieceRateBinding(l), prompt: Text(calc[l.id].map { Fmt.rate($0.rate) } ?? "rate"))
                     .multilineTextAlignment(.trailing).keyboardType(.decimalPad)
                     .foregroundStyle(l.rate.isEmpty ? Color.primary : Color.orange)
                     .accessibilityLabel("Rate per piece for \(l.name). Type a different rate to override the price list; clear it to go back.")

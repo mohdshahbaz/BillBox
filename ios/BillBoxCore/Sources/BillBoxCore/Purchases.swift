@@ -252,11 +252,17 @@ enum Purchases {
         guard var p = try db.prepare("""
         SELECT pu.*, pa.name party_name, pa.gstin party_gstin, pa.state_code party_state FROM purchases pu JOIN parties pa ON pa.id=pu.party_id WHERE pu.id=?
         """).get(id) else { return nil }
-        var lines = try db.prepare("SELECT l.*, it.name item_name, COALESCE(it.hsn,'') hsn FROM purchase_lines l JOIN items it ON it.id=l.item_id WHERE l.purchase_id=? ORDER BY l.id").all(id)
+        var lines = try db.prepare("SELECT l.*, it.name item_name, COALESCE(it.hsn,'') hsn, MAX(1, COALESCE(it.pcs_per_box,1)) pcs_per_box FROM purchase_lines l JOIN items it ON it.id=l.item_id WHERE l.purchase_id=? ORDER BY l.id").all(id)
         for i in lines.indices {
             lines[i]["sno"] = i + 1
             if lines[i].str("exp_date") >= "2099-01-01" { lines[i]["exp_date"] = NSNull() }
             if !JS.truthy(lines[i]["unit"]) { lines[i]["unit"] = "PCS" }
+            // pieces into stock (older lines have none saved): a BOX line's qty is boxes
+            let saved = lines[i]["pcs_qty"]
+            if saved == nil || saved is NSNull {
+                let q = JS.number(lines[i]["qty"])
+                lines[i]["pcs_qty"] = BOX_UNIT.test(JS.string(lines[i]["unit"])) ? q * JS.number(lines[i]["pcs_per_box"]) : q
+            }
         }
         p["lines"] = lines
         return p

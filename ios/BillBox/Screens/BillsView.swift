@@ -277,7 +277,8 @@ import SwiftUI
                 DataGrid(b.list("lines"), layoutKey: "billdetail") {
                     GridColumn("S.No", id: "sno", min: 44, ideal: 48, align: .trailing) { (l: JSON) in Text("\(l.rid)").monospacedDigit().foregroundStyle(.secondary) }
                     GridColumn("Item", id: "item", min: 150, ideal: 240) { (l: JSON) in Text(l.str("item_name")).lineLimit(2) }
-                    GridColumn("Qty (box + pcs)", id: "qty", min: 90, ideal: 120, align: .trailing) { (l: JSON) in Text(Fmt.boxPcs(l.int("qty"), l.int("pcs_per_box"))).monospacedDigit() }
+                    GridColumn("Qty (box + pcs)", id: "qty", min: 90, ideal: 120, align: .trailing) { (l: JSON) in // a purchase line's qty is in its unit (boxes for BOX); pcs_qty is the pieces
+                        Text(Fmt.boxPcs(l.has("pcs_qty") ? l.int("pcs_qty") : l.int("qty"), l.int("pcs_per_box"))).monospacedDigit() }
                     GridColumn("Free pcs", id: "free", min: 44, ideal: 60, align: .trailing) { (l: JSON) in Text(l.str("free_qty")).monospacedDigit() }
                     GridColumn("Rate", id: "rate", min: 70, ideal: 90, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "rate")).monospacedDigit() }
                     GridColumn("Taxable", id: "taxable", min: 80, ideal: 100, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "taxable")).monospacedDigit() }
