@@ -115,8 +115,8 @@ final class AppModel: ObservableObject {
         ready = true
         startSyncLoop()
         // a newer BillBox: said once when the app opens (Settings › Updates installs it)
-        // (not in the simulator self-test: the banner would cover the top of every screenshot)
-        if !SimSelfTest.asked { Task { [weak self] in
+        // (not in the simulator: the self-test's screenshots would all have the banner over their top)
+        if !Self.inSimulator { Task { [weak self] in
             if let u = try? await AppUpdate.check(), u.bool("available") { self?.notify("BillBox \(u.str("latest")) is available: Settings › Updates.") }
         } }
     }
@@ -294,6 +294,15 @@ final class AppModel: ObservableObject {
     /// Runs work and shows any failure as a banner instead of crashing or going silent.
     func guarded(_ work: () async throws -> Void) async {
         do { try await work() } catch { notify(error.localizedDescription, error: true) }
+    }
+
+    /// Running in the iOS Simulator (the GitHub self-test).
+    static var inSimulator: Bool {
+        #if targetEnvironment(simulator)
+        true
+        #else
+        false
+        #endif
     }
 
     /// Like `guarded`, but also hands back what went wrong, so a screen whose list could not load shows it in place
