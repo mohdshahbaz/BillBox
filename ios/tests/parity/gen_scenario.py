@@ -360,7 +360,8 @@ post('/backup/drive/connect'); post('/backup/drive/upload'); post('/backup/drive
 
 # ---------------- Parties › Assign routes: customers without a route get the route named in their name or address
 for n, ad in [('Verma Store', 'Near railway station, Bijnor'), ('Civil Lines Medical', ''), ('Stationwala Kirana', 'Main bazaar'),
-              ('Nagina Road Agency', 'Nagina Road, near Civil Lines'), ('No Match Traders', 'Kotdwar')]:
+              ('Nagina Road Agency', 'Nagina Road, near Civil Lines'), ('Patel Medical', 'Opp. Civil Hospital'), ('Yadav Dairy', 'Station Road 12'),
+              ('No Match Traders', 'Kotdwar')]:
     post('/parties', {'name': n, 'address': ad}, company=1)
 post('/routes/auto-assign', {}, company=1); post('/routes/auto-assign', {'apply': False}, company=1)
 post('/routes/auto-assign', {'apply': True, 'party_ids': [0]}, company=1); post('/routes/auto-assign', {'apply': True}, company=1)

@@ -203,7 +203,7 @@ fun PartiesScreen() {
     }, { confirmBulk = false }, destructive = true)
 }
 
-/** Customers without a route get the route named in their name or address (POST /routes/auto-assign): preview, untick, apply. */
+/** Customers without a route get the route sharing a word with their name or address (POST /routes/auto-assign): preview, untick, apply. */
 @Composable
 fun AutoRouteForm(onDismiss: () -> Unit, done: suspend () -> Unit) {
     val app = LocalApp.current
@@ -219,10 +219,10 @@ fun AutoRouteForm(onDismiss: () -> Unit, done: suspend () -> Unit) {
     }) {
         val p = preview
         if (p == null) { Loading(); return@FormDialog }
-        Hint(if (matches.isEmpty()) "No customer without a route has a route name in their name or address."
-             else "${matches.size} customers without a route have a route name in their name or address. Untick any that are wrong.")
+        Hint(if (matches.isEmpty()) "No customer without a route shares a word with a route name."
+             else "${matches.size} customers without a route share a word with a route name. Untick any that are wrong.")
         if (p.int("unclear") > 0 || p.int("unmatched") > 0)
-            Hint("Left as they are: ${p.int("unmatched")} with no route name found" + (if (p.int("unclear") > 0) ", ${p.int("unclear")} matching more than one route" else "") + ".")
+            Hint("Left as they are: ${p.int("unmatched")} sharing no word with a route" + (if (p.int("unclear") > 0) ", ${p.int("unclear")} matching two routes equally" else "") + ".")
         matches.forEach { m ->
             val id = m.int("party_id")
             Row(Modifier.fillMaxWidth().clickable { if (id in skip) skip.remove(id) else skip.add(id) }, verticalAlignment = Alignment.CenterVertically) {

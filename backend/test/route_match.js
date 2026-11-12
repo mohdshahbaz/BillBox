@@ -2,7 +2,7 @@
 const os = require('os'), fs = require('fs'), path = require('path'), assert = require('assert');
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'routematch-'));
 const db = require('../src/db');
-const { autoAssignRoutes, routeKey } = require('../src/utils/routematch');
+const { autoAssignRoutes, routeKey, placeWords } = require('../src/utils/routematch');
 let passed = 0;
 const ok = (name, fn) => { db.withCompany(db.firstCompanyId(), fn); passed++; console.log('  ok  ', name); };
 const route = (name) => Number(db.prepare('INSERT INTO routes(name) VALUES(?)').run(name).lastInsertRowid);
@@ -10,13 +10,14 @@ const party = (name, address, type = 'RETAILER', route_id = null) =>
   Number(db.prepare('INSERT INTO parties(name,address,type,route_id) VALUES(?,?,?,?)').run(name, address, type, route_id).lastInsertRowid);
 const routeOf = (id) => db.prepare('SELECT route_id FROM parties WHERE id=?').get(id).route_id;
 
-ok('route names: filler words and weekdays ignored, too-short names skipped', () => {
+ok('route words: ROUTE, BEAT, weekdays, ROAD, NAGAR… and short or digit-only words are not used', () => {
+  assert.deepStrictEqual(placeWords('Civil Lines Route (Mon)'), ['CIVIL', 'LINES']);
+  assert.deepStrictEqual(placeWords('Main Road Sector 4'), []);
   assert.strictEqual(routeKey('Khajrana Route (Mon)'), ' KHAJRANA ');
   assert.strictEqual(routeKey('MONDAY BEAT - New Palasia'), ' NEW PALASIA ');
   assert.strictEqual(routeKey('A1'), null);
-  assert.strictEqual(routeKey('Route'), ' ROUTE ', 'a name made only of filler is kept as it is');
 });
-ok('matches by name or address, whole words, longest route wins; suppliers and assigned parties left alone', () => {
+ok('whole words in name or address; the longer whole route name breaks a tie; suppliers and assigned parties left alone', () => {
   const kh = route('KHAJRANA ROUTE'), pal = route('Palasia'), npal = route('New Palasia'), mhow = route('MHOW');
   const a = party('SHARMA STORE KHAJRANA', '');
   const b = party('GUPTA KIRANA', 'Shop 4, near temple, khajrana, Indore');
@@ -30,23 +31,25 @@ ok('matches by name or address, whole words, longest route wins; suppliers and a
   assert.deepStrictEqual(got, { [a]: kh, [b]: kh, [c]: npal, [d]: pal });
   assert.strictEqual(prev.unmatched, 1); assert.strictEqual(prev.assigned, 0);
   assert.strictEqual(routeOf(a), null, 'preview changes nothing');
-  const done = autoAssignRoutes(db, { apply: true, party_ids: [a, c] });
-  assert.strictEqual(done.assigned, 2);
+  assert.strictEqual(autoAssignRoutes(db, { apply: true, party_ids: [a, c] }).assigned, 2);
   assert.strictEqual(routeOf(a), kh); assert.strictEqual(routeOf(c), npal); assert.strictEqual(routeOf(b), null);
   assert.strictEqual(routeOf(f), null); assert.strictEqual(routeOf(g), mhow);
   assert.strictEqual(autoAssignRoutes(db, { apply: true }).assigned, 2, 'the rest');
   assert.strictEqual(routeOf(b), kh); assert.strictEqual(routeOf(d), pal);
 });
-ok('a route in the name comes first; two equally long routes are unclear, skipped', () => {
-  const ng = route('Nagina Road'); route('Civil Lines');
-  const n = party('NAGINA ROAD AGENCY', 'near Civil Lines');
-  const both = party('PATEL STORES', 'Nagina Road, near Civil Lines');
-  const r0 = autoAssignRoutes(db, { apply: true });
-  assert.strictEqual(routeOf(n), ng); assert.strictEqual(routeOf(both), null); assert.ok(r0.unclear >= 1);
-
+ok('any word of the route counts; the name counts before the address; ROAD alone does not', () => {
+  const ng = route('Nagina Road'), cl = route('Civil Lines Beat');
+  const n = party('NAGINA ROAD AGENCY', 'near Civil Lines');            // name beats address
+  const both = party('PATEL STORES', 'Nagina Road, near Civil Lines');   // address: Civil + Lines beat Nagina
+  const one = party('GUPTA MEDICAL', 'Opp. Civil Hospital');             // one word is enough
+  const road = party('YADAV DAIRY', 'Station Road');
+  autoAssignRoutes(db, { apply: true });
+  assert.strictEqual(routeOf(n), ng); assert.strictEqual(routeOf(both), cl); assert.strictEqual(routeOf(one), cl); assert.strictEqual(routeOf(road), null);
+});
+ok('two routes level on every rule: unclear, skipped', () => {
   route('RAJWADA'); route('Rajwada');
   const p = party('SONI STORE', 'Rajwada');
   const r = autoAssignRoutes(db, { apply: true });
-  assert.strictEqual(r.unclear, 2, "Patel Stores and Soni Store"); assert.strictEqual(routeOf(p), null);
+  assert.strictEqual(r.unclear, 1); assert.strictEqual(routeOf(p), null);
 });
 console.log(`${passed} route matching checks passed`);

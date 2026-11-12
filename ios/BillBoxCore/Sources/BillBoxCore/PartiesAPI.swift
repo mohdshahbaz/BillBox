@@ -201,12 +201,21 @@ extension Router {
         return ["ok": true, "into": into.v("id"), "moved": moved] as Row
     }
 
-    // utils/routematch.js: outlets without a route get the route named in their name or address.
+    // utils/routematch.js: outlets without a route get the route that shares a word with their name or address.
     static let ROUTE_FILLER: Set<String> = ["ROUTE", "ROUTES", "BEAT", "MON", "TUE", "TUES", "WED", "THU", "THUR", "THURS", "FRI", "SAT", "SUN",
         "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+    static let ROUTE_GENERIC: Set<String> = ["ROAD", "NAGAR", "MARG", "CHOWK", "CHAURAHA", "BAZAR", "BAZAAR", "MARKET", "MANDI", "COLONY", "STREET",
+        "NEAR", "MAIN", "GALI", "LANE", "SECTOR", "AREA", "SIDE", "THE", "AND", "OPP", "OPPOSITE", "BEHIND", "SHOP", "STORE", "STORES"]
     static func routeWords(_ s: String) -> [String] {
         let up = s.uppercased().unicodeScalars.map { ($0 >= "A" && $0 <= "Z") || ($0 >= "0" && $0 <= "9") ? Character($0) : " " }
         return String(up).split(separator: " ").map(String.init)
+    }
+    static func routePlaceWords(_ name: String) -> [String] {
+        var seen = Set<String>(), out: [String] = []
+        for w in routeWords(name) where w.count >= 3 && !w.allSatisfy({ $0.isASCII && $0.isNumber }) && !ROUTE_FILLER.contains(w) && !ROUTE_GENERIC.contains(w) {
+            if seen.insert(w).inserted { out.append(w) }
+        }
+        return out
     }
     static func routeKey(_ name: String) -> String? {
         let all = routeWords(name)
@@ -218,10 +227,11 @@ extension Router {
     /// {matches: [{party_id, party_name, address, route_id, route_name}], unclear, unmatched, assigned}; apply → also assigns them.
     func autoAssignRoutes(_ db: Database, _ b: Row) throws -> Any {
         let apply = JS.truthy(b["apply"] ?? nil)
-        let only: Set<Double>? = (unwrap(b["party_ids"] ?? nil) as? [Any]).map { Set($0.map { JS.number($0) }) }
-        let routes: [(id: Any?, name: String, key: String)] = try db.prepare("SELECT id, name FROM routes").all().compactMap { r in
+        let only: Set<Double>? = (unwrap(b["party_ids"] ?? nil) as? [Any]).map { ids in Set(ids.map { JS.number($0) }) }
+        let routes: [(id: Any?, name: String, words: [String], key: String?)] = try db.prepare("SELECT id, name FROM routes").all().compactMap { r in
             let name = JS.string(r.v("name"))
-            return Router.routeKey(name).map { (id: r.v("id"), name: name, key: $0) }
+            let w = Router.routePlaceWords(name)
+            return w.isEmpty ? nil : (id: r.v("id"), name: name, words: w, key: Router.routeKey(name))
         }
         let parties = try db.prepare("SELECT id, name, address FROM parties WHERE active=1 AND route_id IS NULL AND type <> 'SUPPLIER' ORDER BY name").all()
         var matches: [Row] = []
@@ -229,15 +239,22 @@ extension Router {
         for p in parties {
             if let only, !only.contains(JS.number(p.v("id"))) { continue }
             let addr = p.v("address") == nil ? "" : JS.string(p.v("address"))
-            let inName = " " + Router.routeWords(JS.string(p.v("name"))).joined(separator: " ") + " "
-            let inAddress = " " + Router.routeWords(addr).joined(separator: " ") + " "
-            var hit = routes.filter { inName.contains($0.key) }
-            if hit.isEmpty { hit = routes.filter { inAddress.contains($0.key) } }
-            if hit.isEmpty { unmatched += 1; continue }
-            let len = hit.map { $0.key.count }.max() ?? 0
-            let best = hit.filter { $0.key.count == len }
-            if best.count > 1 { unclear += 1; continue }
-            matches.append(["party_id": p.v("id"), "party_name": p.v("name"), "address": addr, "route_id": best[0].id, "route_name": best[0].name] as Row)
+            let nameList = Router.routeWords(JS.string(p.v("name"))), addrList = Router.routeWords(addr)
+            let nameW = Set(nameList), addrW = Set(addrList)
+            let text = " " + nameList.joined(separator: " ") + " | " + addrList.joined(separator: " ") + " "
+            var scored: [(i: Int, s: [Int])] = []
+            for (i, r) in routes.enumerated() {
+                let inName = r.words.filter { nameW.contains($0) }.count
+                let inAddr = r.words.filter { !nameW.contains($0) && addrW.contains($0) }.count
+                if inName + inAddr == 0 { continue }
+                let phrase = r.key.map { text.contains($0) ? $0.count : 0 } ?? 0
+                scored.append((i: i, s: [inName, inAddr, phrase]))
+            }
+            if scored.isEmpty { unmatched += 1; continue }
+            scored.sort { $1.s.lexicographicallyPrecedes($0.s) }   // best first
+            if scored.count > 1 && scored[0].s == scored[1].s { unclear += 1; continue }
+            let best = routes[scored[0].i]
+            matches.append(["party_id": p.v("id"), "party_name": p.v("name"), "address": addr, "route_id": best.id, "route_name": best.name] as Row)
         }
         if apply && !matches.isEmpty {
             try db.transaction {

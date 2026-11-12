@@ -57,7 +57,7 @@ class _PartiesState extends State<PartiesScreen> {
     });
   }
 
-  /// Customers without a route get the route named in their name or address (POST /routes/auto-assign): preview, untick, apply.
+  /// Customers without a route get the route sharing a word with their name or address (POST /routes/auto-assign): preview, untick, apply.
   Future<void> _autoRoutes() => guard(context, () async {
         final pre = await Api.post('/routes/auto-assign', {'apply': false}) as Json;
         if (!mounted) return;
@@ -74,12 +74,12 @@ class _PartiesState extends State<PartiesScreen> {
                 width: math.min(620.0, MediaQuery.sizeOf(ctx).width - 80),
                 child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(matches.isEmpty
-                      ? 'No customer without a route has a route name in their name or address.'
-                      : '${matches.length} customers without a route have a route name in their name or address. Untick any that are wrong.'),
+                      ? 'No customer without a route shares a word with a route name.'
+                      : '${matches.length} customers without a route share a word with a route name. Untick any that are wrong.'),
                   if (unclear > 0 || unmatched > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text('Left as they are: $unmatched with no route name found${unclear > 0 ? ', $unclear matching more than one route' : ''}.',
+                      child: Text('Left as they are: $unmatched sharing no word with a route${unclear > 0 ? ', $unclear matching two routes equally' : ''}.',
                           style: Theme.of(ctx).textTheme.bodySmall),
                     ),
                   const SizedBox(height: 8),

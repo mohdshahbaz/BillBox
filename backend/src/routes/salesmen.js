@@ -63,7 +63,7 @@ router.post('/routes', h((req, res) => {
   res.status(201).json({ id: Number(info.lastInsertRowid) });
 }));
 
-/** Outlets without a route get the route named in their name or address: {apply: false} previews, {apply: true, party_ids?} assigns. */
+/** Outlets without a route get the route sharing a word with their name or address: {apply: false} previews, {apply: true, party_ids?} assigns. */
 router.post('/routes/auto-assign', h((req, res) => {
   const b = req.body || {};
   res.json(require('../utils/routematch').autoAssignRoutes(db, { apply: !!b.apply, party_ids: b.party_ids }));

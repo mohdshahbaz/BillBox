@@ -88,7 +88,7 @@ let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
             }
             ToolbarItemGroup {
                 Button { creating = true } label: { Label(supplier ? "New supplier" : "New customer", systemImage: "person.badge.plus") }
-                if !supplier { Button { autoRoutes = true } label: { Label("Assign routes", systemImage: "point.topleft.down.curvedto.point.bottomright.up") }.help("Give customers without a route the route named in their name or address") }
+                if !supplier { Button { autoRoutes = true } label: { Label("Assign routes", systemImage: "point.topleft.down.curvedto.point.bottomright.up") }.help("Give customers without a route the route that shares a word with their name or address") }
             }
         }
         .task { await load() }
@@ -434,7 +434,7 @@ extension PartiesView {
     }
 }
 
-/// Outlets without a route get the route named in their name or address (POST /routes/auto-assign): preview, untick, apply.
+/// Outlets without a route get the route sharing a word with their name or address (POST /routes/auto-assign): preview, untick, apply.
 @MainActor struct AutoRouteSheet: View {
     @EnvironmentObject private var app: AppModel
     let done: () async -> Void
@@ -451,11 +451,11 @@ extension PartiesView {
             await done()
         }) {
             if let p = preview {
-                Text(matches.isEmpty ? "No customer without a route has a route name in their name or address."
-                     : "\(matches.count) customers without a route have a route name in their name or address. Untick any that are wrong.")
+                Text(matches.isEmpty ? "No customer without a route shares a word with a route name."
+                     : "\(matches.count) customers without a route share a word with a route name. Untick any that are wrong.")
                     .foregroundStyle(.secondary)
                 if p.int("unclear") > 0 || p.int("unmatched") > 0 {
-                    Text("Left as they are: \(p.int("unmatched")) with no route name found\(p.int("unclear") > 0 ? ", \(p.int("unclear")) matching more than one route" : "").")
+                    Text("Left as they are: \(p.int("unmatched")) sharing no word with a route\(p.int("unclear") > 0 ? ", \(p.int("unclear")) matching two routes equally" : "").")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 ForEach(matches) { m in
