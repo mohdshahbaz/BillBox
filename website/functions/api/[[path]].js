@@ -7,16 +7,19 @@
  *   GET  /api/<env>/config                         prices, the Razorpay key id (public) and the UPI id for the buy page
  *   POST /api/<env>/order      {plan, email, name, device}         a Razorpay order for that plan
  *   POST /api/<env>/verify     {order_id, payment_id, signature}   checks the payment, returns the licence key
- *   POST /api/<env>/lookup     {email, payment_id}                 the licence key of a payment again
+ *   POST /api/<env>/claim      {plan, email, name, method, ref}    a direct UPI / bank transfer (no fees), waits for the owner
+ *   POST /api/<env>/lookup     {email, payment_id}                 the licence key of a payment (or a confirmed UPI/bank ref) again
  *   POST /api/<env>/activate   {key, device, name}                 an activation for one device (at most `devices`)
  *   POST /api/<env>/deactivate {key, device}                       frees that device's place
  *   POST /api/<env>/webhook    (Razorpay: payment.captured)         issues the licence even if the buyer closed the page
  *   POST /api/<env>/admin/issue  {plan, email, name, days?, devices?, note?}   (Authorization: Bearer ADMIN_TOKEN)
  *   POST /api/<env>/admin/revoke {id}     GET /api/<env>/admin/list
+ *   GET  /api/<env>/admin/claims   POST /api/<env>/admin/approve {ref}   POST /api/<env>/admin/reject {ref}
  *
  * Bindings: KV namespace LICENSES; secrets RZP_KEY_ID_LIVE, RZP_KEY_SECRET_LIVE, RZP_KEY_ID_TEST, RZP_KEY_SECRET_TEST,
  * RZP_WEBHOOK_SECRET (optional), LICENSE_KEY_LIVE, LICENSE_KEY_TEST (Ed25519 private keys, PKCS#8 in base64),
- * ADMIN_TOKEN, UPI_VPA (optional, shown for direct UPI payment).
+ * ADMIN_TOKEN, UPI_VPA and BANK_DETAILS (optional: direct UPI and bank transfer, no fees; BANK_DETAILS is
+ * "Name|Account number|IFSC|Bank").
  *
  * Token: "BB1." + base64url(JSON) + "." + base64url(Ed25519 signature of the part before the second dot). The apps
  * check tokens with the matching public key (backend/src/services/license.js, ios/BillBoxCore/License.swift).
@@ -88,6 +91,8 @@ async function rzpCall(env, which, method, path, body) {
   return j;
 }
 
+const cleanRef = (r) => String(r || '').replace(/[\s-]+/g, '').toUpperCase().slice(0, 30);
+const bank = (env) => { const b = String(env.BANK_DETAILS || '').split('|').map((x) => x.trim()); return b[0] && b[1] && b[2] ? { name: b[0], account: b[1], ifsc: b[2], bank: b[3] || '' } : null; };
 const cleanEmail = (e) => String(e || '').trim().toLowerCase().slice(0, 120);
 const newId = () => 'L' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 7).toUpperCase();
 
@@ -114,7 +119,7 @@ async function handle(request, env, which, path) {
   const body = method === 'POST' ? await request.clone().json().catch(() => ({})) : {};
 
   if (path === 'config' && method === 'GET') {
-    return json({ env: which, key_id: rzp(env, which).id || '', upi_vpa: env.UPI_VPA || '', devices: DEVICES,
+    return json({ env: which, key_id: rzp(env, which).id || '', upi_vpa: env.UPI_VPA || '', bank: bank(env), devices: DEVICES,
       plans: Object.fromEntries(Object.entries(PLANS).map(([k, p]) => [k, { plan: p.plan, amount: p.amount, currency: p.currency, label: p.label }])) });
   }
 
@@ -154,11 +159,35 @@ async function handle(request, env, which, path) {
     return json({ ok: true });
   }
 
+  if (path === 'claim' && method === 'POST') {
+    const p = PLANS[body.plan];
+    if (!p) throw new Fail(400, 'Choose a plan.');
+    if (p.currency !== 'INR') throw new Fail(400, 'UPI and bank transfer work in rupees only.');
+    const m = body.method === 'bank' ? 'bank' : 'upi';
+    if (m === 'upi' ? !env.UPI_VPA : !bank(env)) throw new Fail(503, 'This way of paying is not set up yet.');
+    const email = cleanEmail(body.email);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Fail(400, 'Enter your e-mail address: the licence key is kept for it.');
+    const ref = cleanRef(body.ref);
+    if (!/^[A-Z0-9]{10,22}$/.test(ref)) throw new Fail(400, m === 'upi' ? 'Enter the 12-digit UPI reference (UTR) from your UPI app.' : 'Enter the UTR / reference number of the transfer.');
+    const had = await kvGet(env, `${which}:claim:${ref}`);
+    if (had) {
+      if (had.email !== email) throw new Fail(409, 'That reference was already sent. Write to the seller if this is a mistake.');
+      if (had.status === 'approved') return json({ status: 'approved', ...out(await kvGet(env, `${which}:licence:${had.licence}`)) });
+      return json({ status: had.status, ref });
+    }
+    await kvPut(env, `${which}:claim:${ref}`, { ref, method: m, plan_key: body.plan, plan: p.plan, amount: p.amount, email, name: String(body.name || '').slice(0, 80), status: 'pending', created: new Date().toISOString() });
+    return json({ status: 'pending', ref });
+  }
+
   if (path === 'lookup' && method === 'POST') {
-    const id = await kvGet(env, `${which}:payment:${String(body.payment_id || '').trim()}`);
+    const raw = String(body.payment_id || '').trim(), email = cleanEmail(body.email);
+    const id = (await kvGet(env, `${which}:payment:${raw}`)) || (await kvGet(env, `${which}:payment:${cleanRef(raw)}`));
     const rec = id && (await kvGet(env, `${which}:licence:${id}`));
-    if (!rec || rec.email !== cleanEmail(body.email)) throw new Fail(404, 'No licence for that e-mail and payment ID.');
-    return json(out(rec));
+    if (rec && rec.email === email) return json(out(rec));
+    const c = await kvGet(env, `${which}:claim:${cleanRef(raw)}`);
+    if (c && c.email === email && c.status === 'pending') throw new Fail(404, 'Your payment is waiting to be confirmed — usually within a few hours. Check back here later.', 'PENDING');
+    if (c && c.email === email && c.status === 'rejected') throw new Fail(404, 'This payment could not be found in our account. Write to the seller with the reference and a screenshot.', 'REJECTED');
+    throw new Fail(404, 'No licence for that e-mail and payment ID.');
   }
 
   if ((path === 'activate' || path === 'deactivate') && method === 'POST') {
@@ -201,6 +230,21 @@ async function handle(request, env, which, path) {
       if (!rec) throw new Fail(404, 'No such licence.');
       rec.revoked = body.undo ? false : true; await kvPut(env, `${which}:licence:${rec.id}`, rec);
       return json({ ok: true, revoked: rec.revoked });
+    }
+    if (what === 'claims' && method === 'GET') {
+      const l = await env.LICENSES.list({ prefix: `${which}:claim:` });
+      const rows = [];
+      for (const k of l.keys.slice(0, 500)) { const r = await kvGet(env, k.name); if (r) rows.push(r); }
+      return json(rows.sort((a, b) => (b.status === 'pending') - (a.status === 'pending') || (a.created < b.created ? 1 : -1)));
+    }
+    if ((what === 'approve' || what === 'reject') && method === 'POST') {
+      const c = await kvGet(env, `${which}:claim:${cleanRef(body.ref)}`);
+      if (!c) throw new Fail(404, 'No such payment.');
+      if (what === 'reject') { if (c.status !== 'approved') { c.status = 'rejected'; await kvPut(env, `${which}:claim:${c.ref}`, c); } return json({ ok: true, status: c.status }); }
+      const p = PLANS[c.plan_key];
+      const rec = await issue(env, which, { plan: p.plan, days: p.days, email: c.email, name: c.name, payment: c.ref, note: `${c.method.toUpperCase()} ${c.ref}`, by: c.method });
+      c.status = 'approved'; c.licence = rec.id; await kvPut(env, `${which}:claim:${c.ref}`, c);
+      return json({ status: 'approved', ...out(rec) });
     }
     if (what === 'list' && method === 'GET') {
       const l = await env.LICENSES.list({ prefix: `${which}:licence:` });

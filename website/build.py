@@ -104,7 +104,7 @@ FAQ = [
     ("How many devices does one licence cover?", "Two devices — any mix of Mac, Windows, Linux, iPhone and Android. Remove the licence from one device (Settings › Licence) to move it to another."),
     ("Can I move my books from Marg ERP?", "Yes. BillBox imports items, parties, batches and opening balances from a Marg backup (Mac, iPhone and Android; Windows and Linux soon)."),
     ("Where is my data stored?", "Only on your devices, in a SQLite database per company. Backups go to a folder you choose and, if you switch it on, to your own Google Drive. We never see your books."),
-    ("Which payment methods do you accept?", "UPI, cards, net banking and wallets through Razorpay, or direct UPI with no fees. Outside India: international cards in US dollars."),
+    ("Which payment methods do you accept?", "UPI, cards, net banking and wallets through Razorpay, or direct UPI / bank transfer with no fees. Outside India: international cards in US dollars."),
 ]
 
 def head(title, desc, path, extra_ld=None, image=None):
@@ -280,7 +280,7 @@ def pricing():
     s = head("BillBox pricing — ₹1,499 a year or ₹3,999 for life", "BillBox costs ₹1,499 a year or ₹3,999 for life in India ($29 a year elsewhere). Every feature, every app, two devices, 15-day free trial.", "/pricing/", [software_ld()])
     s += f"""<section class="hero"><div class="wrap center"><p class="eyebrow">Pricing</p><h1>Pay once a year.<br class="d"> <span class="grad">Or never again.</span></h1>
   <p class="lead">Every feature on every app. Try it free for 15 days — no card needed.</p>{pricing_cards()}
-  <p style="color:var(--muted);margin-top:28px;font-size:15px">Prices include GST where it applies. Pay by UPI, cards, net banking or wallets (Razorpay), or by direct UPI with no fees. <a href="/refunds/">Refunds</a>.</p>
+  <p style="color:var(--muted);margin-top:28px;font-size:15px">Prices include GST where it applies. Pay by UPI, cards, net banking or wallets (Razorpay), or by direct UPI or bank transfer with no fees. <a href="/refunds/">Refunds</a>.</p>
 </div></section>"""
     write("/pricing/", s + FOOT)
 
@@ -299,7 +299,7 @@ def buy():
     </div>
     <label for="email">E-mail (your licence is kept for it)</label><input id="email" type="email" autocomplete="email" required placeholder="you@business.in">
     <label for="name">Business name (optional)</label><input id="name" autocomplete="organization" placeholder="Your business">
-    <div class="btns" style="justify-content:flex-start"><button class="btn" id="pay" type="button">Pay with Razorpay</button><button class="btn ghost" id="upiBtn" type="button">Pay by UPI directly (no fees)</button></div>
+    <div class="btns" style="justify-content:flex-start"><button class="btn" id="pay" type="button">Pay with Razorpay</button><button class="btn ghost" id="upiBtn" type="button">UPI direct (no fees)</button><button class="btn ghost" id="bankBtn" type="button" hidden>Bank transfer (no fees)</button></div>
     <div id="msg"></div>
   </form>
   <div class="card" id="done" hidden style="margin-top:28px"><h3>Thank you! Here is your licence key</h3>
@@ -307,11 +307,16 @@ def buy():
     <div class="keybox" id="key"></div><div class="btns" style="justify-content:flex-start"><button class="btn" id="copy" type="button">Copy the key</button></div>
     <p style="color:var(--muted);font-size:14px" id="keyinfo"></p></div>
   <div class="card" id="upi" hidden style="margin-top:28px"><h3>Pay by UPI</h3>
-    <p style="color:var(--muted)">Scan with any UPI app (GPay, PhonePe, Paytm, BHIM) or pay to <b id="vpa"></b>. Then send the UPI reference number and your e-mail to <a id="mailto"></a> — your licence key comes back by e-mail, usually within a few hours.</p>
-    <div class="center"><div id="qr"></div></div></div>
+    <p style="color:var(--muted)">Scan with any UPI app (GPay, PhonePe, Paytm, BHIM) or pay to <b id="vpa"></b>.</p>
+    <div class="center"><div id="qr"></div><p id="upiApp"></p></div></div>
+  <div class="card" id="bank" hidden style="margin-top:28px"><h3>Bank transfer (IMPS / NEFT / RTGS)</h3>
+    <p style="color:var(--muted)">Send <b id="bamt"></b> to:</p><div class="keybox" id="bdetails"></div></div>
+  <div class="card" id="claim" hidden style="margin-top:28px"><h3>Paid? Send the reference</h3>
+    <label for="cref" id="creflabel">UPI reference / UTR (12 digits, in your UPI app's payment details)</label><input id="cref" inputmode="text" autocomplete="off">
+    <div class="btns" style="justify-content:flex-start"><button class="btn" id="claimBtn" type="button">I have paid</button></div><div id="cmsg"></div></div>
   <div class="card" id="find" style="margin-top:28px"><h3>Find my licence key</h3>
     <label for="femail">E-mail used when paying</label><input id="femail" type="email">
-    <label for="fpay">Razorpay payment ID (pay_…, in the receipt e-mail)</label><input id="fpay">
+    <label for="fpay">Razorpay payment ID (pay_…) or your UPI / bank reference</label><input id="fpay">
     <div class="btns" style="justify-content:flex-start"><button class="btn" id="findBtn" type="button">Show my key</button></div><div id="fmsg"></div></div>
 </div></section>
 <script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
@@ -329,7 +334,7 @@ def legal(path, title, desc, body):
 def legal_pages():
     legal("/privacy/", "Privacy policy", "How BillBox handles your data: your books stay on your devices.", f"""
 <h2>Your books</h2><p>BillBox keeps your companies, bills, stock and ledgers only on your own devices. We do not receive, store or read them. Backups go to the folder you choose and, if you switch it on, to your own Google Drive using permission only for files BillBox itself creates.</p>
-<h2>Licences and payments</h2><p>When you buy, we keep your e-mail, business name (if given), the plan, the payment ID and the anonymous ID of each device using the licence, so that the licence can be checked and recovered. Payments are processed by Razorpay; we never see your card or bank details.</p>
+<h2>Licences and payments</h2><p>When you buy, we keep your e-mail, business name (if given), the plan, the payment ID (or the UPI / bank reference you send) and the anonymous ID of each device using the licence, so that the licence can be checked and recovered. Card, net banking and wallet payments are processed by Razorpay; we never see your card or bank login details.</p>
 <h2>Website</h2><p>This website does not use advertising or tracking cookies.</p>
 <h2>Your choices</h2><p>Write to <a href="mailto:{EMAIL}">{EMAIL}</a> to see or delete the licence data we hold about you.</p>""")
     legal("/terms/", "Terms of use", "The terms for using and buying BillBox.", f"""
@@ -367,6 +372,9 @@ def admin():
       <label class="choice"><input type="radio" name="env" value="test" checked><b>Test</b><span>admin apps</span></label>
       <label class="choice"><input type="radio" name="env" value="live"><b>Live</b><span>public apps</span></label></div>
   </div>
+  <div class="card" style="margin-top:20px"><h3>Payments to confirm (UPI, bank)</h3><p style="color:var(--muted);font-size:14px">Check each reference in your bank / UPI app first; Confirm makes the licence and the buyer sees the key on the buy page.</p>
+    <div class="btns" style="justify-content:flex-start;margin-top:10px"><button class="btn" id="loadClaims" type="button">Load</button></div>
+    <div style="overflow-x:auto"><table id="claims" style="width:100%;font-size:14px;margin-top:14px;border-collapse:collapse"></table></div></div>
   <div class="card" style="margin-top:20px"><h3>Issue a licence (UPI, cash, free)</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 16px">
       <div><label for="iplan">Plan</label><select id="iplan"><option value="yearly">Yearly</option><option value="lifetime">Lifetime</option></select></div>

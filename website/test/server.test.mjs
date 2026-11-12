@@ -19,7 +19,7 @@ L.KEYS.live = live.x; L.KEYS.test = test.x;
 const store = new Map();
 const env = {
   LICENSES: { get: async (k) => store.get(k) ?? null, put: async (k, v) => { store.set(k, v); }, list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })) }) },
-  LICENSE_KEY_LIVE: live.der, LICENSE_KEY_TEST: test.der, RZP_KEY_ID_TEST: 'rzp_test_X', RZP_KEY_SECRET_TEST: 'sekret', ADMIN_TOKEN: 'adm1n', UPI_VPA: 'ak@upi',
+  LICENSE_KEY_LIVE: live.der, LICENSE_KEY_TEST: test.der, RZP_KEY_ID_TEST: 'rzp_test_X', RZP_KEY_SECRET_TEST: 'sekret', ADMIN_TOKEN: 'adm1n', UPI_VPA: 'ak@upi', BANK_DETAILS: 'AK Enterprises|1234567890|SBIN0000001|SBI',
 };
 const orders = {};
 const realFetch = globalThis.fetch;
@@ -86,6 +86,33 @@ await ok('admin: issue (for a UPI or cash sale), list, revoke; wrong token refus
   assert.strictEqual((await call('POST', 'test/admin/revoke', { id: r.license_id }, { authorization: 'Bearer adm1n' })).j.revoked, true);
   const a = await call('POST', 'test/activate', { key: r.license_key, device: 'Z' });
   assert.strictEqual(a.status, 403); assert.strictEqual(a.j.code, 'REVOKED');
+});
+await ok('direct UPI / bank: claim waits, owner confirms, key found by e-mail + reference; bad ones refused', async () => {
+  const A = { authorization: 'Bearer adm1n' };
+  const c = (await call('GET', 'test/config')).j;
+  assert.strictEqual(c.upi_vpa, 'ak@upi'); assert.deepStrictEqual(c.bank, { name: 'AK Enterprises', account: '1234567890', ifsc: 'SBIN0000001', bank: 'SBI' });
+  assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_usd', email: 'u@v.in', method: 'upi', ref: '123456789012' })).status, 400, 'rupees only');
+  assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_inr', email: 'u@v.in', method: 'upi', ref: '12' })).status, 400, 'short ref');
+  const r = (await call('POST', 'test/claim', { plan: 'lifetime_inr', email: 'U@v.in', name: 'Shop', method: 'upi', ref: '4321 5678 9012' })).j;
+  assert.deepStrictEqual(r, { status: 'pending', ref: '432156789012' });
+  assert.strictEqual((await call('POST', 'test/claim', { plan: 'lifetime_inr', email: 'x@y.in', method: 'upi', ref: '432156789012' })).status, 409, 'someone else cannot reuse the ref');
+  const wait = await call('POST', 'test/lookup', { email: 'u@v.in', payment_id: '432156789012' });
+  assert.strictEqual(wait.status, 404); assert.strictEqual(wait.j.code, 'PENDING');
+  assert.strictEqual((await call('GET', 'test/admin/claims')).status, 401);
+  const list = (await call('GET', 'test/admin/claims', null, A)).j;
+  assert.strictEqual(list[0].ref, '432156789012'); assert.strictEqual(list[0].status, 'pending');
+  const ap = (await call('POST', 'test/admin/approve', { ref: '432156789012' }, A)).j;
+  assert.strictEqual(ap.plan, 'lifetime'); assert.ok(ap.license_key.startsWith('BB1.'));
+  assert.strictEqual((await call('POST', 'test/admin/approve', { ref: '432156789012' }, A)).j.license_key, ap.license_key, 'confirming twice gives the same licence');
+  assert.strictEqual((await call('POST', 'test/lookup', { email: 'u@v.in', payment_id: '4321-5678-9012' })).j.license_key, ap.license_key);
+  assert.strictEqual((await call('POST', 'test/claim', { plan: 'lifetime_inr', email: 'u@v.in', method: 'upi', ref: '432156789012' })).j.license_key, ap.license_key);
+  assert.strictEqual((await L.activate({ key: ap.license_key })).state, 'licensed');
+  (await call('POST', 'test/claim', { plan: 'yearly_inr', email: 'b@k.in', method: 'bank', ref: 'SBIN26111200001' }));
+  assert.strictEqual((await call('POST', 'test/admin/reject', { ref: 'SBIN26111200001' }, A)).j.status, 'rejected');
+  assert.strictEqual((await call('POST', 'test/lookup', { email: 'b@k.in', payment_id: 'SBIN26111200001' })).j.code, 'REJECTED');
+  delete env.BANK_DETAILS;
+  assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_inr', email: 'b@k.in', method: 'bank', ref: 'SBIN26111200002' })).status, 503, 'bank not set up');
+  assert.strictEqual((await call('GET', 'test/config')).j.bank, null);
 });
 await ok('prices: ₹1,499 yearly, ₹3,999 lifetime, $29 yearly', async () => {
   assert.deepStrictEqual([PLANS.yearly_inr.amount, PLANS.lifetime_inr.amount, PLANS.yearly_usd.amount], [149900, 399900, 2900]);

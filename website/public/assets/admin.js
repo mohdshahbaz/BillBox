@@ -1,4 +1,4 @@
-// Owner's licence page: issue (for UPI or cash sales), list and revoke, through /api/<env>/admin/… with the admin token.
+// Owner's licence page: confirm direct UPI / bank payments, issue (for cash sales), list and revoke, through /api/<env>/admin/… with the admin token.
 (function () {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -25,5 +25,16 @@
       $('list').querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', async () => { await call('POST', 'revoke', { id: b.dataset.id, undo: !!b.dataset.undo }); load(); }));
     } catch (e) { $('list').innerHTML = `<tr><td><div class="notice err">${esc(e.message)}</div></td></tr>`; }
   }
+  async function loadClaims() {
+    try {
+      const rows = await call('GET', 'claims');
+      $('claims').innerHTML = rows.length ? '<tr><th align=left>Sent</th><th align=left>E-mail</th><th align=left>Plan</th><th align=left>Reference</th><th align=left>Status</th><th></th></tr>' + rows.map((r) =>
+        `<tr style="border-top:1px solid var(--line)"><td>${esc(r.created.slice(0, 16).replace('T', ' '))}</td><td>${esc(r.email)}<div style="color:var(--muted);font-size:12px">${esc(r.name)}</div></td><td>${esc(r.plan)} ₹${(r.amount / 100).toLocaleString('en-IN')}</td><td><b>${esc(r.ref)}</b><div style="color:var(--muted);font-size:12px">${esc(r.method.toUpperCase())}</div></td><td>${esc(r.status)}</td><td>${r.status === 'pending' ? `<button class="btn" data-ok="${esc(r.ref)}">Confirm</button> <button class="btn ghost" data-no="${esc(r.ref)}">Not received</button>` : ''}</td></tr>`).join('')
+        : '<tr><td style="color:var(--muted)">No UPI or bank payments sent yet.</td></tr>';
+      $('claims').querySelectorAll('[data-ok]').forEach((b) => b.addEventListener('click', async () => { await call('POST', 'approve', { ref: b.dataset.ok }); loadClaims(); }));
+      $('claims').querySelectorAll('[data-no]').forEach((b) => b.addEventListener('click', async () => { await call('POST', 'reject', { ref: b.dataset.no }); loadClaims(); }));
+    } catch (e) { $('claims').innerHTML = `<tr><td><div class="notice err">${esc(e.message)}</div></td></tr>`; }
+  }
+  $('loadClaims').addEventListener('click', loadClaims);
   $('load').addEventListener('click', load);
 })();

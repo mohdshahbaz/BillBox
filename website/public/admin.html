@@ -31,6 +31,9 @@
       <label class="choice"><input type="radio" name="env" value="test" checked><b>Test</b><span>admin apps</span></label>
       <label class="choice"><input type="radio" name="env" value="live"><b>Live</b><span>public apps</span></label></div>
   </div>
+  <div class="card" style="margin-top:20px"><h3>Payments to confirm (UPI, bank)</h3><p style="color:var(--muted);font-size:14px">Check each reference in your bank / UPI app first; Confirm makes the licence and the buyer sees the key on the buy page.</p>
+    <div class="btns" style="justify-content:flex-start;margin-top:10px"><button class="btn" id="loadClaims" type="button">Load</button></div>
+    <div style="overflow-x:auto"><table id="claims" style="width:100%;font-size:14px;margin-top:14px;border-collapse:collapse"></table></div></div>
   <div class="card" style="margin-top:20px"><h3>Issue a licence (UPI, cash, free)</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 16px">
       <div><label for="iplan">Plan</label><select id="iplan"><option value="yearly">Yearly</option><option value="lifetime">Lifetime</option></select></div>
