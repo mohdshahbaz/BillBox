@@ -6,7 +6,7 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 1. Design research and `docs/DESIGN_SYSTEM.md`
 - [x] 2. iPhone: shared components to the design system
 - [x] 3. iPhone: screen by screen, self-test screenshots reviewed
-- [ ] 4. Android: theme and components (Material 3), then screens; Android self-test (in progress)
+- [x] 4. Android: theme and components (Material 3), then screens; Android self-test
 - [ ] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow
 - [ ] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
 - [ ] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
@@ -14,6 +14,11 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [ ] 9. Docs updated, one pull request into `main` (not merged)
 
 ## Log
+- 2026-11-12 (run 2, end): stage 4 done. Android: status pills (bill type, printed, party type), tabular figures for
+  amounts, summary card clears the floating button, self-test now also shoots 5 screens in dark mode.
+  Android self-test 8ed38b7: API 31 and API 34 both 543/543 steps match (API 31 had 499 differences before the
+  randomUUID fix); light and dark screenshots reviewed. CI green on be32f31 (engines agree, Android builds).
+  Last iPhone self-test: 43314544985 (b293417) green.
 - 2026-11-12 (run 2, later): stage 3 done. iPhone self-test 43314544985 (b293417, unit tests on): 17 tests passed,
   543/543 steps match, no crash reports, screenshots reviewed (no banner, chips wrap, summary cards, nothing cut).
   Stage 4 started: Android `DS` tokens; semantic colours `Good/Bad/Warn/Info/Money` now light/dark pairs with AA
@@ -45,6 +50,8 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - iPhone/Android tables still run past the screen edge (sideways scroll by design).
 
 ## Next
-Stage 4: check Android self-test for f33071b (API 31 and 34: parity 0 differences, screenshots light; add dark
-screenshots if the workflow lacks them), then screens: status pills in Bills/Parties, skeleton/error states on lists,
-NavigationRail on large screens (exists), billing bar. Then stage 5 (Flutter desktop).
+Stage 5: Windows/Linux Flutter (`frontend/`): no Flutter in the cloud sandbox, so rely on the Desktop workflow
+(`desktop.yml`, run it with workflow_dispatch on ui-overhaul) for `flutter analyze` and both builds. Bring
+`lib/widgets.dart` theme onto docs/DESIGN_SYSTEM.md (ColorScheme from accent, semantic colours with dark pairs,
+rounded table cards with tinted header, summary cards, tabular figures), NavigationRail, keyboard shortcuts.
+Then stage 6 (Mac), 7 (backend perf), 8 (bills), 9 (docs + PR).
