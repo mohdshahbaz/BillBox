@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' show FontFeature;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -476,7 +475,7 @@ String? isoFromDmy(String s) {
   if (m == null) return RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(s.trim()) ? s.trim() : null;
   final y = m[3]!.length == 2 ? '20${m[3]}' : m[3]!;
   final d = DateTime.tryParse('$y-${m[2]!.padLeft(2, '0')}-${m[1]!.padLeft(2, '0')}');
-  return d == null ? null : d.toIso8601String().substring(0, 10);
+  return d?.toIso8601String().substring(0, 10);
 }
 
 String todayStr() => DateTime.now().toIso8601String().substring(0, 10);

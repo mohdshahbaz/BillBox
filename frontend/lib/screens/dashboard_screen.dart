@@ -61,16 +61,16 @@ class _DashboardState extends State<DashboardScreen> {
                 Row(children: [
                   Container(
                     padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(9)),
+                    decoration: BoxDecoration(color: color.withValues(alpha: .12), borderRadius: BorderRadius.circular(9)),
                     child: Icon(icon, size: 18, color: color),
                   ),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(label, style: TextStyle(color: Palette.muted, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Expanded(child: Text(label, style: const TextStyle(color: Palette.muted, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
                 ]),
                 const SizedBox(height: 14),
                 Text(value, style: tabular.copyWith(fontSize: 25, fontWeight: FontWeight.w700, color: Palette.ink, letterSpacing: -.5)),
                 const SizedBox(height: 4),
-                Text(sub, style: TextStyle(color: Palette.muted, fontSize: 12), maxLines: 2),
+                Text(sub, style: const TextStyle(color: Palette.muted, fontSize: 12), maxLines: 2),
               ]),
             ),
           );
@@ -79,7 +79,7 @@ class _DashboardState extends State<DashboardScreen> {
         Panel(title: 'Sales and purchases, last 14 days', child: _Bars(series: (x['series'] as List).cast<Json>())),
         Panel(
           title: 'Low stock alerts',
-          trailing: Text('${x['low_stock_count']} items', style: TextStyle(color: Palette.muted, fontSize: 12)),
+          trailing: Text('${x['low_stock_count']} items', style: const TextStyle(color: Palette.muted, fontSize: 12)),
           child: (x['low_stock'] as List).isEmpty
               ? const Text('No item is at or below the low-stock level.', style: TextStyle(color: Palette.muted))
               : Column(children: [
@@ -111,7 +111,7 @@ class _DashboardState extends State<DashboardScreen> {
         Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${_greeting()}', style: TextStyle(color: Palette.muted, fontSize: 14)),
+              Text(_greeting(), style: const TextStyle(color: Palette.muted, fontSize: 14)),
               Text(company, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: Palette.ink, letterSpacing: -.6)),
             ]),
           ),

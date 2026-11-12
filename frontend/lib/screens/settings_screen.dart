@@ -76,12 +76,12 @@ class _Companies extends StatelessWidget {
           child: Panel(
             padding: const EdgeInsets.all(16),
             child: Row(children: [
-              CircleAvatar(backgroundColor: Palette.teal.withOpacity(.12), child: Text('${c['name']}'.substring(0, 1).toUpperCase(), style: const TextStyle(color: Palette.teal, fontWeight: FontWeight.w700))),
+              CircleAvatar(backgroundColor: Palette.teal.withValues(alpha: .12), child: Text('${c['name']}'.substring(0, 1).toUpperCase(), style: const TextStyle(color: Palette.teal, fontWeight: FontWeight.w700))),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${c['name']}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  Text('GSTIN ${(c['company_gstin'] ?? '') == '' ? 'not set' : c['company_gstin']}  ·  State ${c['state_code']}  ·  ${c['company_address'] ?? ''}', style: TextStyle(color: Palette.muted, fontSize: 12)),
+                  Text('GSTIN ${(c['company_gstin'] ?? '') == '' ? 'not set' : c['company_gstin']}  ·  State ${c['state_code']}  ·  ${c['company_address'] ?? ''}', style: const TextStyle(color: Palette.muted, fontSize: 12)),
                 ]),
               ),
               if (c['id'] == app.companyId)
