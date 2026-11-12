@@ -17,6 +17,27 @@ router.post('/categories', h((req, res) => {
   const info = db.prepare('INSERT INTO categories(name) VALUES(?)').run(req.body.name.trim());
   res.status(201).json({ id: Number(info.lastInsertRowid), name: req.body.name.trim() });
 }));
+/** Rename. Another category already using the name (any case): 409. */
+router.put('/categories/:id', h((req, res) => {
+  const cur = db.prepare('SELECT * FROM categories WHERE id=?').get(req.params.id);
+  if (!cur) throw new HttpError(404, 'Category not found');
+  if (!blank(req.body.name)) throw new HttpError(400, 'Category name is required');
+  const name = req.body.name.trim();
+  if (db.prepare('SELECT id FROM categories WHERE lower(name)=lower(?) AND id<>?').get(name, cur.id)) throw new HttpError(409, 'A category with that name already exists');
+  db.prepare('UPDATE categories SET name=? WHERE id=?').run(name, cur.id);
+  res.json({ id: cur.id, name });
+}));
+/** Delete: its items become Uncategorised, then the category goes. */
+router.delete('/categories/:id', h((req, res) => {
+  const cur = db.prepare('SELECT * FROM categories WHERE id=?').get(req.params.id);
+  if (!cur) throw new HttpError(404, 'Category not found');
+  let moved = 0;
+  db.transaction(() => {
+    moved = db.prepare('UPDATE items SET category_id=NULL WHERE category_id=?').run(cur.id).changes;
+    db.prepare('DELETE FROM categories WHERE id=?').run(cur.id);
+  })();
+  res.json({ ok: true, uncategorised: moved });
+}));
 
 // ---------- items ----------
 const withMargins = (it) => {

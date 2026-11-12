@@ -3,6 +3,7 @@
 #   git tag v15.2.0 && git push origin v15.2.0        → v15.2.0 (public) and v15.2.0-admin (admin), both published
 #   or: Actions › Release › Run workflow › both / public / admin (the version can be left empty: next number)
 #   a version ending in -admin (v15.2.0-admin) makes only the admin build
+#   every push to main also starts an admin build with the next number (admin-auto.yml)
 #
 # Android is signed with your release key when these repository secrets exist (android/tools/make_keystore.sh makes them):
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD

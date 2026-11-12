@@ -333,7 +333,7 @@ struct BillLine: Identifiable {
     }
 
     private var linesTable: some View {
-        DataGrid(lines, layoutKey: "billing", rowHeight: 38) {
+        DataGrid(lines, layoutKey: "billing", rowHeight: 38, arrowCursor: false) {
             GridColumn("S.No", id: "sno", min: 36, ideal: 44) { (l: BillLine) in
                 Text("\((lines.firstIndex(where: { $0.id == l.id }) ?? 0) + 1)").mono().foregroundStyle(.secondary)
             }

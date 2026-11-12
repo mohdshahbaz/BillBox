@@ -19,6 +19,8 @@ import SwiftUI
     @State private var schemeFor: JSON?
     @State private var showBulk = false
     @State private var showCategory = false
+    @State private var renamingCat: JSON?
+    @State private var deletingCat: JSON?
     @State private var showOnline = false
     @State private var showTidy = false
     @State private var showMerge = false
@@ -30,6 +32,7 @@ import SwiftUI
     @State private var confirmDeleteAll = false
 
     private var zeroStockItems: [JSON] { items.filter { $0.num("stock") <= 0 } }
+    private var currentCat: JSON? { catId == 0 ? nil : cats.first { $0.id == catId } }
     private func stockText(_ it: JSON) -> String { Fmt.boxPcs(it.int("stock"), it.int("pcs_per_box")) }
 
     var body: some View { dialogs(chrome(content)) }
@@ -120,6 +123,10 @@ import SwiftUI
                     }
                     Divider()
                     Button("New category…") { showCategory = true }
+                    if let c = currentCat {
+                        Button("Rename category “\(c.str("name"))”…") { renamingCat = c }
+                        Button("Delete category “\(c.str("name"))”…", role: .destructive) { deletingCat = c }
+                    }
                     Divider()
                     Button("Delete items with zero/negative stock…", role: .destructive) { confirmZeroStockDelete = true }.disabled(zeroStockItems.isEmpty)
                     Button("Delete ALL items, even those in stock…", role: .destructive) { confirmDeleteAll = true }
@@ -142,6 +149,22 @@ import SwiftUI
         .sheet(item: $schemeFor) { it in SchemeSheet(item: it) }
         .sheet(isPresented: $showBulk) { BulkPriceSheet(cats: cats, initialCat: catId) { await load() } }
         .sheet(isPresented: $showCategory) { CategorySheet { await load() } }
+        .sheet(item: $renamingCat) { c in CategorySheet(existing: c) { await load() } }
+        .confirmationDialog("Delete category \(deletingCat?.str("name") ?? "")?", isPresented: Binding(get: { deletingCat != nil }, set: { if !$0 { deletingCat = nil } }), titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                guard let c = deletingCat else { return }
+                Task {
+                    await app.guarded {
+                        let r = try await API.obj("DELETE", "/categories/\(c.id)")
+                        if catId == c.id { catId = 0 }
+                        app.notify("\(c.str("name")) deleted; \(r.int("uncategorised")) items moved to Uncategorised.")
+                        await load()
+                    }
+                }
+            }
+        } message: {
+            Text("Its items are kept and moved to Uncategorised.")
+        }
         .sheet(isPresented: $showOnline) { OnlineItemsSheet { await load() } }
         .sheet(isPresented: $showTidy) { TidyItemsSheet { await load() } }
         .sheet(isPresented: $showMerge) { MergeSelectedSheet(items: items.filter { selection.contains($0.id) }) { selection = []; await load() } }

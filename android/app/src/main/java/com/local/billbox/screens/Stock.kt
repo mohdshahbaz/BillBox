@@ -83,9 +83,11 @@ fun StockScreen() {
     var confirmZero by remember { mutableStateOf(false) }
     var confirmAll by remember { mutableStateOf(false) }
     var catMenu by remember { mutableStateOf(false) }
+    var deletingCat by remember { mutableStateOf<J?>(null) }
     var moreMenu by remember { mutableStateOf(false) }
     val debounce = rememberDebouncer()
     val zero = items.filter { it.num("stock") <= 0.0 }
+    val currentCat = if (catId == 0) null else cats.firstOrNull { it.id == catId }
 
     suspend fun load() {
         app.guarded {
@@ -130,10 +132,12 @@ fun StockScreen() {
                     item("Tidy names & merge duplicates…") { sheet = "tidy" },
                     item("Merge selected items…", selection.size >= 2) { sheet = "merge" },
                     item("New category…") { sheet = "category" },
+                    item("Rename category${currentCat?.let { " “${it.str("name")}”" } ?: ""}…", currentCat != null) { sheet = "renameCategory" },
+                    item("Delete category${currentCat?.let { " “${it.str("name")}”" } ?: ""}…", currentCat != null, true) { deletingCat = currentCat },
                     item("Delete items with zero/negative stock…", zero.isNotEmpty(), true) { confirmZero = true },
                     item("Delete ALL items, even those in stock…", true, true) { confirmAll = true },
                 ).forEachIndexed { i, (m, run) ->
-                    if (i == 3 || i == 6 || i == 7) HorizontalDivider()
+                    if (i == 3 || i == 6 || i == 9) HorizontalDivider()
                     DropdownMenuItem(text = { Text(m.first, color = if (m.third) MaterialTheme.colorScheme.error else Color.Unspecified) }, enabled = m.second, onClick = { moreMenu = false; run() })
                 }
             }
@@ -189,11 +193,20 @@ fun StockScreen() {
     when (sheet) {
         "bulk" -> BulkPriceForm(cats, catId, { sheet = "" }) { load() }
         "category" -> CategoryForm({ sheet = "" }) { load() }
+        "renameCategory" -> currentCat?.let { CategoryForm({ sheet = "" }, existing = it) { load() } }
         "online" -> OnlineItemsForm({ sheet = "" }) { load() }
         "tidy" -> TidyItemsForm({ sheet = "" }) { load() }
         "merge" -> MergeSelectedForm(items.filter { it.id in selection }, { sheet = "" }) { selection.clear(); load() }
     }
     mrpReport?.let { MrpReportDialog(it) { mrpReport = null } }
+    deletingCat?.let { c -> Confirm("Delete category ${c.str("name")}?", "Its items are kept and moved to Uncategorised.", "Delete", {
+        app.launch {
+            val r = Api.obj("DELETE", "/categories/${c.id}")
+            if (catId == c.id) catId = 0
+            app.notify("${c.str("name")} deleted; ${r.int("uncategorised")} items moved to Uncategorised.")
+            load()
+        }
+    }, { deletingCat = null }, destructive = true) }
     deleteTarget?.let { t -> Confirm("Delete ${t.str("name")}?", "Items that were ever bought or sold are archived instead, so history stays intact.", "Delete", { app.launch { delete(t, false) } }, { deleteTarget = null }, destructive = true) }
     forceTarget?.let { (it, msg) ->
         AlertDialog(onDismissRequest = { forceTarget = null }, title = { Text("Still in stock") }, text = { Text("$msg\n\nDelete it anyway?") },

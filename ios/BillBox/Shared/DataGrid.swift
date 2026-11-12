@@ -218,7 +218,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                     Rectangle().fill(Theme.line).frame(width: 1, height: 22)
                     Color.clear.frame(width: 14).contentShape(Rectangle())
                         .highPriorityGesture(
-                            DragGesture(minimumDistance: 2)
+                            DragGesture(minimumDistance: 2, coordinateSpace: .global)   // the handle moves with the edge: local space fed back into itself
                                 .onChanged { v in
                                     if resizing?.id != c.id { resizing = (c.id, Double(w[i])) }
                                     materialise()

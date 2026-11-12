@@ -80,6 +80,8 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
     /// true: a plain click selects the row (a list with a detail beside it, e.g. Salesmen). false: rows are ticked only with
     /// their tick box (or ⌘/⇧-click); a plain click just highlights the row.
     var clickSelects = false
+    /// false for tables with typing fields in their cells (billing, purchase): they keep the text cursor over those fields.
+    var arrowCursor = true
     var onOpen: ((Row) -> Void)?
     var menu: ((Row) -> AnyView)?
     let columns: [GridColumn<Row>]
@@ -92,17 +94,19 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
     @State private var dragging: String?
     @State private var dragDX: CGFloat = 0
     @State private var resizing: (id: String, start: Double)?
+    @State private var liveWidth: (id: String, w: Double)?   // the column being resized, until the drag ends
     @State private var anchor: Int?   // row last clicked plain, for Shift-click range selection
     @State private var highlighted: Row.ID?   // the row clicked last (ticks are separate)
 
     init(_ rows: [Row], layoutKey: String, selection: Binding<Set<Row.ID>>? = nil, rowHeight: CGFloat = 32,
-         numbered: Bool = true, clickSelects: Bool = false, onOpen: ((Row) -> Void)? = nil, menu: ((Row) -> AnyView)? = nil,
+         numbered: Bool = true, clickSelects: Bool = false, arrowCursor: Bool = true, onOpen: ((Row) -> Void)? = nil, menu: ((Row) -> AnyView)? = nil,
          @ColumnBuilder<Row> columns: () -> [GridColumn<Row>]) {
         self.rows = rows
         self.layoutKey = layoutKey
         self.selection = selection
         self.rowHeight = rowHeight
         self.clickSelects = clickSelects
+        self.arrowCursor = arrowCursor
         self.onOpen = onOpen
         self.menu = menu
         var cols = columns()
@@ -136,7 +140,8 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
     private var visible: [GridColumn<Row>] { orderedColumns.filter { !isHidden($0) } }
 
     private func baseWidth(_ c: GridColumn<Row>) -> CGFloat {
-        let w = CGFloat(layout.widths[c.id] ?? Double(c.ideal))
+        let saved = liveWidth?.id == c.id ? liveWidth?.w : layout.widths[c.id]
+        let w = CGFloat(saved ?? Double(c.ideal))
         return Swift.max(c.min, w)
     }
 
@@ -149,7 +154,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
             // S.No or a number column (the first column took it all and stretched across the table).
             var targets = cols.indices.filter { cols[$0].flex }
             if targets.isEmpty {
-                let text = cols.indices.filter { !cols[$0].isIndex && cols[$0].align != .trailing && layout.widths[cols[$0].id] == nil }
+                let text = cols.indices.filter { !cols[$0].isIndex && cols[$0].align != .trailing && layout.widths[cols[$0].id] == nil && liveWidth?.id != cols[$0].id }
                 if let widest = text.max(by: { cols[$0].ideal < cols[$1].ideal }) { targets = [widest] }
             }
             if targets.isEmpty { targets = cols.indices.filter { !cols[$0].isIndex } }
@@ -254,6 +259,8 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
         }
         .background(Theme.page)
         .overlay(Rectangle().stroke(Theme.line, lineWidth: 0.5))
+        // rows always show the arrow (the first row could show the text cursor); the heading keeps its resize cursor
+        .overlay(Group { if arrowCursor { ArrowCursorArea(top: 29) } })
     }
 
     private func header(_ cols: [GridColumn<Row>], _ w: [CGFloat]) -> some View {
@@ -304,15 +311,23 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
     }
 
     private func resizeHandle(_ c: GridColumn<Row>, width: CGFloat) -> some View {
-        let drag = DragGesture(minimumDistance: 1)
+        // Global coordinates: the handle moves with the column edge, and measuring the drag in its own (moving) space fed
+        // every new width back into the next one, so on macOS 12 the table re-laid itself out without end and the app hung.
+        // While dragging only a local width changes (whole points); the saved layout is written once, when the drag ends.
+        let drag = DragGesture(minimumDistance: 1, coordinateSpace: .global)
             .onChanged { v in
                 if resizing?.id != c.id { resizing = (c.id, Double(width)) }
-                materialise()
-                layout.widths[c.id] = Swift.max(Double(c.min), (resizing?.start ?? Double(width)) + Double(v.translation.width))
+                let nw = Swift.max(Double(c.min), ((resizing?.start ?? Double(width)) + Double(v.translation.width)).rounded())
+                if liveWidth?.id != c.id || liveWidth?.w != nw { liveWidth = (c.id, nw) }
             }
-            .onEnded { _ in resizing = nil; layout.save() }
+            .onEnded { _ in
+                if let lw = liveWidth { materialise(); layout.widths[lw.id] = lw.w; layout.save() }
+                liveWidth = nil; resizing = nil
+                NSCursor.arrow.set()
+            }
         return Color.clear.frame(width: 8, height: 26).contentShape(Rectangle())
-            .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
+            // set, not push/pop: the handle moves under the pointer while dragging and unbalanced pushes left the wrong cursor
+            .onHover { inside in if inside { NSCursor.resizeLeftRight.set() } else if resizing == nil { NSCursor.arrow.set() } }
             .gesture(drag)
     }
 
@@ -384,5 +399,24 @@ private struct RowTaps: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// An arrow cursor over the table body (everything below `top` points). It takes no clicks or scrolling (hitTest is nil);
+/// AppKit honours its cursor rect anyway.
+private struct ArrowCursorArea: NSViewRepresentable {
+    let top: CGFloat
+    func makeNSView(context: Context) -> CursorView { let v = CursorView(); v.top = top; return v }
+    func updateNSView(_ v: CursorView, context: Context) { if v.top != top { v.top = top; v.window?.invalidateCursorRects(for: v) } }
+
+    final class CursorView: NSView {
+        var top: CGFloat = 0
+        override var isFlipped: Bool { true }
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override func resetCursorRects() {
+            let r = NSRect(x: 0, y: top, width: bounds.width, height: Swift.max(0, bounds.height - top))
+            if !r.isEmpty { addCursorRect(r, cursor: .arrow) }
+        }
+        override func setFrameSize(_ newSize: NSSize) { super.setFrameSize(newSize); window?.invalidateCursorRects(for: self) }
     }
 }

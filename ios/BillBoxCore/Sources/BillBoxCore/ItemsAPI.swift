@@ -69,6 +69,29 @@ extension Router {
         return .json(201, ["id": id, "name": name] as Row)
     }
 
+    /// Rename. Another category already using the name (any case): 409.
+    func updateCategory(_ db: Database, _ id: String, _ b: Row) throws -> Any {
+        guard let cur = try db.prepare("SELECT * FROM categories WHERE id=?").get(id) else { throw HttpError(404, "Category not found") }
+        guard JS.blank(b["name"] ?? nil) != nil else { throw HttpError(400, "Category name is required") }
+        let name = JS.trim(JS.string(b.v("name")))
+        if try db.prepare("SELECT id FROM categories WHERE lower(name)=lower(?) AND id<>?").get(name, cur.v("id")) != nil {
+            throw HttpError(409, "A category with that name already exists")
+        }
+        try db.prepare("UPDATE categories SET name=? WHERE id=?").run(name, cur.v("id"))
+        return ["id": cur.v("id"), "name": name] as Row
+    }
+
+    /// Delete: its items become Uncategorised, then the category goes.
+    func deleteCategory(_ db: Database, _ id: String) throws -> Any {
+        guard let cur = try db.prepare("SELECT * FROM categories WHERE id=?").get(id) else { throw HttpError(404, "Category not found") }
+        var moved = 0
+        try db.transaction {
+            moved = try db.prepare("UPDATE items SET category_id=NULL WHERE category_id=?").run(cur.v("id")).changes
+            try db.prepare("DELETE FROM categories WHERE id=?").run(cur.v("id"))
+        }
+        return ["ok": true, "uncategorised": moved] as Row
+    }
+
     // ---- Mix boxes (backend/src/routes/items.js): a box of N pieces made of `each` pieces of every matching item in stock ----
 
     static let mixDefaults: [Row] = [

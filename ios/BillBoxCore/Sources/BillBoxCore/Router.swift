@@ -165,6 +165,8 @@ public final class Router {
         // items.js
         case ("GET", 1, "categories"): return ok(try categories(db))
         case ("POST", 1, "categories"): return try addCategory(db, b)
+        case ("PUT", 2, "categories"): return ok(try updateCategory(db, s[1], b))
+        case ("DELETE", 2, "categories"): return ok(try deleteCategory(db, s[1]))
         case ("GET", 1, "items"): return ok(try listItems(db, q))
         case ("GET", 1, "mixboxes"): return ok(try mixPresets(db))
         case ("POST", 2, "mixboxes") where s[1] == "plan": return ok(try planMixBox(db, b))

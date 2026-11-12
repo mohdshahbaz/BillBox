@@ -150,6 +150,32 @@ class _InventoryState extends State<InventoryScreen> {
     });
   }
 
+  Json? get _currentCat => catId == null ? null : cats.cast<Json?>().firstWhere((c) => c!['id'] == catId, orElse: () => null);
+
+  Future<void> _renameCategory() async {
+    final c = _currentCat;
+    if (c == null) return;
+    final v = await formDialog(context, 'Rename category', [FieldSpec('name', 'Category name', initial: '${c['name']}')]);
+    if (v == null || !mounted) return;
+    await guard(context, () async {
+      await Api.put('/categories/${c['id']}', {'name': (v['name'] ?? '').trim()});
+      await _load();
+    });
+  }
+
+  /// Delete: its items are kept and become Uncategorised.
+  Future<void> _deleteCategory() async {
+    final c = _currentCat;
+    if (c == null) return;
+    if (!await confirm(context, 'Delete category ${c['name']}?', 'Its items are kept and moved to Uncategorised.', ok: 'Delete', danger: true) || !mounted) return;
+    await guard(context, () async {
+      final r = await Api.delete('/categories/${c['id']}') as Json;
+      catId = null;
+      if (mounted) toast(context, '${c['name']} deleted; ${r['uncategorised']} items moved to Uncategorised.');
+      await _load();
+    });
+  }
+
   Future<void> _addItem() async {
     final v = await formDialog(context, 'New item', _itemFields());
     if (v == null || !mounted) return;
@@ -230,6 +256,10 @@ class _InventoryState extends State<InventoryScreen> {
         ),
         OutlinedButton.icon(onPressed: _bulkPrices, icon: const Icon(Icons.price_change_outlined), label: const Text('Set prices from MRP')),
         OutlinedButton.icon(onPressed: _addCategory, icon: const Icon(Icons.category_outlined), label: const Text('New category')),
+        if (catId != null) ...[
+          OutlinedButton.icon(onPressed: _renameCategory, icon: const Icon(Icons.edit_outlined), label: const Text('Rename category')),
+          OutlinedButton.icon(onPressed: _deleteCategory, icon: const Icon(Icons.delete_outline), label: const Text('Delete category')),
+        ],
         FilledButton.icon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('New item')),
       ]),
       FormWrap([

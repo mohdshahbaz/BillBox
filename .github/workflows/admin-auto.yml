@@ -1,0 +1,25 @@
+# Every push to main starts an admin release: Release › edition admin, next patch number (v16.2.22 → v16.2.23-admin).
+# Pushes that only touch docs, the website or *.md files are skipped, and so is a push whose last commit message
+# contains [skip release]. Public releases are unchanged: push a tag or use Actions › Release › Run workflow.
+name: Admin build on push
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', 'website/**', '**/*.md']
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  start:
+    if: ${{ !contains(github.event.head_commit.message, '[skip release]') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Start Release (admin)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref main -f edition=admin -f version= -f prerelease=false -f clear_old=false
+          echo "Admin release started for ${GITHUB_SHA::7}: Actions › Release."

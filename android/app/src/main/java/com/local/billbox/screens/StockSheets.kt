@@ -184,9 +184,13 @@ fun SchemeForm(item: J, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun CategoryForm(onDismiss: () -> Unit, done: suspend () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    FormDialog("New category", onDismiss, canSave = name.isNotBlank(), onSave = { Api.obj("POST", "/categories", body = mapOf("name" to name)); done() }) {
+fun CategoryForm(onDismiss: () -> Unit, existing: J? = null, done: suspend () -> Unit) {
+    var name by remember { mutableStateOf(existing?.str("name") ?: "") }
+    FormDialog(if (existing == null) "New category" else "Rename category", onDismiss, canSave = name.isNotBlank(), onSave = {
+        if (existing != null) Api.obj("PUT", "/categories/${existing.id}", body = mapOf("name" to name.trim()))
+        else Api.obj("POST", "/categories", body = mapOf("name" to name))
+        done()
+    }) {
         Field("Category name", name, { name = it })
     }
 }

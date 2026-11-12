@@ -161,16 +161,22 @@ import SwiftUI
 
 @MainActor struct CategorySheet: View {
     @EnvironmentObject private var app: AppModel
+    var existing: JSON? = nil
     let done: () async -> Void
     @State private var name = ""
 
     var body: some View {
-        FormSheet(title: "New category", width: 420, canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty, onSave: {
-            _ = try await API.obj("POST", "/categories", body: ["name": name])
+        FormSheet(title: existing == nil ? "New category" : "Rename category", width: 420, canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty, onSave: {
+            if let e = existing {
+                _ = try await API.obj("PUT", "/categories/\(e.id)", body: ["name": name.trimmingCharacters(in: .whitespaces)])
+            } else {
+                _ = try await API.obj("POST", "/categories", body: ["name": name])
+            }
             await done()
         }) {
             Field("Category name", text: $name)
         }
+        .onAppear { if let e = existing, name.isEmpty { name = e.str("name") } }
     }
 }
 

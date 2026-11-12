@@ -19,6 +19,8 @@ import AppKit
     @State private var schemeFor: JSON?
     @State private var showBulk = false
     @State private var showCategory = false
+    @State private var renamingCat: JSON?
+    @State private var deletingCat: JSON?
     @State private var showOnline = false
     @State private var showTidy = false
     @State private var showMerge = false
@@ -29,6 +31,7 @@ import AppKit
     @State private var confirmDeleteAll = false
 
     private var zeroStockItems: [JSON] { items.filter { $0.num("stock") <= 0 } }
+    private var currentCat: JSON? { catId == 0 ? nil : cats.first { $0.id == catId } }
 
     private func stockText(_ it: JSON) -> String { Fmt.boxPcs(it.int("stock"), it.int("pcs_per_box")) }
 
@@ -134,6 +137,8 @@ import AppKit
                     }
                     Divider()
                     Button("New category…") { showCategory = true }
+                    Button("Rename category “\(currentCat?.str("name") ?? "")”…") { renamingCat = currentCat }.disabled(currentCat == nil)
+                    Button("Delete category “\(currentCat?.str("name") ?? "")”…") { deletingCat = currentCat }.disabled(currentCat == nil)
                     Divider()
                     Button("Delete items with zero/negative stock…") { confirmZeroStockDelete = true }.disabled(zeroStockItems.isEmpty)
                     Button("Delete ALL items, even those in stock…") { confirmDeleteAll = true }
@@ -153,6 +158,22 @@ import AppKit
         .sheet(item: $schemeFor) { it in SchemeSheet(item: it) }
         .sheet(isPresented: $showBulk) { BulkPriceSheet(cats: cats, initialCat: catId) { await load() } }
         .sheet(isPresented: $showCategory) { CategorySheet { await load() } }
+        .sheet(item: $renamingCat) { c in CategorySheet(existing: c) { await load() } }
+        .confirmationDialog("Delete category \(deletingCat?.str("name") ?? "")?", isPresented: Binding(get: { deletingCat != nil }, set: { if !$0 { deletingCat = nil } }), titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                guard let c = deletingCat else { return }
+                Task {
+                    await app.guarded {
+                        let r = try await API.obj("DELETE", "/categories/\(c.id)")
+                        if catId == c.id { catId = 0 }
+                        app.notify("\(c.str("name")) deleted; \(r.int("uncategorised")) items moved to Uncategorised.")
+                        await load()
+                    }
+                }
+            }
+        } message: {
+            Text("Its items are kept and moved to Uncategorised.")
+        }
         .sheet(isPresented: $showOnline) { OnlineItemsSheet { await load() } }
         .sheet(isPresented: $showTidy) { TidyItemsSheet { await load() } }
         .sheet(isPresented: $showMerge) { MergeSelectedSheet(items: items.filter { selection.contains($0.id) }) { selection = []; await load() } }
@@ -434,16 +455,22 @@ import AppKit
 
 @MainActor struct CategorySheet: View {
     @EnvironmentObject private var app: AppModel
+    var existing: JSON? = nil
     let done: () async -> Void
     @State private var name = ""
 
     var body: some View {
-        FormSheet(title: "New category", width: 420, canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty, onSave: {
-            _ = try await API.obj("POST", "/categories", body: ["name": name])
+        FormSheet(title: existing == nil ? "New category" : "Rename category", width: 420, canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty, onSave: {
+            if let e = existing {
+                _ = try await API.obj("PUT", "/categories/\(e.id)", body: ["name": name.trimmingCharacters(in: .whitespaces)])
+            } else {
+                _ = try await API.obj("POST", "/categories", body: ["name": name])
+            }
             await done()
         }) {
             TextField("Category name", text: $name)
         }
+        .onAppear { if let e = existing, name.isEmpty { name = e.str("name") } }
     }
 }
 
