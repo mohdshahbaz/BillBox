@@ -4,6 +4,9 @@
 #   or: Actions › Release › Run workflow › both / public / admin (the version can be left empty: next number)
 #   a version ending in -admin (v15.2.0-admin) makes only the admin build
 #   every push to main also starts an admin build with the next number (admin-auto.yml)
+#   Run workflow › Platform builds one app only (android, mac, iphone, windows-linux). It is left on the run's page
+#   (Summary › Artifacts) and no release is made, unless "Publish as a release" is ticked: then it is a pre-release,
+#   so the website's download buttons and the other apps' updaters keep using the last full release
 #
 # Android is signed with your release key when these repository secrets exist (android/tools/make_keystore.sh makes them):
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
@@ -35,6 +38,15 @@ on:
         description: 'Delete the past builds (keeps the new one and the website''s public download). Off: every past build stays'
         type: boolean
         default: false
+      platform:
+        description: 'Which apps: all, or one (its build stays on the run page unless published below)'
+        type: choice
+        options: [all, android, mac, iphone, windows-linux]
+        default: all
+      publish_partial:
+        description: 'One-app build: publish it as a release anyway (always a pre-release)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -50,12 +62,16 @@ jobs:
       code: ${{ steps.v.outputs.code }}
       builds: ${{ steps.v.outputs.builds }}
       tags: ${{ steps.v.outputs.tags }}
+      platform: ${{ steps.v.outputs.platform }}
+      publish: ${{ steps.v.outputs.publish }}
     steps:
       - id: v
         env:
           INPUT: ${{ github.event.inputs.version }}
           PRE: ${{ github.event.inputs.prerelease }}
           EDITION_IN: ${{ github.event.inputs.edition }}
+          PLATFORM_IN: ${{ github.event.inputs.platform }}
+          PUBLISH_PARTIAL: ${{ github.event.inputs.publish_partial }}
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
@@ -82,6 +98,15 @@ jobs:
           else
             B='[{"edition":"public","version":"'"$V"'","tag":"v'"$V"'","prerelease":'"$PUB"'},{"edition":"admin","version":"'"$V"'-admin","tag":"v'"$V"'-admin","prerelease":true}]'
           fi
+          # one app only: no release unless asked, and then always a pre-release (never the website's "latest")
+          PLATFORM="${PLATFORM_IN:-all}"; PUBLISH=true
+          if [ "$PLATFORM" != all ]; then
+            B="$(jq -c 'map(.prerelease = true)' <<<"$B")"
+            [ "$PUBLISH_PARTIAL" = true ] || PUBLISH=false
+          fi
+          echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+          echo "Platform: $PLATFORM · release: $PUBLISH"
           echo "builds=$B" >> "$GITHUB_OUTPUT"
           echo "tags=$(jq -r 'map(.tag) | join(" ")' <<<"$B")" >> "$GITHUB_OUTPUT"
           echo "Releasing: $(jq -r 'map(.tag) | join(", ")' <<<"$B") (build $(( MA * 10000 + MI * 100 + PA )))"
@@ -100,6 +125,8 @@ jobs:
       tag: ${{ matrix.tag }}
       edition: ${{ matrix.edition }}
       prerelease: ${{ matrix.prerelease }}
+      platform: ${{ needs.plan.outputs.platform }}
+      publish: ${{ needs.plan.outputs.publish == 'true' }}
     secrets: inherit
 
   tidy:
@@ -114,7 +141,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAGS: ${{ needs.plan.outputs.tags }}
-          CLEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.clear_old && 'yes' || 'no' }}
+          CLEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.clear_old && needs.plan.outputs.publish == 'true' && 'yes' || 'no' }}
         run: |
           if [ "$CLEAR" = yes ]; then
             KEEP_PUBLIC="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --exclude-pre-releases --exclude-drafts --json tagName,isLatest,createdAt \

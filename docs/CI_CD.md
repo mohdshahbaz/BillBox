@@ -39,6 +39,11 @@ git push origin v15.2.0
 or on GitHub: **Actions › Release › Run workflow**, type the version (e.g. `15.2.1`), Run. A version with a dash
 (`15.3.0-beta1`), or the "pre-release" tick, makes a test release that is not shown as the latest.
 
+**One app only**: in Run workflow, set **Platform** to `android`, `mac`, `iphone` or `windows-linux`. Only that app is
+built (minutes instead of half an hour) and it is left under the run's **Summary › Artifacts**; no release is made. Tick
+**Publish as a release** to publish it anyway: it is always a pre-release, so the website and the other apps' updaters
+keep the last full release.
+
 About 20–30 minutes later the release is under **Releases** with:
 
 - `BillBox-android-<version>.apk` — versionName from the tag, versionCode = major·10000 + minor·100 + patch

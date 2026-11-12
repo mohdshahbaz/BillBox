@@ -10,12 +10,15 @@ on:
       tag: { type: string, required: true }          # v16.3.0
       edition: { type: string, required: true }      # public | admin
       prerelease: { type: boolean, required: true }
+      platform: { type: string, required: false, default: all }   # all | android | mac | iphone | windows-linux
+      publish: { type: boolean, required: false, default: true }  # false: builds stay on the run page, no release
 
 permissions:
   contents: write
 
 jobs:
   android:
+    if: inputs.platform == 'all' || inputs.platform == 'android'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -67,6 +70,7 @@ jobs:
           path: dist/*.apk
 
   mac:
+    if: inputs.platform == 'all' || inputs.platform == 'mac'
     runs-on: macos-latest
     timeout-minutes: 60
     # one app per kind of Mac (smaller downloads): BillBox-mac-V-arm64 and BillBox-mac-V-intel. The Intel job also publishes
@@ -106,6 +110,7 @@ jobs:
             dist/*.zip
 
   ios:
+    if: inputs.platform == 'all' || inputs.platform == 'iphone'
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -130,6 +135,7 @@ jobs:
           path: dist/*.ipa
 
   desktop:
+    if: inputs.platform == 'all' || inputs.platform == 'windows-linux'
     uses: ./.github/workflows/desktop.yml
     with:
       version: ${{ inputs.version }}
@@ -138,6 +144,8 @@ jobs:
 
   publish:
     needs: [android, mac, ios, desktop]
+    # runs when every chosen app built (the others are skipped) and a release was asked for
+    if: always() && inputs.publish && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
