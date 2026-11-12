@@ -433,7 +433,7 @@ extension DashboardView {
     }
     #endif
 
-    private var legacy: some View {
+    @ViewBuilder private var legacy: some View {
         let top = max(1, values.map { abs($0.value) }.max() ?? 1)
         // one measurement for the whole chart (a GeometryReader in each bar made every redraw lay out twelve times)
         GeometryReader { g in

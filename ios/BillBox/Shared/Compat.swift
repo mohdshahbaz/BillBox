@@ -139,7 +139,7 @@ struct BarChartView: View {
     }
     #endif
 
-    private var legacy: some View {
+    @ViewBuilder private var legacy: some View {
         let top = max(1, data.map { max($0.a, max($0.b, showThird ? $0.c : 0)) }.max() ?? 1)
         VStack(spacing: 4) {
             HStack(alignment: .bottom, spacing: 4) {
