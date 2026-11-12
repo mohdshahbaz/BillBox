@@ -9,6 +9,7 @@ import SwiftUI
     @State private var day = Calendar.current.component(.weekday, from: Date()) - 1
     @State private var newSalesman = false
     @State private var newRoute = false
+    @State private var showRoutes = false
     @State private var editing: JSON?
     @State private var merging: JSON?
     @State private var deleting: JSON?
@@ -36,6 +37,7 @@ import SwiftUI
         .navigationTitle("Salesmen and routes")
         .toolbar {
             ToolbarItemGroup {
+                Button { showRoutes = true } label: { Label("Routes", systemImage: "list.bullet") }
                 Button { newRoute = true } label: { Label("New route", systemImage: "point.topleft.down.curvedto.point.bottomright.up") }.disabled(people.isEmpty)
                 Button { newSalesman = true } label: { Label("New salesman", systemImage: "person.badge.plus") }
                 Menu {
@@ -69,7 +71,8 @@ import SwiftUI
         } message: {
             Text("Their routes are left without a salesman. Bills and receipts keep the name. To move their bills to someone else, use Merge instead.")
         }
-        .sheet(isPresented: $newRoute) { RouteSheet(people: people) }
+        .sheet(isPresented: $newRoute) { RouteSheet(people: people) { await loadSelected() } }
+        .sheet(isPresented: $showRoutes) { RoutesSheet(people: people) { await loadSelected() } }
     }
 
     private var detail: some View {
@@ -195,21 +198,121 @@ import SwiftUI
     }
 }
 
+/// New route, or edit one (`existing`): name, salesman, visit days (PUT /routes/:id). Its outlets stay on it.
 @MainActor struct RouteSheet: View {
     @EnvironmentObject private var app: AppModel
     let people: [JSON]
+    var existing: JSON? = nil
+    var done: () async -> Void = {}
     @State private var name = ""
     @State private var salesman = ""
     @State private var days = "1"
+    @State private var loaded = false
 
     var body: some View {
-        FormSheet(title: "New route", width: 440, canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty, onSave: {
-            _ = try await API.obj("POST", "/routes", body: ["name": name, "salesman_id": salesman.isEmpty ? (people.first.map { String($0.id) } ?? "") : salesman, "days": days])
-            app.notify("Route added.")
+        FormSheet(title: existing == nil ? "New route" : "Edit route", width: 440, canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty, onSave: {
+            let body: [String: Any?] = ["name": name.trimmingCharacters(in: .whitespaces), "salesman_id": salesman, "days": days]
+            if let e = existing {
+                _ = try await API.obj("PUT", "/routes/\(e.id)", body: body)
+                app.notify("Route saved.")
+            } else {
+                _ = try await API.obj("POST", "/routes", body: body)
+                app.notify("Route added.")
+            }
+            await done()
         }) {
             TextField("Route name", text: $name)
-            Picker("Salesman", selection: $salesman) { ForEach(people) { Text($0.str("name")).tag(String($0.id)) } }
+            Picker("Salesman", selection: $salesman) {
+                Text("Not assigned").tag("")
+                ForEach(people) { Text($0.str("name")).tag(String($0.id)) }
+            }
             Labeled("Visit days") { DayPicker(days: $days) }
+            if existing != nil {
+                Text("A route's name lists its places, separated by commas (e.g. Qazipara, Mandi, Mandawar Road): Parties › Assign routes uses them. Its outlets stay on it.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
+        .onAppear {
+            guard !loaded else { return }
+            loaded = true
+            if let e = existing {
+                name = e.str("name")
+                salesman = e.has("salesman_id") ? String(e.int("salesman_id")) : ""
+                days = e.str("days").isEmpty ? (e.has("day_of_week") ? String(e.int("day_of_week")) : "") : e.str("days")
+            } else {
+                salesman = people.first.map { String($0.id) } ?? ""
+            }
+        }
+    }
+}
+
+/// Every route: its salesman, visit days and outlets, with Edit and Delete.
+@MainActor struct RoutesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var app: AppModel
+    let people: [JSON]
+    let done: () async -> Void
+    @State private var routes: [JSON]? = nil
+    @State private var editing: JSON?
+    @State private var deleting: JSON?
+
+    private func detail(_ r: JSON) -> String {
+        let days = dayList(r.str("days"))
+        let d = !days.isEmpty ? days : (r.has("day_of_week") ? String(dayNames[min(6, max(0, r.int("day_of_week")))].prefix(3)) : "no visit day")
+        let sm = r.str("salesman_name").isEmpty ? "no salesman" : r.str("salesman_name")
+        return "\(sm) · \(d) · \(r.int("outlets")) outlet\(r.int("outlets") == 1 ? "" : "s")"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Routes").font(.title3).fw(.semibold)
+            list.frame(maxHeight: .infinity)
+            HStack { Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
+        }
+        .padding(16)
+        .frame(width: 580, height: 480)
+        .task { await load() }
+        .sheet(item: $editing) { r in RouteSheet(people: people, existing: r) { await load(); await done() } }
+        .confirmationDialog("Delete \(deleting?.str("name") ?? "")?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                guard let d = deleting else { return }
+                Task {
+                    await app.guarded {
+                        _ = try await API.obj("DELETE", "/routes/\(d.id)")
+                        app.notify("\(d.str("name")) deleted.")
+                        await load(); await done()
+                    }
+                }
+            }
+        } message: {
+            Text("Its outlets stay: those on other routes too keep them, the others are left without a route.")
+        }
+    }
+
+    @ViewBuilder private var list: some View {
+        if let routes {
+            if routes.isEmpty {
+                Text("No routes yet. Add one with New route.").foregroundStyle(.secondary)
+            } else {
+                List(routes) { r in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(r.str("name")).fw(.medium)
+                            Text(detail(r)).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Edit") { editing = r }.buttonStyle(.borderless)
+                        Button(role: .destructive) { deleting = r } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
+                            .accessibilityLabel("Delete \(r.str("name"))")
+                    }
+                }
+            }
+        } else {
+            ProgressView()
+        }
+    }
+
+    private func load() async {
+        await app.guarded { routes = try await API.list("/routes") }
     }
 }

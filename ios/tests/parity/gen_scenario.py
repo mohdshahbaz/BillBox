@@ -97,6 +97,8 @@ put('/salesmen/2', {'phone': '9810000002', 'monthly_target': '180000'}); put('/s
 post('/routes', {'name': 'Civil Lines Beat', 'salesman_id': '1', 'days': '1,3'}); post('/routes', {'name': 'Station Beat', 'salesman_id': 1, 'days': [5, 3, 3, 9]})
 post('/routes', {'name': 'Old style', 'day_of_week': 2}); post('/routes', {'name': ' '})
 put('/routes/3', {'days': '0,6'}); get('/routes')
+# editing a route: renamed (trimmed), salesman changed or cleared, days changed; a blank name and a missing route are refused
+put('/routes/3', {'name': '  Old style beat ', 'salesman_id': 2, 'days': [2, 4]}); put('/routes/3', {'name': '   '}); put('/routes/3', {'salesman_id': ''}); put('/routes/99', {'name': 'x'}); get('/routes')
 P = [
     {'name': 'Gupta General Store', 'gstin': '09aaapg1111a1z1', 'phone': '9876500001', 'price_tier': 'RETAIL', 'credit_limit': 25000, 'credit_days': 15, 'route_id': 1, 'opening_balance': 4200},
     {'name': 'Singh Kirana', 'mobiles': '9876500002; 9876500003\n9876500002', 'route_id': '1'},

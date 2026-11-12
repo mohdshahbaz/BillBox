@@ -390,10 +390,12 @@ extension Router {
         guard let cur = try db.prepare("SELECT * FROM routes WHERE id=?").get(id) else { throw HttpError(404, "Route not found") }
         var b = cur
         for (k, v) in body { b[k] = v }
+        guard JS.blank(b["name"] ?? nil) != nil else { throw HttpError(400, "Route name is required") }
+        let name = JS.trim(JS.string(b.v("name")))
         let src: Any? = body.defined("days") ? body["days"] ?? nil : (body.defined("day_of_week") ? body["day_of_week"] ?? nil : cur["days"] ?? nil)
         let days = normDays(src)
         try db.prepare("UPDATE routes SET name=?,salesman_id=?,day_of_week=?,days=? WHERE id=?")
-            .run(b.v("name"), JS.blank(b["salesman_id"] ?? nil), days.map { JS.parseInt($0) }, days, cur.v("id"))
+            .run(name, JS.blank(b["salesman_id"] ?? nil), days.map { JS.parseInt($0) }, days, cur.v("id"))
         return ["ok": true] as Row
     }
 

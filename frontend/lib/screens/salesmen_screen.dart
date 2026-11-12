@@ -60,19 +60,143 @@ class _SalesmenState extends State<SalesmenScreen> {
     });
   }
 
-  Future<void> _addRoute() async {
-    final v = await formDialog(context, 'New route (beat)', [
-      const FieldSpec('name', 'Route name'),
-      FieldSpec('salesman_id', 'Salesman', options: {for (final s in sms) '${s['id']}': '${s['name']}'}),
-      FieldSpec('day_of_week', 'Visit day', options: {for (var i = 0; i < 7; i++) '$i': _days[i]}),
-    ]);
-    if (v == null || !mounted) return;
+  /// New route, or edit one: name, salesman, visit days. Returns true when saved.
+  Future<bool> _routeForm([Json? existing]) async {
+    final name = TextEditingController(text: existing == null ? '' : '${existing['name'] ?? ''}');
+    String salesman = existing == null ? (sms.isEmpty ? '' : '${sms.first['id']}') : (existing['salesman_id'] == null ? '' : '${existing['salesman_id']}');
+    final daysText = existing == null ? '1' : '${existing['days'] ?? existing['day_of_week'] ?? ''}';
+    final days = daysText.split(',').map((x) => int.tryParse(x.trim())).whereType<int>().where((d) => d >= 0 && d <= 6).toSet();
+    String? err;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) => AlertDialog(
+            title: Text(existing == null ? 'New route (beat)' : 'Edit route'),
+            content: SizedBox(
+              width: 460,
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                TextField(controller: name, autofocus: true, decoration: const InputDecoration(labelText: 'Route name', hintText: 'places, comma separated: Qazipara, Mandi, Mandawar Road')),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: salesman,
+                  decoration: const InputDecoration(labelText: 'Salesman'),
+                  items: [
+                    const DropdownMenuItem(value: '', child: Text('Not assigned')),
+                    for (final s in sms) DropdownMenuItem(value: '${s['id']}', child: Text('${s['name']}')),
+                  ],
+                  onChanged: (v) => salesman = v ?? '',
+                ),
+                const SizedBox(height: 12),
+                const Text('Visit days'),
+                const SizedBox(height: 6),
+                Wrap(spacing: 6, children: [
+                  for (var i = 0; i < 7; i++)
+                    FilterChip(
+                      label: Text(_days[i]),
+                      selected: days.contains(i),
+                      onSelected: (on) => setSt(() {
+                        if (on) {
+                          days.add(i);
+                        } else {
+                          days.remove(i);
+                        }
+                      }),
+                    ),
+                ]),
+                if (err != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(err!, style: const TextStyle(color: Palette.brick))),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              FilledButton(
+                onPressed: () {
+                  if (name.text.trim().isEmpty) return setSt(() => err = 'Route name is required');
+                  Navigator.pop(ctx, true);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          )),
+    );
+    if (ok != true || !mounted) return false;
+    final body = {'name': name.text.trim(), 'salesman_id': salesman, 'days': (days.toList()..sort()).join(',')};
+    var saved = false;
     await guard(context, () async {
-      await Api.post('/routes', v);
-      if (mounted) toast(context, 'Route created. Assign parties to it from the Parties screen.');
+      if (existing == null) {
+        await Api.post('/routes', body);
+        if (mounted) toast(context, 'Route created. Assign parties to it from the Parties screen.');
+      } else {
+        await Api.put('/routes/${existing['id']}', body);
+        if (mounted) toast(context, 'Route saved.');
+      }
+      saved = true;
       await _loadSelected();
     });
+    return saved;
   }
+
+  Future<void> _addRoute() async {
+    await _routeForm();
+  }
+
+  /// Every route with its salesman, visit days and outlets: Edit and Delete.
+  Future<void> _routes() => guard(context, () async {
+        var list = ((await Api.get('/routes')) as List).cast<Json>();
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) {
+            Future<void> reload() async {
+              final r = ((await Api.get('/routes')) as List).cast<Json>();
+              setSt(() => list = r);
+            }
+
+            String detail(Json r) {
+              final ds = '${r['days'] ?? r['day_of_week'] ?? ''}'.split(',').map((x) => int.tryParse(x.trim())).whereType<int>().where((d) => d >= 0 && d <= 6).map((d) => _days[d]).join(', ');
+              final n = num_(r['outlets']).toInt();
+              return '${'${r['salesman_name'] ?? ''}'.isEmpty ? 'no salesman' : r['salesman_name']} · ${ds.isEmpty ? 'no visit day' : ds} · $n outlet${n == 1 ? '' : 's'}';
+            }
+
+            return AlertDialog(
+              title: const Text('Routes'),
+              content: SizedBox(
+                width: 560,
+                child: list.isEmpty
+                    ? const Text('No routes yet. Add one with New route.')
+                    : ListView(shrinkWrap: true, children: [
+                        for (final r in list)
+                          ListTile(
+                            title: Text('${r['name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text(detail(r)),
+                            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                              IconButton(
+                                tooltip: 'Edit',
+                                icon: const Icon(Icons.edit_outlined),
+                                onPressed: () async {
+                                  if (await _routeForm(r)) await reload();
+                                },
+                              ),
+                              IconButton(
+                                tooltip: 'Delete',
+                                icon: const Icon(Icons.delete_outline, color: Palette.brick),
+                                onPressed: () async {
+                                  if (!await confirm(context, 'Delete ${r['name']}?', 'Its outlets stay: those on other routes too keep them, the others are left without a route.', ok: 'Delete', danger: true)) return;
+                                  if (!mounted) return;
+                                  await guard(context, () async {
+                                    await Api.delete('/routes/${r['id']}');
+                                    await reload();
+                                    await _loadSelected();
+                                  });
+                                },
+                              ),
+                            ]),
+                          ),
+                      ]),
+              ),
+              actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done'))],
+            );
+          }),
+        );
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +206,7 @@ class _SalesmenState extends State<SalesmenScreen> {
     final dayInfo = p?['day'] as Json?;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       PageHeader('Salesmen and routes', actions: [
+        OutlinedButton.icon(onPressed: _routes, icon: const Icon(Icons.list_alt), label: const Text('Routes')),
         OutlinedButton.icon(onPressed: sms.isEmpty ? null : _addRoute, icon: const Icon(Icons.route), label: const Text('New route')),
         FilledButton.icon(onPressed: _addSalesman, icon: const Icon(Icons.person_add_alt), label: const Text('New salesman')),
       ]),

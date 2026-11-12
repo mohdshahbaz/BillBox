@@ -57,6 +57,15 @@ import com.local.billbox.ui.Segments
 import com.local.billbox.ui.Warn
 import com.local.billbox.ui.dayNames
 import com.local.billbox.ui.panel
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import com.local.billbox.ui.InfoDialog
+import com.local.billbox.ui.Loading
+import com.local.billbox.ui.dayList
 import java.time.LocalDate
 
 /** A figure in a card. */
@@ -79,6 +88,10 @@ fun SalesmenScreen() {
     var day by remember { mutableIntStateOf(LocalDate.now().dayOfWeek.value % 7) }
     var newSalesman by remember { mutableStateOf(false) }
     var newRoute by remember { mutableStateOf(false) }
+    var showRoutes by remember { mutableStateOf(false) }
+    var routes by remember { mutableStateOf<List<J>?>(null) }
+    var editRoute by remember { mutableStateOf<J?>(null) }
+    var deleteRoute by remember { mutableStateOf<J?>(null) }
     var menu by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<J?>(null) }
     var merging by remember { mutableStateOf<J?>(null) }
@@ -86,6 +99,8 @@ fun SalesmenScreen() {
     val current = people.firstOrNull { it.id == sel }
 
     suspend fun load() { app.guarded { people = Api.list("/salesmen"); if (sel == null) sel = people.firstOrNull()?.id } }
+    suspend fun loadRoutes() { app.guarded { routes = Api.list("/routes") } }
+    suspend fun reloadBeat() { val s = sel ?: return; app.guarded { beat = Api.get("/salesmen/$s/beat", mapOf("day" to day)) } }
     LaunchedEffect(Unit) { load() }
     LaunchedEffect(app.dataVersion) { if (app.dataVersion > 0) load() }
     LaunchedEffect(sel, day) {
@@ -94,6 +109,7 @@ fun SalesmenScreen() {
     }
 
     ScreenScaffold("Salesmen and routes", actions = {
+        IconButton(onClick = { showRoutes = true; app.launch { loadRoutes() } }) { Icon(Icons.AutoMirrored.Filled.List, "Routes") }
         IconButton(onClick = { newRoute = true }, enabled = people.isNotEmpty()) { Icon(Icons.Default.AltRoute, "New route") }
         IconButton(onClick = { newSalesman = true }) { Icon(Icons.Default.PersonAdd, "New salesman") }
         androidx.compose.foundation.layout.Box {
@@ -189,16 +205,59 @@ fun SalesmenScreen() {
                 app.launch { app.guarded { Api.obj("DELETE", "/salesmen/${d.id}"); if (sel == d.id) sel = null; app.notify("${d.str("name")} deleted."); load() } }
             }, onDismiss = { deleting = null }, destructive = true)
     }
-    if (newRoute) {
-        var name by remember { mutableStateOf("") }
-        var salesman by remember { mutableStateOf(people.firstOrNull()?.id?.toString() ?: "") }
-        var days by remember { mutableStateOf("1") }
-        FormDialog("New route", { newRoute = false }, canSave = name.isNotBlank(), onSave = {
-            Api.obj("POST", "/routes", body = mapOf("name" to name, "salesman_id" to salesman, "days" to days)); app.notify("Route added.")
-        }) {
-            Field("Route name", name, { name = it })
-            Choice("Salesman", people.map { it.id.toString() to it.str("name") }, salesman, { salesman = it })
-            Text("Visit days"); DayPicker(days) { days = it }
+    if (showRoutes) {
+        InfoDialog("Routes", { showRoutes = false }) {
+            val list = routes
+            when {
+                list == null -> Loading()
+                list.isEmpty() -> Hint("No routes yet. Add one with New route.")
+                else -> list.forEach { r ->
+                    val days = dayList(r.str("days"))
+                    val d = days.ifEmpty { if (r.has("day_of_week")) dayNames[r.int("day_of_week").coerceIn(0, 6)].take(3) else "no visit day" }
+                    val n = r.int("outlets")
+                    Row(Modifier.fillMaxWidth().panel(10.dp).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
+                            Text(r.str("name"), fontWeight = FontWeight.Medium)
+                            Hint("${r.str("salesman_name").ifEmpty { "no salesman" }} · $d · $n outlet${if (n == 1) "" else "s"}")
+                        }
+                        IconButton(onClick = { editRoute = r }) { Icon(Icons.Default.Edit, "Edit ${r.str("name")}") }
+                        IconButton(onClick = { deleteRoute = r }) { Icon(Icons.Default.Delete, "Delete ${r.str("name")}", tint = MaterialTheme.colorScheme.error) }
+                    }
+                }
+            }
         }
+    }
+    deleteRoute?.let { d ->
+        Confirm("Delete ${d.str("name")}?", "Its outlets stay: those on other routes too keep them, the others are left without a route.",
+            "Delete", onConfirm = {
+                deleteRoute = null
+                app.launch { app.guarded { Api.obj("DELETE", "/routes/${d.id}"); app.notify("${d.str("name")} deleted."); loadRoutes(); reloadBeat() } }
+            }, onDismiss = { deleteRoute = null }, destructive = true)
+    }
+    if (newRoute) RouteForm(people, null, { newRoute = false }) { reloadBeat() }
+    editRoute?.let { r -> RouteForm(people, r, { editRoute = null }) { loadRoutes(); reloadBeat() } }
+}
+
+/** New route, or edit one (`existing`): name, salesman, visit days (PUT /routes/:id). Its outlets stay on it. */
+@Composable
+fun RouteForm(people: List<J>, existing: J?, onDismiss: () -> Unit, done: suspend () -> Unit) {
+    val app = LocalApp.current
+    var name by remember(existing?.id) { mutableStateOf(existing?.str("name") ?: "") }
+    var salesman by remember(existing?.id) {
+        mutableStateOf(if (existing == null) people.firstOrNull()?.id?.toString() ?: "" else if (existing.has("salesman_id")) existing.int("salesman_id").toString() else "")
+    }
+    var days by remember(existing?.id) {
+        mutableStateOf(if (existing == null) "1" else existing.str("days").ifEmpty { if (existing.has("day_of_week")) existing.int("day_of_week").toString() else "" })
+    }
+    FormDialog(if (existing == null) "New route" else "Edit route", onDismiss, canSave = name.isNotBlank(), onSave = {
+        val body = mapOf("name" to name.trim(), "salesman_id" to salesman, "days" to days)
+        if (existing != null) { Api.obj("PUT", "/routes/${existing.id}", body = body); app.notify("Route saved.") }
+        else { Api.obj("POST", "/routes", body = body); app.notify("Route added.") }
+        done()
+    }) {
+        Field("Route name", name, { name = it })
+        Choice("Salesman", listOf("" to "Not assigned") + people.map { it.id.toString() to it.str("name") }, salesman, { salesman = it })
+        Text("Visit days"); DayPicker(days) { days = it }
+        if (existing != null) Hint("A route's name lists its places, separated by commas (e.g. Qazipara, Mandi, Mandawar Road): Parties › Assign routes uses them. Its outlets stay on it.")
     }
 }

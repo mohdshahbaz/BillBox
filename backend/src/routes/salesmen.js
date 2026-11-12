@@ -74,6 +74,8 @@ router.put('/routes/:id', h((req, res) => {
   const cur = db.prepare('SELECT * FROM routes WHERE id=?').get(req.params.id);
   if (!cur) throw new HttpError(404, 'Route not found');
   const b = { ...cur, ...req.body };
+  if (!blank(b.name)) throw new HttpError(400, 'Route name is required');
+  b.name = String(b.name).trim();
   const days = normDays(req.body.days !== undefined ? req.body.days : req.body.day_of_week !== undefined ? req.body.day_of_week : cur.days);
   db.prepare('UPDATE routes SET name=?,salesman_id=?,day_of_week=?,days=? WHERE id=?')
     .run(b.name, blank(b.salesman_id), days ? parseInt(days) : null, days, cur.id);

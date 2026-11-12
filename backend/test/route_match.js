@@ -114,4 +114,18 @@ ok('outlet counts, the beat plan and deleting a route follow every route of a pa
   assert.strictEqual(db.prepare('SELECT COUNT(*) n FROM party_routes').get().n, 0);
 });
 
+ok('editing a route: name (trimmed), salesman and days change; its outlets stay; a blank name is refused', () => {
+  clear();
+  const sm = Number(db.prepare("INSERT INTO salesmen(name) VALUES('Edit Sm')").run().lastInsertRowid);
+  const r = Number(db.prepare("INSERT INTO routes(name,days,day_of_week) VALUES('Old Name','1',1)").run().lastInsertRowid);
+  const p = call('post', '/parties', { body: { name: 'Edit Route Store', route_ids: [r] } }).id;
+  call('put', '/routes/:id', { params: { id: r }, body: { name: '  New Name ', salesman_id: sm, days: [3, 5] } });
+  const row = () => db.prepare('SELECT * FROM routes WHERE id=?').get(r);
+  assert.deepStrictEqual([row().name, row().salesman_id, row().days, row().day_of_week], ['New Name', sm, '3,5', 3]);
+  assert.deepStrictEqual(routesOf(p), [r]);
+  assert.throws(() => call('put', '/routes/:id', { params: { id: r }, body: { name: '  ' } }), /Route name is required/);
+  call('put', '/routes/:id', { params: { id: r }, body: { salesman_id: '' } });
+  assert.deepStrictEqual([row().name, row().salesman_id, row().days], ['New Name', null, '3,5']);
+});
+
 console.log(`\n${passed} route tests passed`);
