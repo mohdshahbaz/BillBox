@@ -124,10 +124,10 @@ func compactPrint(_ co: JSON) -> Bool { co.str("print_compact") != "0" }
 /// behind a ruled line, and the footer keeps one line of terms: the room saved goes to item rows.
 func signatureInBand(_ co: JSON) -> Bool { compactPrint(co) && co.str("print_signature") != "0" }
 /// Width of that signature block in the totals band.
-func signatureBandWidth(_ g: Spec) -> CGFloat { 86 * g.cw }
+func signatureBandWidth(_ g: Spec) -> CGFloat { 100 * g.cw }
 /// Settings › Printing › Receiver's signature box: an empty box for the buyer's signature, between the bank details and yours.
 func receiverInBand(_ co: JSON) -> Bool { compactPrint(co) && co.str("print_receiver") != "0" }
-func receiverBandWidth(_ g: Spec) -> CGFloat { 70 * g.cw }
+func receiverBandWidth(_ g: Spec) -> CGFloat { 86 * g.cw }
 /// Nothing left for the footer row (terms off or empty, no payment line, no note): the row is left out and its room goes to items.
 func footerEmpty(_ co: JSON) -> Bool {
     (co.str("print_terms") == "0" || co.str("invoice_terms").trimmingCharacters(in: .whitespaces).isEmpty)
@@ -569,7 +569,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 }
                 if on("print_words") || bankTab {
                     // the bank details sit beside "Amount in words" (the words take the left 42%), so they need no extra height
-                    let leftW = g.contentW - 186 * g.cw - 12 - (sigHere ? signatureBandWidth(g) : 0) - (recvHere ? receiverBandWidth(g) : 0)   // inside the margins and the 6 pt padding each side
+                    let leftW = g.contentW - sumW - 12 - (sigHere ? signatureBandWidth(g) : 0) - (recvHere ? receiverBandWidth(g) : 0)   // inside the margins and the 6 pt padding each side
                     HStack(alignment: .bottom, spacing: 0) {
                         if on("print_words") {
                             VStack(alignment: .leading, spacing: 1.5) {
@@ -581,6 +581,8 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                         // the bank details start right after the words (Settings › Printing › Bank details size sets how much room they get)
                         if bankTab { bankTabBlock.frame(width: leftW * bankShare, alignment: .topLeading).padding(.leading, leftW * 0.02) }
                     }
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .layoutPriority(1)
                 }
             }
             .padding(.horizontal, 6).padding(.vertical, 4)
@@ -589,8 +591,9 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             .clipped()
             if recvHere {
                 // an empty box for the buyer to sign, between the bank details and the company's signature
-                VStack(spacing: 0) {
+                VStack(spacing: 2) {
                     Spacer(minLength: 0)
+                    Rectangle().fill(muted.opacity(0.7)).frame(height: 0.5).padding(.horizontal, 6)
                     t("Receiver's Signature", 6.5).foregroundStyle(muted).lineLimit(1).minimumScaleFactor(0.7)
                 }
                 .padding(.horizontal, 4).padding(.vertical, 4)
@@ -600,10 +603,11 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             }
             if sigHere {
                 // the company's signature, beside the bank details behind a ruled line: the footer keeps only the terms
-                VStack(spacing: 0) {
+                VStack(spacing: 2) {
                     t(hc("For \(companyName)"), 7, bold: true).lineLimit(2).minimumScaleFactor(0.7).multilineTextAlignment(.center)
                     Spacer(minLength: 0)
-                    t("Authorised Signatory", 6.5).foregroundStyle(muted)
+                    Rectangle().fill(muted.opacity(0.7)).frame(height: 0.5).padding(.horizontal, 6)
+                    t("Authorised Signatory", 6.5).foregroundStyle(muted).lineLimit(1).minimumScaleFactor(0.7)
                 }
                 .padding(.horizontal, 5).padding(.vertical, 4)
                 .frame(width: signatureBandWidth(g))
@@ -623,8 +627,10 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
     /// The signature prints in the totals band (last page) instead of the footer.
     private var sigHere: Bool { page == pages - 1 && signatureInBand(co) }
     private var recvHere: Bool { page == pages - 1 && receiverInBand(co) }
+    /// Width of the totals column: a little narrower when the signature boxes share the band.
+    private var sumW: CGFloat { (sigHere || recvHere ? 176 : 186) * g.cw }
     /// Width of the band's left side (GST table, words, bank): what the signature boxes and the totals column leave.
-    private var bandLeftW: CGFloat { g.contentW - 186 * g.cw - (sigHere ? signatureBandWidth(g) : 0) - (recvHere ? receiverBandWidth(g) : 0) }
+    private var bandLeftW: CGFloat { g.contentW - sumW - (sigHere ? signatureBandWidth(g) : 0) - (recvHere ? receiverBandWidth(g) : 0) }
     /// The bank block's share of the band's left side; with the signature boxes beside it the words wrap narrower so the bank keeps its width.
     private var bankShare: CGFloat { recvHere ? 0.66 : sigHere ? min(0.8, bankSize(co).width + 0.12) : bankSize(co).width }
 
@@ -650,6 +656,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             }
         }
         .padding(.leading, 6)
+        .frame(maxHeight: .infinity, alignment: .bottomLeading)
         .overlay(alignment: .leading) { vRule(0.5, color: muted) }
     }
 
@@ -732,7 +739,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 .frame(height: (compactPrint(co) ? 17 : 19) * g.fs)
                 .background(shade)
             }
-            .frame(width: 186 * g.cw)
+            .frame(width: sumW)
     }
 
     private func sumRow(_ a: String, _ v: Double) -> some View {
