@@ -7,13 +7,19 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 2. iPhone: shared components to the design system
 - [x] 3. iPhone: screen by screen, self-test screenshots reviewed
 - [x] 4. Android: theme and components (Material 3), then screens; Android self-test
-- [ ] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow
+- [ ] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow (in progress)
 - [ ] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
 - [ ] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
 - [ ] 8. Bills: every style and layout checked from self-test PDFs
 - [ ] 9. Docs updated, one pull request into `main` (not merged)
 
 ## Log
+- 2026-11-12 (run 3): stage 5 part 1. Flutter `Palette` now holds the design-system Clean colours (indigo accent,
+  AA-contrast warning/negative/positive), `DS` tokens, radii 14/12, table heading band tinted + upper case,
+  `SummaryCard`/`StatusPill` (All Bills uses both), Ctrl+1…9 on Windows/Linux (⌘ kept for Mac keyboards), window
+  title "BillBox — Company"; analyzer infos cut from 43 to the deprecation notes. Desktop workflow 43324558941:
+  Linux and Windows build + smoke test green; `flutter analyze`: 0 errors, 0 warnings (infos only:
+  `package:flutter/material.dart` deprecated in Flutter 3.50 in favour of material_ui — not migrated).
 - 2026-11-12 (run 2, end): stage 4 done. Android: status pills (bill type, printed, party type), tabular figures for
   amounts, summary card clears the floating button, self-test now also shoots 5 screens in dark mode.
   Android self-test 8ed38b7: API 31 and API 34 both 543/543 steps match (API 31 had 499 differences before the
@@ -50,8 +56,9 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - iPhone/Android tables still run past the screen edge (sideways scroll by design).
 
 ## Next
-Stage 5: Windows/Linux Flutter (`frontend/`): no Flutter in the cloud sandbox, so rely on the Desktop workflow
-(`desktop.yml`, run it with workflow_dispatch on ui-overhaul) for `flutter analyze` and both builds. Bring
-`lib/widgets.dart` theme onto docs/DESIGN_SYSTEM.md (ColorScheme from accent, semantic colours with dark pairs,
-rounded table cards with tinted header, summary cards, tabular figures), NavigationRail, keyboard shortcuts.
+Stage 5 part 2 (Flutter): dark mode and the 25 themes need `Palette` to stop being `const` (≈136 uses, many in
+`const` widgets) — plan: a `ThemeExtension<BillBoxColors>` read via `context.bb`, migrate screen by screen, then
+`darkTheme` + `themeMode`, plus an Appearance section in Settings (theme, light/dark) stored in app_settings;
+sticky table headings (header outside the vertical scroll); summary cards on Books & GST and Debit Notes;
+keyboard focus rings. Check every step with the Desktop workflow (push to ui-overhaul runs it; ~6 min).
 Then stage 6 (Mac), 7 (backend perf), 8 (bills), 9 (docs + PR).
