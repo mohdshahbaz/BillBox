@@ -9,8 +9,9 @@ const { HttpError } = require('../utils/misc');
 const REPO = process.env.BILLBOX_REPO || 'mohdshahbaz/BillBox';
 const API = process.env.BILLBOX_RELEASES_API || `https://api.github.com/repos/${REPO}/releases?per_page=30`;
 const FILES = {
-  // Mac: one zip for Apple silicon and Intel (never a single-kind zip, which an Intel Mac cannot open)
-  android: /^BillBox-android-.*\.apk$/, mac: /^BillBox-mac-(?!.*-(arm64|intel)\.zip$).*\.zip$/, windows: /^BillBox-windows-.*-setup\.exe$/,
+  // Mac: each kind gets its own zip; "mac" (BillBox before the split) takes the plain zip, never an Apple silicon one
+  android: /^BillBox-android-.*\.apk$/, mac: /^BillBox-mac-(?!.*-(arm64|intel)\.zip$).*\.zip$/,
+  'mac-arm64': /^BillBox-mac-.*-arm64\.zip$/, 'mac-intel': /^BillBox-mac-.*-intel\.zip$/, windows: /^BillBox-windows-.*-setup\.exe$/,
   linux: /^BillBox-linux-.*\.deb$/, 'linux-tar': /^BillBox-linux-.*\.tar\.gz$/, iphone: /^BillBox-iphone-.*\.ipa$/,
 };
 
@@ -33,7 +34,9 @@ async function check({ version, edition, platform } = {}) {
     .sort((a, b) => (newer(a.tag_name, b.tag_name) ? -1 : newer(b.tag_name, a.tag_name) ? 1 : 0))[0];
   if (!rel) return { available: false, current: version || '', latest: null };
   const want = FILES[platform] || null;
-  const asset = want ? (rel.assets || []).find((a) => want.test(a.name)) : null;
+  // a release from before the split has only the plain (universal) Mac zip: both kinds take that
+  const asset = want ? ((rel.assets || []).find((a) => want.test(a.name))
+    || (String(platform).startsWith('mac-') ? (rel.assets || []).find((a) => FILES.mac.test(a.name)) : null)) : null;
   const latest = rel.tag_name.replace(/^v/, '');
   return {
     available: !!version && newer(latest, version), current: version || '', latest, page: rel.html_url,

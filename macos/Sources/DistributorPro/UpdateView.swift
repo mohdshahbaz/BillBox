@@ -12,7 +12,11 @@ enum AppUpdate {
     static var version: String { (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "" }
     static var edition: String { (Bundle.main.object(forInfoDictionaryKey: "BillBoxEdition") as? String) ?? "public" }
     #if os(macOS)
-    static let platform = "mac"   // one app for Apple silicon and Intel
+    #if arch(arm64)
+    static let platform = "mac-arm64"   // the Apple silicon build updates to the Apple silicon build
+    #else
+    static let platform = "mac-intel"
+    #endif
     #else
     static let platform = "iphone"
     #endif
@@ -83,7 +87,7 @@ enum AppUpdate {
     var body: some View {
         Form {
             Section {
-                Text("This \(AppUpdate.platform == "mac" ? "Mac" : "iPhone") has BillBox \(AppUpdate.version)\(AppUpdate.edition == "admin" ? " (admin)" : "")")
+                Text("This \(AppUpdate.platform.hasPrefix("mac") ? "Mac" : "iPhone") has BillBox \(AppUpdate.version)\(AppUpdate.edition == "admin" ? " (admin)" : "")")
                 if let errorText { Text(errorText).foregroundStyle(.red).font(.callout) }
                 else if let u {
                     if u.bool("available") {

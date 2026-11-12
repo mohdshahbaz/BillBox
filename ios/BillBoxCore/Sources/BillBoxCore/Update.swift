@@ -8,7 +8,8 @@ import FoundationNetworking
 enum Update {
     static var api = "https://api.github.com/repos/mohdshahbaz/BillBox/releases?per_page=30"
     static let files: [String: String] = [
-        "android": #"^BillBox-android-.*\.apk$"#, "mac": #"^BillBox-mac-(?!.*-(arm64|intel)\.zip$).*\.zip$"#, "windows": #"^BillBox-windows-.*-setup\.exe$"#,
+        "android": #"^BillBox-android-.*\.apk$"#, "mac": #"^BillBox-mac-(?!.*-(arm64|intel)\.zip$).*\.zip$"#,
+        "mac-arm64": #"^BillBox-mac-.*-arm64\.zip$"#, "mac-intel": #"^BillBox-mac-.*-intel\.zip$"#, "windows": #"^BillBox-windows-.*-setup\.exe$"#,
         "linux": #"^BillBox-linux-.*\.deb$"#, "linux-tar": #"^BillBox-linux-.*\.tar\.gz$"#, "iphone": #"^BillBox-iphone-.*\.ipa$"#,
     ]
 
@@ -49,11 +50,13 @@ enum Update {
         var latest = rel["tag_name"] as? String ?? ""
         if latest.hasPrefix("v") { latest.removeFirst() }
         var file: Any = NSNull()
-        if let pat = files[platform], let re = try? NSRegularExpression(pattern: pat),
-           let a = (rel["assets"] as? [[String: Any]] ?? []).first(where: { a in
-               let n = a["name"] as? String ?? ""
-               return re.firstMatch(in: n, range: NSRange(n.startIndex..., in: n)) != nil
-           }) {
+        let assets = rel["assets"] as? [[String: Any]] ?? []
+        func find(_ key: String) -> [String: Any]? {
+            guard let pat = files[key], let re = try? NSRegularExpression(pattern: pat) else { return nil }
+            return assets.first { a in let n = a["name"] as? String ?? ""; return re.firstMatch(in: n, range: NSRange(n.startIndex..., in: n)) != nil }
+        }
+        // a release from before the split has only the plain (universal) Mac zip: both kinds take that
+        if let a = find(platform) ?? (platform.hasPrefix("mac-") ? find("mac") : nil) {
             file = ["name": a["name"] ?? "", "url": a["browser_download_url"] ?? "", "size": a["size"] ?? 0] as Row
         }
         let body = (rel["body"] as? String ?? "").components(separatedBy: "\n## Install").first ?? ""

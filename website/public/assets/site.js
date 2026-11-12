@@ -12,6 +12,7 @@
 
   // [data-dl="windows-setup"] etc. point straight at the file in the newest GitHub release
   const want = {
+    'mac-arm64': /BillBox-mac-.*-arm64\.dmg$/, 'mac-intel': /BillBox-mac-.*-intel\.dmg$/,
     'mac': /BillBox-mac-(?!.*-(arm64|intel)\.dmg$).*\.dmg$/, 'mac-zip': /BillBox-mac-(?!.*-(arm64|intel)\.zip$).*\.zip$/, 'windows-setup': /BillBox-windows-.*-setup\.exe$/, 'windows-zip': /BillBox-windows-.*\.zip$/,
     'linux-deb': /BillBox-linux-.*\.deb$/, 'linux-tar': /BillBox-linux-.*\.tar\.gz$/, 'android': /BillBox-android-.*\.apk$/, 'iphone': /BillBox-iphone-.*\.ipa$/,
   };
@@ -20,7 +21,8 @@
     fetch('https://api.github.com/repos/mohdshahbaz/BillBox/releases/latest').then((r) => (r.ok ? r.json() : null)).then((rel) => {
       if (!rel) return;
       els.forEach((el) => {
-        const a = (rel.assets || []).find((x) => want[el.dataset.dl] && want[el.dataset.dl].test(x.name));
+        const find = (k) => (rel.assets || []).find((x) => want[k] && want[k].test(x.name));
+        const a = find(el.dataset.dl) || (el.dataset.dl.startsWith('mac-') ? find('mac') : null);   // releases from before the split: one app for both
         if (a) { el.href = a.browser_download_url; el.title = `${a.name} · ${(a.size / 1e6).toFixed(0)} MB`; }
       });
       document.querySelectorAll('[data-version]').forEach((el) => { el.textContent = rel.tag_name.replace(/^v/, ''); });

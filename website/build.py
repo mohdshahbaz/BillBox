@@ -18,7 +18,7 @@ PLATFORMS = {
         title="BillBox for Mac — GST billing and stock software for distributors",
         desc="BillBox for Mac: fast GST billing with batches and expiry, purchases from supplier PDFs, stock, ledgers, Marg-style printing and Google Drive backups. A native Mac app for FMCG distributors.",
         lead="A native Mac app that bills as fast as you type. Built for distributors who live in their keyboard.",
-        downloads=[("mac", "Download for Mac (.dmg)"), ("mac-zip", "Mac app as .zip")],
+        downloads=[("mac-arm64", "Download for Apple silicon (M1–M4)"), ("mac-intel", "Download for Intel Mac")],
         specs=[("System", "macOS 12 or newer"), ("Chips", "Apple silicon and Intel"), ("Size", "about 60 MB"), ("Books", "on your Mac, backed up daily")],
         features=[
             ("Billing at keyboard speed", "Item search as you type, box and piece quantities, batches picked by expiry (FEFO), schemes and free pieces, rate and discount memory per party."),
@@ -248,7 +248,7 @@ def platform(k):
     feats = "".join(f'<li><b>{e(a)}.</b> <span>{e(b)}</span></li>' for a, b in p["features"])
     soon = "".join(f'<li class="soon"><b>{e(x)}</b> <span>— coming in an update</span></li>' for x in p["soon"])
     install = {
-        "mac": "Open the .dmg and drag BillBox to Applications. The first time, right-click BillBox › Open (on macOS 15: System Settings › Privacy & Security › Open Anyway).",
+        "mac": "Not sure which Mac you have? Apple menu › About This Mac: “Chip: Apple M…” is Apple silicon, “Processor: Intel” is Intel. Open the .dmg and drag BillBox to Applications. The first time, right-click BillBox › Open (on macOS 15: System Settings › Privacy & Security › Open Anyway).",
         "windows": "Run the installer. If SmartScreen warns about a new app, choose More info › Run anyway. BillBox opens with a 15-day trial.",
         "linux": "sudo apt install ./BillBox-linux-*-amd64.deb — or unpack the .tar.gz anywhere and run BillBox/install.sh once to add it to your menu.",
         "iphone": "Install the .ipa with Sideloadly or AltStore, which sign it with your Apple ID. An App Store version is on the way.",
