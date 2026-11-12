@@ -110,6 +110,7 @@ fun PartiesScreen() {
     var busy by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<J?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var autoRoutes by remember { mutableStateOf(false) }
     var ledgerFor by remember { mutableStateOf<J?>(null) }
     var voucherFor by remember { mutableStateOf<J?>(null) }
     // set when "Record receipt / payment" was started from the ledger: the ledger opens again afterwards, on the year of the new line
@@ -169,10 +170,14 @@ fun PartiesScreen() {
                         },
                     ))
             }
-            Text("${parties.size} ${if (supplier) "suppliers" else "customers"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("${parties.size} ${if (supplier) "suppliers" else "customers"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f).padding(vertical = 4.dp))
+                if (!supplier) TextButton(onClick = { autoRoutes = true }) { Text("Assign routes") }
+            }
         }
     }
 
+    if (autoRoutes) AutoRouteForm({ autoRoutes = false }) { load() }
     if (creating) PartyForm(null, if (supplier) "SUPPLIER" else "RETAILER", routes, salesmen, { creating = false }) { load() }
     editing?.let { p -> PartyForm(p, "RETAILER", routes, salesmen, { editing = null }) { load() } }
     ledgerFor?.let { p -> LedgerDialog(p, { ledgerFor = null }, ledgerYear, { load() }) { ledgerReturn = p; ledgerYear = ""; ledgerFor = null; voucherFor = p } }
@@ -196,6 +201,40 @@ fun PartiesScreen() {
             selection.clear(); selecting = false; busy = false; load()
         }
     }, { confirmBulk = false }, destructive = true)
+}
+
+/** Customers without a route get the route named in their name or address (POST /routes/auto-assign): preview, untick, apply. */
+@Composable
+fun AutoRouteForm(onDismiss: () -> Unit, done: suspend () -> Unit) {
+    val app = LocalApp.current
+    var preview by remember { mutableStateOf<J?>(null) }
+    val skip = remember { mutableStateListOf<Int>() }
+    LaunchedEffect(Unit) { app.guarded { preview = Api.obj("POST", "/routes/auto-assign", body = mapOf("apply" to false)) } }
+    val matches = preview?.list("matches") ?: emptyList()
+    val chosen = matches.map { it.int("party_id") }.filter { it !in skip }
+    FormDialog("Assign routes", onDismiss, "Assign ${chosen.size}", canSave = chosen.isNotEmpty(), onSave = {
+        val r = Api.obj("POST", "/routes/auto-assign", body = mapOf("apply" to true, "party_ids" to chosen))
+        app.notify("${r.int("assigned")} outlets assigned to routes.")
+        done()
+    }) {
+        val p = preview
+        if (p == null) { Loading(); return@FormDialog }
+        Hint(if (matches.isEmpty()) "No customer without a route has a route name in their name or address."
+             else "${matches.size} customers without a route have a route name in their name or address. Untick any that are wrong.")
+        if (p.int("unclear") > 0 || p.int("unmatched") > 0)
+            Hint("Left as they are: ${p.int("unmatched")} with no route name found" + (if (p.int("unclear") > 0) ", ${p.int("unclear")} matching two routes of the same name" else "") + ".")
+        matches.forEach { m ->
+            val id = m.int("party_id")
+            Row(Modifier.fillMaxWidth().clickable { if (id in skip) skip.remove(id) else skip.add(id) }, verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(id !in skip, { on -> if (on) skip.remove(id) else skip.add(id) })
+                Column(Modifier.weight(1f)) {
+                    Text(m.str("party_name"), fontWeight = FontWeight.Medium)
+                    if (m.str("address").isNotEmpty()) Hint(m.str("address"))
+                }
+                Text("→ " + m.str("route_name"), fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
 }
 
 /** Parties › Customers: the way into payments from a photo (Settings › Parties & Payments can hide it). */

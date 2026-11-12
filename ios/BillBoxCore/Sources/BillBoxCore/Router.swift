@@ -222,6 +222,7 @@ public final class Router {
         case ("GET", 3, "salesmen") where s[2] == "performance": return ok(try performance(db, s[1], q))
         case ("GET", 1, "routes"): return ok(try listRoutes(db))
         case ("POST", 1, "routes"): return try addRoute(db, b)
+        case ("POST", 2, "routes") where s[1] == "auto-assign": return ok(try autoAssignRoutes(db, b))
         case ("PUT", 2, "routes"): return ok(try updateRoute(db, s[1], b))
         case ("DELETE", 2, "routes"): return ok(try deleteRoute(db, s[1]))
 

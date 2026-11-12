@@ -57,6 +57,62 @@ class _PartiesState extends State<PartiesScreen> {
     });
   }
 
+  /// Customers without a route get the route named in their name or address (POST /routes/auto-assign): preview, untick, apply.
+  Future<void> _autoRoutes() => guard(context, () async {
+        final pre = await Api.post('/routes/auto-assign', {'apply': false}) as Json;
+        if (!mounted) return;
+        final matches = (pre['matches'] as List).cast<Json>();
+        final skip = <int>{};
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) {
+            final n = matches.where((m) => !skip.contains(m['party_id'])).length;
+            final unclear = num_(pre['unclear']).toInt(), unmatched = num_(pre['unmatched']).toInt();
+            return AlertDialog(
+              title: const Text('Assign routes from name and address'),
+              content: SizedBox(
+                width: math.min(620.0, MediaQuery.sizeOf(ctx).width - 80),
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(matches.isEmpty
+                      ? 'No customer without a route has a route name in their name or address.'
+                      : '${matches.length} customers without a route have a route name in their name or address. Untick any that are wrong.'),
+                  if (unclear > 0 || unmatched > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text('Left as they are: $unmatched with no route name found${unclear > 0 ? ', $unclear matching two routes of the same name' : ''}.',
+                          style: Theme.of(ctx).textTheme.bodySmall),
+                    ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: ListView(shrinkWrap: true, children: [
+                      for (final m in matches)
+                        CheckboxListTile(
+                          dense: true,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          value: !skip.contains(m['party_id']),
+                          onChanged: (v) => setSt(() => v == true ? skip.remove(m['party_id']) : skip.add(m['party_id'] as int)),
+                          title: Text('${m['party_name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: '${m['address'] ?? ''}'.isEmpty ? null : Text('${m['address']}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                          secondary: Text('→ ${m['route_name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                    ]),
+                  ),
+                ]),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                FilledButton(onPressed: n == 0 ? null : () => Navigator.pop(ctx, true), child: Text('Assign $n')),
+              ],
+            );
+          }),
+        );
+        if (ok != true || !mounted) return;
+        final ids = [for (final m in matches) if (!skip.contains(m['party_id'])) m['party_id']];
+        final r = await Api.post('/routes/auto-assign', {'apply': true, 'party_ids': ids}) as Json;
+        if (mounted) toast(context, '${r['assigned']} outlets assigned to routes.');
+        await _load();
+      });
+
   Future<void> _delete(Json p) async {
     if (!await confirm(context, 'Delete ${p['name']}?', 'A party with bills or ledger entries is archived (hidden, books stay correct). A party with no history is removed.', ok: 'Delete', danger: true)) return;
     if (!mounted) return;
@@ -186,7 +242,10 @@ class _PartiesState extends State<PartiesScreen> {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader('Parties', actions: [FilledButton.icon(onPressed: () => _form(), icon: const Icon(Icons.add), label: Text(kind == 'SUPPLIER' ? 'New supplier' : 'New customer'))]),
+      PageHeader('Parties', actions: [
+        if (kind != 'SUPPLIER') OutlinedButton.icon(onPressed: _autoRoutes, icon: const Icon(Icons.alt_route), label: const Text('Assign routes')),
+        FilledButton.icon(onPressed: () => _form(), icon: const Icon(Icons.add), label: Text(kind == 'SUPPLIER' ? 'New supplier' : 'New customer')),
+      ]),
       FormWrap([
         SegmentedButton<String>(
           segments: const [ButtonSegment(value: 'CUSTOMER', label: Text('Customers')), ButtonSegment(value: 'SUPPLIER', label: Text('Suppliers'))],

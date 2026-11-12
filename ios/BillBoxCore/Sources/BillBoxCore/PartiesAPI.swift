@@ -201,6 +201,51 @@ extension Router {
         return ["ok": true, "into": into.v("id"), "moved": moved] as Row
     }
 
+    // utils/routematch.js: outlets without a route get the route named in their name or address.
+    static let ROUTE_FILLER: Set<String> = ["ROUTE", "ROUTES", "BEAT", "MON", "TUE", "TUES", "WED", "THU", "THUR", "THURS", "FRI", "SAT", "SUN",
+        "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+    static func routeWords(_ s: String) -> [String] {
+        let up = s.uppercased().unicodeScalars.map { ($0 >= "A" && $0 <= "Z") || ($0 >= "0" && $0 <= "9") ? Character($0) : " " }
+        return String(up).split(separator: " ").map(String.init)
+    }
+    static func routeKey(_ name: String) -> String? {
+        let all = routeWords(name)
+        let kept = all.filter { !ROUTE_FILLER.contains($0) }
+        let k = (kept.isEmpty ? all : kept).joined(separator: " ")
+        return k.count >= 3 ? " \(k) " : nil
+    }
+
+    /// {matches: [{party_id, party_name, address, route_id, route_name}], unclear, unmatched, assigned}; apply → also assigns them.
+    func autoAssignRoutes(_ db: Database, _ b: Row) throws -> Any {
+        let apply = JS.truthy(b["apply"] ?? nil)
+        let only: Set<Double>? = (unwrap(b["party_ids"] ?? nil) as? [Any]).map { Set($0.map { JS.number($0) }) }
+        let routes: [(id: Any?, name: String, key: String)] = try db.prepare("SELECT id, name FROM routes").all().compactMap { r in
+            let name = JS.string(r.v("name"))
+            return Router.routeKey(name).map { (id: r.v("id"), name: name, key: $0) }
+        }
+        let parties = try db.prepare("SELECT id, name, address FROM parties WHERE active=1 AND route_id IS NULL AND type <> 'SUPPLIER' ORDER BY name").all()
+        var matches: [Row] = []
+        var unclear = 0, unmatched = 0
+        for p in parties {
+            if let only, !only.contains(JS.number(p.v("id"))) { continue }
+            let addr = p.v("address") == nil ? "" : JS.string(p.v("address"))
+            let text = " " + Router.routeWords("\(JS.string(p.v("name"))) \(addr)").joined(separator: " ") + " "
+            let hit = routes.filter { text.contains($0.key) }
+            if hit.isEmpty { unmatched += 1; continue }
+            let len = hit.map { $0.key.count }.max() ?? 0
+            let best = hit.filter { $0.key.count == len }
+            if best.count > 1 { unclear += 1; continue }
+            matches.append(["party_id": p.v("id"), "party_name": p.v("name"), "address": addr, "route_id": best[0].id, "route_name": best[0].name] as Row)
+        }
+        if apply && !matches.isEmpty {
+            try db.transaction {
+                let up = try db.prepare("UPDATE parties SET route_id=? WHERE id=? AND route_id IS NULL")
+                for m in matches { try up.run(m.v("route_id"), m.v("party_id")) }
+            }
+        }
+        return ["matches": matches, "unclear": unclear, "unmatched": unmatched, "assigned": apply ? matches.count : 0] as Row
+    }
+
     func listRoutes(_ db: Database) throws -> Any {
         try db.prepare("""
         SELECT r.*, s.name salesman_name, (SELECT COUNT(*) FROM parties p WHERE p.route_id=r.id AND p.active=1) outlets

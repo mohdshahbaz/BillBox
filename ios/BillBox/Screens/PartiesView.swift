@@ -13,6 +13,7 @@ import SwiftUI
     @State private var loading = true
     @State private var editing: JSON?
     @State private var creating = false
+    @State private var autoRoutes = false
     @State private var ledgerFor: JSON?
     @State private var voucherFor: JSON?
     /// Set when "Record receipt / payment" was started from the ledger: the ledger opens again afterwards, showing the new line.
@@ -83,6 +84,7 @@ import SwiftUI
         .onChange(of: kind) { _ in Task { selection = []; await load() } }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if !supplier { Button { autoRoutes = true } label: { Label("Assign routes", systemImage: "point.topleft.down.curvedto.point.bottomright.up") } }
                 Button { creating = true } label: { Label(supplier ? "New supplier" : "New customer", systemImage: "person.badge.plus") }
             }
             ToolbarItem(placement: .bottomBar) {
@@ -95,6 +97,7 @@ import SwiftUI
 
     @ViewBuilder private func dialogs<V: View>(_ v: V) -> some View {
         v
+        .sheet(isPresented: $autoRoutes) { AutoRouteSheet { await load() } }
         .sheet(isPresented: $creating) { PartySheet(party: nil, defaultType: supplier ? "SUPPLIER" : "RETAILER", routes: routes, salesmen: salesmen) { await load() } }
         .sheet(item: $editing) { p in PartySheet(party: p, defaultType: "RETAILER", routes: routes, salesmen: salesmen) { await load() } }
         .sheet(item: $ledgerFor) { p in
@@ -431,6 +434,53 @@ extension PartiesView {
             if direction.isEmpty { direction = supplier ? "PAID" : "RECEIVED" }
             if date.isEmpty { date = app.dateInFY }
             if !loadedMode { loadedMode = true; let m = app.settings.str("pay_default_mode"); if !m.isEmpty { mode = m } }
+        }
+    }
+}
+
+/// Outlets without a route get the route named in their name or address (POST /routes/auto-assign): preview, untick, apply.
+@MainActor struct AutoRouteSheet: View {
+    @EnvironmentObject private var app: AppModel
+    let done: () async -> Void
+    @State private var preview: JSON?
+    @State private var skip = Set<Int>()
+
+    private var matches: [JSON] { preview?.list("matches") ?? [] }
+    private var chosen: [Int] { matches.map { $0.int("party_id") }.filter { !skip.contains($0) } }
+
+    var body: some View {
+        FormSheet(title: "Assign routes from name and address", saveLabel: "Assign \(chosen.count)", width: 600, canSave: !chosen.isEmpty, onSave: {
+            let r = try await API.obj("POST", "/routes/auto-assign", body: ["apply": true, "party_ids": chosen])
+            app.notify("\(r.int("assigned")) outlets assigned to routes.")
+            await done()
+        }) {
+            if let p = preview {
+                Text(matches.isEmpty ? "No customer without a route has a route name in their name or address."
+                     : "\(matches.count) customers without a route have a route name in their name or address. Untick any that are wrong.")
+                    .foregroundStyle(.secondary)
+                if p.int("unclear") > 0 || p.int("unmatched") > 0 {
+                    Text("Left as they are: \(p.int("unmatched")) with no route name found\(p.int("unclear") > 0 ? ", \(p.int("unclear")) matching two routes of the same name" : "").")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(matches) { m in
+                    let id = m.int("party_id")
+                    Toggle(isOn: Binding(get: { !skip.contains(id) }, set: { if $0 { skip.remove(id) } else { skip.insert(id) } })) {
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(m.str("party_name")).fw(.medium)
+                                if !m.str("address").isEmpty { Text(m.str("address")).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                            }
+                            Spacer()
+                            Text("→ \(m.str("route_name"))").fw(.semibold)
+                        }
+                    }
+                }
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            await app.guarded { preview = try await API.obj("POST", "/routes/auto-assign", body: ["apply": false]) }
         }
     }
 }
