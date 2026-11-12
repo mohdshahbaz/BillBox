@@ -75,7 +75,7 @@ import SwiftUI
             let ach: Double? = p.has("achievement_pct") ? p.num("achievement_pct") : nil
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
                 StatCard(title: "Target for \(p.str("month"))", value: Fmt.money(p, "target"))
-                StatCard(title: "Sales (\(p.int("invoices")) bills)", value: Fmt.money(p, "sales"), tint: .teal)
+                StatCard(title: "Sales (\(p.int("invoices")) bill\(p.int("invoices") == 1 ? "" : "s"))", value: Fmt.money(p, "sales"), tint: .teal)
                 StatCard(title: "Achievement", value: ach.map { "\(Fmt.qty($0))%" } ?? "No target set", tint: (ach ?? 0) >= 100 ? .green : .orange)
                 StatCard(title: "Collections this month", value: Fmt.money(p, "collections"), tint: .green)
             }

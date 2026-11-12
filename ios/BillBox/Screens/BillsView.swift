@@ -14,6 +14,7 @@ import SwiftUI
     @State private var selection = Set<JSON.ID>()
     @State private var selecting = false
     @State private var loading = true
+    @State private var loadError: String?
     @State private var busy = false
     @State private var viewing: JSON?
     @State private var ewbRow: JSON?
@@ -116,6 +117,7 @@ import SwiftUI
         .overlay {
             if loading && rows.isEmpty { SkeletonRows() }
             else if loading { ProgressView() }
+            else if let loadError, rows.isEmpty { ErrorState(message: loadError) { Task { await load() } } }
             else if rows.isEmpty { EmptyState(title: "No bills match these filters", symbol: "doc.text.magnifyingglass") }
         }
     }
@@ -225,7 +227,7 @@ import SwiftUI
     }
 
     private func load() async {
-        await app.guarded {
+        loadError = await app.loading {
             let r = try await API.obj("GET", "/bills", query: ["type": type, "from": from, "to": to, "q": query, "unpaid": unpaid ? 1 : 0, "unprinted": unprinted ? 1 : 0])
             // a sale, a purchase and a debit note can share the same database id, so rows get a unique table id
             // (purchases negative, debit notes from 1,000,000,000)

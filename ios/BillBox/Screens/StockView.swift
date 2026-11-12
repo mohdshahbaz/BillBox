@@ -10,6 +10,7 @@ import SwiftUI
     @State private var selection = Set<JSON.ID>()
     @State private var selecting = false
     @State private var loading = true
+    @State private var loadError: String?
     @State private var busy = false
 
     @State private var editing: JSON?
@@ -76,6 +77,7 @@ import SwiftUI
         .overlay {
             if loading && items.isEmpty { SkeletonRows() }
             else if loading { ProgressView() }
+            else if let loadError, items.isEmpty { ErrorState(message: loadError) { Task { await load() } } }
             else if items.isEmpty { EmptyState(title: "No items", symbol: "archivebox", message: "Add an item, or scan a supplier bill in Purchases and items are created for you.") }
         }
     }
@@ -197,7 +199,7 @@ import SwiftUI
     }
 
     private func load() async {
-        await app.guarded {
+        loadError = await app.loading {
             async let i = API.list("/items", query: ["q": query, "category_id": catId == 0 ? nil : catId])
             async let c = API.list("/categories")
             items = try await i

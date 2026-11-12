@@ -295,4 +295,10 @@ final class AppModel: ObservableObject {
     func guarded(_ work: () async throws -> Void) async {
         do { try await work() } catch { notify(error.localizedDescription, error: true) }
     }
+
+    /// Like `guarded`, but also hands back what went wrong, so a screen whose list could not load shows it in place
+    /// (`ErrorState` with Try again) instead of an empty table.
+    @discardableResult func loading(_ work: () async throws -> Void) async -> String? {
+        do { try await work(); return nil } catch { notify(error.localizedDescription, error: true); return error.localizedDescription }
+    }
 }

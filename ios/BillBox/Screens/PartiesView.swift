@@ -11,6 +11,7 @@ import SwiftUI
     @State private var selection = Set<JSON.ID>()
     @State private var selecting = false
     @State private var loading = true
+    @State private var loadError: String?
     @State private var editing: JSON?
     @State private var creating = false
     @State private var autoRoutes = false
@@ -63,6 +64,7 @@ import SwiftUI
         .overlay {
             if loading && parties.isEmpty { SkeletonRows() }
             else if loading { ProgressView() }
+            else if let loadError, parties.isEmpty { ErrorState(message: loadError) { Task { await load() } } }
             else if parties.isEmpty { EmptyState(title: supplier ? "No suppliers" : "No customers", symbol: "person.2", message: supplier ? "Suppliers are added automatically when you scan their bill." : "Add your first customer.") }
         }
     }
@@ -151,7 +153,7 @@ import SwiftUI
     }
 
     private func load() async {
-        await app.guarded {
+        loadError = await app.loading {
             async let p = API.list("/parties", query: ["q": query, "kind": kind])
             async let r = API.list("/routes")
             async let s = API.list("/salesmen")

@@ -107,7 +107,8 @@ struct PLine: Identifiable {
 
     @ViewBuilder private func chrome<V: View>(_ v: V) -> some View {
         v
-        .navigationTitle(editingId != nil ? "Edit purchase bill \(editingNo)" : "Purchase bill")
+        // short, so it is not cut off beside the company switcher and three toolbar buttons on a phone
+        .navigationTitle(editingId != nil ? "Edit \(editingNo)" : "Purchase")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
