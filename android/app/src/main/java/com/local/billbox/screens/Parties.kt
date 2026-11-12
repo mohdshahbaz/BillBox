@@ -1,5 +1,6 @@
 package com.local.billbox.screens
 
+import com.local.billbox.ui.StatusPill
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -158,7 +159,7 @@ fun PartiesScreen() {
                     ) },
                     columns = listOf(
                         Col("Party", "name", 200) { p -> Cell(p.str("name"), bold = true, lines = 2) },
-                        Col("Type", "type", 90) { p -> Cell(cap(p.str("type"))) },
+                        Col("Type", "type", 100) { p -> StatusPill(cap(p.str("type")), if (p.str("type") == "WHOLESALER") Color(0xFFA21CAF) else MaterialTheme.colorScheme.primary) },
                         Col("GSTIN", "gstin", 150) { p -> Cell(p.str("gstin")) },
                         Col("Route", "route", 130) { p -> Cell(p.str("route_name")) },
                         Col("Price tier", "tier", 90) { p -> Cell(cap(p.str("price_tier"))) },

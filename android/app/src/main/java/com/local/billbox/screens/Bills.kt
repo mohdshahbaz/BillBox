@@ -1,5 +1,6 @@
 package com.local.billbox.screens
 
+import com.local.billbox.ui.StatusPill
 import com.local.billbox.ui.SummaryCard
 import com.local.billbox.ui.SummaryItem
 import androidx.compose.foundation.layout.Arrangement
@@ -203,13 +204,13 @@ fun BillsScreen() {
                     ) },
                     columns = listOf(
                         Col("Date", "date", 96) { r -> Cell(Fmt.dmy(r.str("date"))) },
-                        Col("Type", "type", 84) { r -> Cell(billTypeName(r), billTypeColor(r), bold = true) },
-                        Col("Bill no", "no", 130) { r -> Cell(r.str("no")) },
+                        Col("Type", "type", 84) { r -> StatusPill(billTypeName(r), billTypeColor(r)) },
+                        Col("Bill no", "no", 150) { r -> Cell(r.str("no")) },
                         Col("Supplier bill", "ref", 110) { r -> Cell(r.str("ref")) },
                         Col("Party", "party", 200) { r -> Cell(r.str("party"), lines = 2) },
                         Col("Total", "total", 110, end = true) { r -> Cell(Fmt.money(r, "total"), end = true) },
                         Col("Paid", "paid", 110, end = true) { r -> Cell(Fmt.money(r, "paid"), end = true) },
-                        Col("Printed", "printed", 70) { r -> Cell(if (r.str("type") != "SALE") "" else if (r.int("printed") == 1) "Yes" else "Not yet", if (r.int("printed") == 1) MaterialTheme.colorScheme.onSurfaceVariant else Warn) },
+                        Col("Printed", "printed", 84) { r -> StatusPill(if (r.str("type") != "SALE") "" else if (r.int("printed") == 1) "Yes" else "Not yet", if (r.int("printed") == 1) MaterialTheme.colorScheme.onSurfaceVariant else Warn) },
                         Col("Due", "due", 110, end = true) { r -> val due = r.num("total") - r.num("paid"); Cell(Fmt.money(due), if (due > 0.5) Bad else Color.Unspecified, bold = true, end = true) },
                     ))
             }
