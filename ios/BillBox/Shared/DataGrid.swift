@@ -277,12 +277,13 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                 ZStack(alignment: .trailing) {
                     let on = sortBy == c.id
                     HStack(spacing: 3) {
-                        Text(c.title).lineLimit(2).minimumScaleFactor(0.8)
+                        // S.No is narrow: one line, shrunk if needed, never "S.N / O"
+                        Text(c.title).lineLimit(c.isIndex ? 1 : 2).minimumScaleFactor(c.isIndex ? 0.6 : 0.8)
                         if on { Image(systemName: ascending ? "arrow.up" : "arrow.down").font(.system(size: 9, weight: .bold)) }
                     }
                     .font(.caption2.weight(.semibold)).textCase(.uppercase)
                     .foregroundStyle(on ? Theme.accent : Color.secondary)
-                    .padding(.horizontal, 8).padding(.trailing, 6)
+                    .padding(.horizontal, c.isIndex ? DS.Space.xxs : DS.Pad.cell).padding(.trailing, 6)
                     .frame(width: w[i], alignment: c.align)
                     .frame(minHeight: 34)
                     .contentShape(Rectangle())

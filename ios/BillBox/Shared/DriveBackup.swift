@@ -38,7 +38,7 @@ import SwiftUI
                         Text("Last upload: \(status.str("last_upload")) · \(status.str("last_status") == "ok" ? "done" : status.str("last_status"))")
                             .font(.caption).foregroundStyle(.secondary)
                     } else if connected && status.str("last_status").hasPrefix("failed") {
-                        Text(status.str("last_status")).font(.caption).foregroundStyle(.red)
+                        Text(status.str("last_status")).font(.caption).foregroundStyle(Theme.negative)
                     }
                 }
             }

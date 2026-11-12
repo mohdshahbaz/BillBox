@@ -14,7 +14,7 @@ import SwiftUI
                     ProgressView("Opening your books…")
                 } else if let err = app.startError {
                     VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle").font(.system(size: 40)).foregroundStyle(.orange)
+                        Image(systemName: "exclamationmark.triangle").font(.system(size: 40)).foregroundStyle(Theme.warning)
                         Text("The books could not be opened").font(.title3.weight(.semibold))
                         Text(err).multilineTextAlignment(.center).foregroundStyle(.secondary)
                         Button("Try again") { Task { await app.start() } }.buttonStyle(.borderedProminent)
@@ -181,7 +181,7 @@ extension View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(app.companyName).font(.caption.weight(.semibold)).lineLimit(1)
                     Text("FY \(app.fyLabel) · " + (app.isCurrentFY ? "Current year" : "Past year · view and edit")).font(.caption2)
-                        .foregroundStyle(app.isCurrentFY ? Color.secondary : Color.orange).lineLimit(1).minimumScaleFactor(0.7)
+                        .foregroundStyle(app.isCurrentFY ? Color.secondary : Theme.warning).lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
             .frame(maxWidth: 150, alignment: .leading)

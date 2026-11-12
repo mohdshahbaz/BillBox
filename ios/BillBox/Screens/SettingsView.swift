@@ -58,7 +58,7 @@ import UniformTypeIdentifiers
                             Text([c.str("company_gstin"), c.str("company_address")].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        if c.id == app.companyId { Label("Open", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption) }
+                        if c.id == app.companyId { Label("Open", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.positive).font(.caption) }
                         else { Button("Open") { Task { await app.switchCompany(c.id) } }.buttonStyle(.bordered) }
                         // a page in the More tab's path, not a sheet: on iPhone the sheet could close again before it showed
                         NavigationLink(value: MoreRoute.settings("company:\(c.id)")) { Text("Edit…") }.buttonStyle(.bordered)
@@ -114,7 +114,7 @@ import UniformTypeIdentifiers
                 Field("Phone", text: b("company_phone")).keyboardType(.phonePad)
                 Field("Terms printed on invoices", text: b("invoice_terms", CompanyEditPage.terms), axis: .vertical)
             }
-            if let errorText { Section { Text(errorText).font(.callout).foregroundStyle(.red) } }
+            if let errorText { Section { Text(errorText).font(.callout).foregroundStyle(Theme.negative) } }
             Section {
                 Button { Task { await save() } } label: { Label(busy ? "Saving…" : "Save", systemImage: "checkmark.circle.fill").frame(maxWidth: .infinity) }
                     .buttonStyle(.borderedProminent).disabled(!canSave)
@@ -352,7 +352,7 @@ import UniformTypeIdentifiers
         Section {
             if insideApp {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("Deleting BillBox deletes these backups", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.callout.weight(.semibold))
+                    Label("Deleting BillBox deletes these backups", systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning).font(.callout.weight(.semibold))
                     Text("iPhone removes an app's own folder together with the app. Choose a folder in iCloud Drive, or make one in Files › On My iPhone (outside BillBox): backups there stay when BillBox is deleted, and “Restore from a backup folder or .zip…” reads them after installing again.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Button { Task { await chooseFolder() } } label: { Label("Choose a safe folder…", systemImage: "icloud.and.arrow.up") }
@@ -751,7 +751,7 @@ struct SettingsRow: View {
             if inside {
                 NavigationLink { BackupSettings() } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Backups are inside BillBox").font(.callout.weight(.semibold))
                             Text("Deleting the app deletes them. Choose a folder in iCloud Drive.").font(.caption).foregroundStyle(.secondary)

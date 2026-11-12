@@ -59,7 +59,7 @@ struct PaymentLine: Identifiable {
                 .disabled(reading)
                 .padding(.vertical, 4)
                 if reading { HStack(spacing: 8) { ProgressView(); Text("Reading the writing…").font(.callout).foregroundStyle(.secondary) } }
-                if let readError { Text(readError).font(.callout).foregroundStyle(.red) }
+                if let readError { Text(readError).font(.callout).foregroundStyle(Theme.negative) }
             } header: { Text("1. Photo of the list") } footer: {
                 Text("Write one party per line: name, the bill amounts separated by commas, then the payment. “Gupta Store 1200, 850 - 2000” records 2,000 against bills of 1,200 and 850; “Gupta Store 1200, 850” records 2,050.")
             }
@@ -106,7 +106,7 @@ struct PaymentLine: Identifiable {
             }
             if !l.wrappedValue.bills.isEmpty { Text("Bills: " + l.wrappedValue.bills).font(.caption).foregroundStyle(.secondary) }
             if !l.wrappedValue.problems.isEmpty && !l.wrappedValue.ready {
-                Text(l.wrappedValue.problems.joined(separator: " · ")).font(.caption).foregroundStyle(.orange)
+                Text(l.wrappedValue.problems.joined(separator: " · ")).font(.caption).foregroundStyle(Theme.warning)
             }
         }
         .onChange(of: l.wrappedValue.partyId) { v in if v != nil && (Double(l.wrappedValue.amount) ?? 0) > 0 { l.wrappedValue.include = true } }

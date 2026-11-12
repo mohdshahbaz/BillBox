@@ -65,7 +65,7 @@ struct DNLine: Identifiable, Equatable {
             Button(role: .destructive) { deleting = r } label: { Label("Delete…", systemImage: "trash") }
         }) }) {
             GridColumn("Date", id: "date", min: 122, ideal: 124) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
-            GridColumn("Note no", id: "no", min: 120, ideal: 140, sort: { (r: JSON) -> Any? in r.str("note_no") }) { (r: JSON) in Text(r.str("note_no")).monospacedDigit() }
+            GridColumn("Note no", id: "no", min: 120, ideal: 140, sort: { (r: JSON) -> Any? in r.str("note_no") }) { (r: JSON) in Text(r.str("note_no")).monospacedDigit().lineLimit(1).truncationMode(.middle) }
             GridColumn("Supplier", id: "party", min: 140, ideal: 200) { (r: JSON) in Text(r.str("party")).lineLimit(2) }
             GridColumn("Against bill", id: "ref", min: 90, ideal: 120, sort: { (r: JSON) -> Any? in r.str("against_bill") }) { (r: JSON) in Text(r.str("against_bill")) }
             GridColumn("Reason", id: "reason", min: 90, ideal: 140) { (r: JSON) in Text(r.str("reason")).lineLimit(2) }
@@ -218,7 +218,7 @@ struct DNEdit: Identifiable {
                     }
                     Field("Notes", text: $notes, axis: .vertical)
                 }
-                if let errorText { Section { Text(errorText).font(.callout).foregroundStyle(.red) } }
+                if let errorText { Section { Text(errorText).font(.callout).foregroundStyle(Theme.negative) } }
             }
             .groupedForm()
             .navigationTitle(editId == nil ? "New debit note" : "Edit \(noteNo)")
@@ -269,7 +269,7 @@ struct DNEdit: Identifiable {
                     Task { await loadBatches(picked) }
                 }
                 Button(role: .destructive) { if lines.count > 1 { lines.removeAll { $0.id == l.wrappedValue.id } } } label: { Image(systemName: "minus.circle.fill") }
-                    .buttonStyle(.plain).foregroundStyle(.red).disabled(lines.count < 2).accessibilityLabel("Remove row")
+                    .buttonStyle(.plain).foregroundStyle(Theme.negative).disabled(lines.count < 2).accessibilityLabel("Remove row")
             }
             HStack(spacing: 8) {
                 Field("Qty", text: l.qty).keyboardType(.numberPad).frame(maxWidth: 70)
@@ -287,7 +287,7 @@ struct DNEdit: Identifiable {
                     }
                 }
                 Text("\(Fmt.boxPcs(pcs, ppb)) out of stock  ·  in stock \(Fmt.boxPcs(it.int("stock"), ppb))  ·  GST \(Fmt.qty(it.num("gst_rate")))%")
-                    .font(.caption).foregroundStyle(pcs > it.int("stock") ? Color.red : Color.secondary)
+                    .font(.caption).foregroundStyle(pcs > it.int("stock") ? Theme.negative : Color.secondary)
             }
         }
         .padding(.vertical, 2)

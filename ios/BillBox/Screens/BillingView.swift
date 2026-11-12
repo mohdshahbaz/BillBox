@@ -316,7 +316,7 @@ struct BillLine: Identifiable {
                                 .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer()
-                        if it.num("stock") <= 0 { Text("Out of stock").font(.caption).foregroundStyle(.red) }
+                        if it.num("stock") <= 0 { Text("Out of stock").font(.caption).foregroundStyle(Theme.negative) }
                     }
                     .padding(.horizontal, 10).padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -441,7 +441,7 @@ struct BillLine: Identifiable {
             GridColumn("Rate / pc (ex-GST)", id: "rate", min: 100, ideal: 116, align: .trailing) { (l: BillLine) in
                 TextField("", text: pieceRateBinding(l), prompt: Text(calc[l.id].map { Fmt.rate($0.rate) } ?? "rate"))
                     .multilineTextAlignment(.trailing).keyboardType(.decimalPad)
-                    .foregroundStyle(l.rate.isEmpty ? Color.primary : Color.orange)
+                    .foregroundStyle(l.rate.isEmpty ? Color.primary : Theme.warning)
                     .accessibilityLabel("Rate per piece for \(l.name). Type a different rate to override the price list; clear it to go back.")
             }
             GridColumn("Rate / box", id: "boxrate", min: 90, ideal: 104, align: .trailing) { (l: BillLine) in
@@ -449,7 +449,7 @@ struct BillLine: Identifiable {
                     let shown = Double(l.rate) ?? (calc[l.id]?.rate ?? 0)
                     TextField("", text: boxRateBinding(l), prompt: Text(Fmt.amount(shown * Double(l.ppb))))
                         .multilineTextAlignment(.trailing).keyboardType(.decimalPad)
-                        .foregroundStyle(l.rate.isEmpty ? Color.primary : Color.orange)
+                        .foregroundStyle(l.rate.isEmpty ? Color.primary : Theme.warning)
                         .accessibilityLabel("Rate per box for \(l.name)")
                 } else {
                     Text("–").foregroundStyle(.secondary)
@@ -457,7 +457,7 @@ struct BillLine: Identifiable {
             }
             GridColumn("Free", id: "free", min: 50, ideal: 76) { (l: BillLine) in
                 let f = calc[l.id]?.free ?? 0
-                Text(f > 0 ? "+\(Fmt.qty(f)) pcs free" : "").foregroundStyle(.green).fontWeight(.semibold)
+                Text(f > 0 ? "+\(Fmt.qty(f)) pcs free" : "").foregroundStyle(Theme.positive).fontWeight(.semibold)
             }
             GridColumn("Amount", id: "amount", min: 90, ideal: 104, align: .trailing) { (l: BillLine) in
                 Text(calc[l.id].map { Fmt.money($0.amount) } ?? "").monospacedDigit().fontWeight(.semibold)
@@ -563,10 +563,10 @@ struct BillLine: Identifiable {
                     .multilineTextAlignment(.trailing).keyboardType(.decimalPad)
                     .padding(8).background(Theme.page, in: RoundedRectangle(cornerRadius: 8))
                     .accessibilityLabel("Paid now")
-                if let n = tierNote { Text(n).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true) }
+                if let n = tierNote { Text(n).font(.caption).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true) }
                 Text(duesLine)
                     .font(.caption)
-                    .foregroundStyle(duesOver ? Color.red : Color.secondary)
+                    .foregroundStyle(duesOver ? Theme.negative : Color.secondary)
             }
         }
     }

@@ -54,7 +54,7 @@ import SwiftUI
             GridColumn("HSN", id: "hsn", min: 60, ideal: 80) { (it: JSON) in Text(it.str("hsn")).monospacedDigit() }
             GridColumn("Stock (box + pcs)", id: "stock", min: 110, ideal: 140) { (it: JSON) in
                 Text(stockText(it)).monospacedDigit().fontWeight(.semibold)
-                    .foregroundStyle(it.num("stock") <= app.lowStockQty ? Color.orange : Color.primary)
+                    .foregroundStyle(it.num("stock") <= app.lowStockQty ? Theme.warning : Color.primary)
             }
             GridColumn("Pcs per box", id: "box", min: 70, ideal: 90, sort: { (it: JSON) -> Any? in it.int("pcs_per_box") }) { (it: JSON) in Text(it.int("pcs_per_box") > 1 ? "\(it.int("pcs_per_box"))" : "–") }
             GridColumn("Total pcs", id: "pcs", min: 70, ideal: 90, align: .trailing, hidden: true, sort: { (it: JSON) -> Any? in it.num("stock") }) { (it: JSON) in Text(it.str("stock")).monospacedDigit() }

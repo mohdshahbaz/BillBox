@@ -25,7 +25,7 @@ import UniformTypeIdentifiers
                 if !picked.isEmpty { Text(picked).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
                 if busy { ProgressView() }
             }
-            if let errorText { Section { Text(errorText).foregroundStyle(.red) } }
+            if let errorText { Section { Text(errorText).foregroundStyle(Theme.negative) } }
             if let r = result ?? report { summary(r) }
             if let path { MargPriceFix(path: path) }
         }
@@ -47,7 +47,7 @@ import UniformTypeIdentifiers
         let ok = problems.isEmpty
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Image(systemName: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(ok ? Color.green : Color.orange)
+                Image(systemName: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(ok ? Theme.positive : Theme.warning)
                 Text(title)
                 Spacer()
                 Text("\(c.int("ok")) of \(c.int("checked")) match").mono().foregroundStyle(.secondary)
@@ -85,7 +85,7 @@ import UniformTypeIdentifiers
         if !cleaning.isEmpty || !warnings.isEmpty {
             Section("Cleaned up") {
                 ForEach(Array(cleaning.enumerated()), id: \.offset) { _, s in Text(s).font(.callout) }
-                ForEach(Array(warnings.enumerated()), id: \.offset) { _, s in Text(s).font(.callout).foregroundStyle(.orange) }
+                ForEach(Array(warnings.enumerated()), id: \.offset) { _, s in Text(s).font(.callout).foregroundStyle(Theme.warning) }
             }
         }
         let done = result != nil
@@ -156,7 +156,7 @@ import UniformTypeIdentifiers
         Section {
             Button { Task { await run(apply: false) } } label: { Label("Check item prices against this backup", systemImage: "indianrupeesign.circle") }
                 .disabled(busy)
-            if let errorText { Text(errorText).foregroundStyle(.red).font(.callout) }
+            if let errorText { Text(errorText).foregroundStyle(Theme.negative).font(.callout) }
             if let c = check {
                 let rows = c.list("items")
                 if c.bool("applied") {

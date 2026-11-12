@@ -271,7 +271,7 @@ import SwiftUI
                 }
             }
             Section {
-                if let problem { Text(problem).foregroundStyle(.red).font(.callout) }
+                if let problem { Text(problem).foregroundStyle(Theme.negative).font(.callout) }
                 if let r = result {
                     Text("\(r.int("would_update")) items will change" + (r.int("skipped_no_mrp") > 0 ? " · \(r.int("skipped_no_mrp")) without an MRP left as they are" : "") + ".")
                         .font(.callout.weight(.medium))
@@ -393,7 +393,7 @@ import SwiftUI
                     DataGrid(names.enumerated().map { (i, n) in JSON(["id": i + 1, "name": n, "found": (by[n] as? [String: Any])?["found"] ?? 0, "missing": (by[n] as? [String: Any])?["missing"] ?? 0]) }, layoutKey: "mrpreport") {
                         GridColumn("Category") { (r: JSON) in Text(r.str("name")) }
                         GridColumn("MRP found", min: 90, ideal: 90) { (r: JSON) in Text(r.str("found")).mono() }
-                        GridColumn("Still missing", min: 100, ideal: 100) { (r: JSON) in Text(r.str("missing")).mono().foregroundStyle(r.int("missing") > 0 ? Color.orange : Color.primary) }
+                        GridColumn("Still missing", min: 100, ideal: 100) { (r: JSON) in Text(r.str("missing")).mono().foregroundStyle(r.int("missing") > 0 ? Theme.warning : Color.primary) }
                     }
                     .frame(height: max(120, CGFloat(names.count) * 28 + 40))
                     let missing = report.list("missing")

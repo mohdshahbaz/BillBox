@@ -27,7 +27,7 @@ import SwiftUI
             Section {
                 HStack(spacing: 10) {
                     Image(systemName: s.bool("on") ? "arrow.triangle.2.circlepath.icloud.fill" : signedIn ? "icloud" : "icloud.slash")
-                        .font(.title2).foregroundStyle(s.bool("on") ? Color.green : Color.secondary)
+                        .font(.title2).foregroundStyle(s.bool("on") ? Theme.positive : Color.secondary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(!signedIn ? "Not signed in" : s.bool("on") ? "\(companyName) is synced live" : "Signed in as \(s.str("email"))")
                             .font(.callout.weight(.medium))
@@ -36,7 +36,7 @@ import SwiftUI
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         if !s.str("last_sync").isEmpty { Text("Last sync: \(Fmt.ist(s.str("last_sync")))\(s.int("pending") > 0 ? " · \(s.int("pending")) changes waiting" : "")").font(.caption).foregroundStyle(.secondary) }
-                        if !s.str("last_error").isEmpty { Text(s.str("last_error")).font(.caption).foregroundStyle(.red) }
+                        if !s.str("last_error").isEmpty { Text(s.str("last_error")).font(.caption).foregroundStyle(Theme.negative) }
                     }
                 }
                 if !signedIn {

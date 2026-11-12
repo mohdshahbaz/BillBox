@@ -188,8 +188,8 @@ struct DashSnap {
         let chips: [(String, String, Color, () -> Void)] = [
             x.int("unprinted_bills") > 0 ? ("\(x.int("unprinted_bills")) bills to print", "printer", Theme.info, { app.openUnprinted = true; go(.bills) }) : nil,
             x.int("low_stock_count") > 0 ? ("\(x.int("low_stock_count")) items low on stock", "exclamationmark.triangle", Theme.negative, { go(.stock) }) : nil,
-            x.int("expiring_30d") > 0 ? ("\(x.int("expiring_30d")) batches expire within \(x.has("expiry_days") ? x.int("expiry_days") : 30) days", "clock.badge.exclamationmark", Theme.warning, { go(.reports) }) : nil,
-            x.int("expired_stock") > 0 ? ("\(x.int("expired_stock")) expired batches in stock", "xmark.octagon", Theme.negative, { go(.reports) }) : nil,
+            x.int("expiring_30d") > 0 ? ("\(x.int("expiring_30d")) \(x.int("expiring_30d") == 1 ? "batch expires" : "batches expire") within \(x.has("expiry_days") ? x.int("expiry_days") : 30) days", "clock.badge.exclamationmark", Theme.warning, { go(.reports) }) : nil,
+            x.int("expired_stock") > 0 ? ("\(x.int("expired_stock")) expired batch\(x.int("expired_stock") == 1 ? "" : "es") in stock", "xmark.octagon", Theme.negative, { go(.reports) }) : nil,
         ].compactMap { $0 }
         // one line when they fit, otherwise one under another: a chip is never cut off at the screen edge
         func chip(_ c: (String, String, Color, () -> Void)) -> some View {
@@ -260,7 +260,7 @@ struct DashSnap {
                 HStack(spacing: 14) {
                     Text(Self.monthName(c.str("month")) + " " + String(c.str("month").prefix(4))).fw(.semibold)
                     Text("Sales \(Fmt.money(c.num("sales")))").foregroundStyle(.teal)
-                    Text("Purchases \(Fmt.money(c.num("purchases")))").foregroundStyle(.orange)
+                    Text("Purchases \(Fmt.money(c.num("purchases")))").foregroundStyle(Theme.warning)
                     Text("Profit \(Fmt.money(c.num("profit")))").foregroundStyle(c.num("profit") >= 0 ? .green : .red)
                 }
                 .font(.caption).mono().lineLimit(1).minimumScaleFactor(0.6)
@@ -403,7 +403,7 @@ extension DashboardView {
                 let v = values[i]
                 let on = v.id == selected
                 BarMark(x: .value("Month", v.label), y: .value("Amount", v.value))
-                    .foregroundStyle(v.value < 0 ? Color.red : color)
+                    .foregroundStyle(v.value < 0 ? Theme.negative : color)
                     .cornerRadius(4)
                     .opacity(on ? 1 : 0.45)
                     .annotation(position: .top) {
@@ -452,7 +452,7 @@ extension DashboardView {
                         Spacer(minLength: 0)
                         if on { Text(Fmt.money(v.value)).font(.system(size: 9).weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5).fixedSize() }
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(v.value < 0 ? Color.red : color)
+                            .fill(v.value < 0 ? Theme.negative : color)
                             .opacity(on ? 1 : 0.45)
                             .frame(height: max(v.value != 0 ? 3 : 0, barArea * CGFloat(abs(v.value) / top)))
                         Text(v.label).font(.system(size: 10)).foregroundStyle(on ? .primary : .secondary).lineLimit(1).minimumScaleFactor(0.6)

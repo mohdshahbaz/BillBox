@@ -46,7 +46,7 @@ struct FoundItem: Identifiable {
                         .disabled(company.trimmingCharacters(in: .whitespaces).isEmpty || !working.isEmpty)
                     if !working.isEmpty { ProgressView().padding(.leading, 6); Text(working).font(.caption).foregroundStyle(.secondary) }
                 }
-                if let problem { Text(problem).font(.callout).foregroundStyle(.red) }
+                if let problem { Text(problem).font(.callout).foregroundStyle(Theme.negative) }
             } header: { Text("1. Find the company's price list") } footer: {
                 Text("Searches the web for “company category price list MRP”. Pick the company's own page or PDF where you can.")
             }
@@ -96,7 +96,7 @@ struct FoundItem: Identifiable {
                 TextField("Name", text: f.name)
                 TextField("MRP", text: f.mrp).frame(width: 80).multilineTextAlignment(.trailing)
             }
-            if let ex = f.wrappedValue.exists { Text("Already in your items as \(ex)").font(.caption).foregroundStyle(.orange) }
+            if let ex = f.wrappedValue.exists { Text("Already in your items as \(ex)").font(.caption).foregroundStyle(Theme.warning) }
         }
     }
 
@@ -222,9 +222,9 @@ struct FoundItem: Identifiable {
             HStack {
                 Text(g.str("match") == "same" ? "Same name" : "Similar (\(Int(g.num("score") * 100))% words alike)")
                     .font(.caption.weight(.semibold)).padding(.horizontal, 8).padding(.vertical, 3)
-                    .background((g.str("match") == "same" ? Color.green : Color.orange).opacity(0.15), in: Capsule())
-                    .foregroundStyle(g.str("match") == "same" ? Color.green : Color.orange)
-                if !g.strings("warnings").isEmpty { Text(g.strings("warnings").joined(separator: " · ")).font(.caption).foregroundStyle(.orange) }
+                    .background((g.str("match") == "same" ? Theme.positive : Theme.warning).opacity(0.15), in: Capsule())
+                    .foregroundStyle(g.str("match") == "same" ? Theme.positive : Theme.warning)
+                if !g.strings("warnings").isEmpty { Text(g.strings("warnings").joined(separator: " · ")).font(.caption).foregroundStyle(Theme.warning) }
                 Spacer()
             }
             ForEach(members(g)) { m in

@@ -57,7 +57,7 @@ import SwiftUI
             GridColumn("Credit limit", id: "limit", min: 90, ideal: 110, align: .trailing, sort: { (p: JSON) -> Any? in p.num("credit_limit") }) { (p: JSON) in Text(p.num("credit_limit") > 0 ? Fmt.money(p, "credit_limit") : "–").monospacedDigit() }
             GridColumn("Balance", id: "balance", min: 110, ideal: 130, align: .trailing) { (p: JSON) in
                 Text(balanceText(p.num("balance"))).monospacedDigit().fontWeight(.semibold)
-                    .foregroundStyle(p.num("balance") > 0.5 ? Color.orange : (p.num("balance") < -0.5 ? Color.red : Color.secondary))
+                    .foregroundStyle(p.num("balance") > 0.5 ? Theme.warning : (p.num("balance") < -0.5 ? Theme.negative : Color.secondary))
             }
         }
         .overlay {
@@ -346,7 +346,7 @@ extension PartiesView {
             VStack(alignment: .leading, spacing: 8) {
                 Text(balanceText(bal) + (bal > 0.005 ? "  (they owe you)" : (bal < -0.005 ? "  (you owe them)" : "")))
                     .font(.headline)
-                    .foregroundStyle(bal > 0.5 ? Color.orange : (bal < -0.5 ? Color.red : Color.green))
+                    .foregroundStyle(bal > 0.5 ? Theme.warning : (bal < -0.5 ? Theme.negative : Theme.positive))
                 if let d = data, abs(d.num("opening_balance")) > 0.005 {
                     Text("Opening balance for FY \(shownYear), brought forward from earlier years: \(balanceText(d.num("opening_balance")))")
                         .font(.callout).foregroundStyle(.secondary)

@@ -22,7 +22,7 @@ import SwiftUI
                 Text("Type the company name to confirm").font(.caption).foregroundStyle(.secondary)
                 TextField(name, text: $typed).textFieldStyle(.roundedBorder).disableAutocorrection(true)
             }
-            if !error.isEmpty { Text(error).font(.callout).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
+            if !error.isEmpty { Text(error).font(.callout).foregroundStyle(Theme.negative).fixedSize(horizontal: false, vertical: true) }
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)

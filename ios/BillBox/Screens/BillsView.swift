@@ -106,11 +106,11 @@ import SwiftUI
             GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).monospacedDigit() }
             GridColumn("Paid", id: "paid", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "paid")).monospacedDigit() }
             GridColumn("Printed", id: "printed", min: 70, ideal: 84, sort: { (r: JSON) -> Any? in r.str("type") == "SALE" ? r.int("printed") : nil }) { (r: JSON) in
-                StatusPill(text: r.str("type") != "SALE" ? "" : r.int("printed") == 1 ? "Yes" : "Not yet", tint: r.int("printed") == 1 ? Color.secondary : Color.orange)
+                StatusPill(text: r.str("type") != "SALE" ? "" : r.int("printed") == 1 ? "Yes" : "Not yet", tint: r.int("printed") == 1 ? Color.secondary : Theme.warning)
             }
             GridColumn("Due", id: "due", min: 90, ideal: 110, align: .trailing, sort: { (r: JSON) -> Any? in r.num("total") - r.num("paid") }) { (r: JSON) in
                 let due = r.num("total") - r.num("paid")
-                Text(Fmt.money(due)).monospacedDigit().fontWeight(.semibold).foregroundStyle(due > 0.5 ? Color.red : Color.primary)
+                Text(Fmt.money(due)).monospacedDigit().fontWeight(.semibold).foregroundStyle(due > 0.5 ? Theme.negative : Color.primary)
             }
         }
         .overlay {

@@ -103,7 +103,7 @@ import SwiftUI
                     GridColumn("Last order", id: "last", min: 90, ideal: 110, sort: { (o: JSON) -> Any? in o.str("last_order") }) { (o: JSON) in Text(o.has("last_order") ? Fmt.dmy(o.str("last_order")) : "Never") }
                     GridColumn("Outstanding to collect", id: "outstanding", min: 140, ideal: 170, align: .trailing) { (o: JSON) in
                         Text(Fmt.money(o, "outstanding")).monospacedDigit().fontWeight(.semibold)
-                            .foregroundStyle(o.num("outstanding") > 0 ? Color.orange : Color.primary)
+                            .foregroundStyle(o.num("outstanding") > 0 ? Theme.warning : Color.primary)
                     }
                 }
                 .frame(height: min(CGFloat(outlets.count) * 40 + 44, 440))

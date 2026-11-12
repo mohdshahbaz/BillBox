@@ -88,14 +88,14 @@ struct PLine: Identifiable {
                 let usedCount = max(1, (parsed.obj("pages").raw["used"] as? [Any])?.count ?? 1)
                 DisclosureGroup {
                     VStack(alignment: .leading, spacing: 3) {
-                        ForEach(Array(warnings.enumerated()), id: \.offset) { _, w in Text("• \(w)").foregroundStyle(.red).font(.callout) }
+                        ForEach(Array(warnings.enumerated()), id: \.offset) { _, w in Text("• \(w)").foregroundStyle(Theme.negative).font(.callout) }
                     }
                 } label: {
                     Text("Filled in from the PDF (\(usedCount) Original page\(usedCount == 1 ? "" : "s") read). Check every field against the paper bill before saving.")
                         .fontWeight(.semibold).font(.callout)
                 }
                 .padding(10)
-                .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
             }
             header
             linesTable
@@ -232,7 +232,7 @@ struct PLine: Identifiable {
                 VStack(alignment: .leading, spacing: 2) {
                     if !l.matched && !l.desc.isEmpty {
                         HStack {
-                            Text("“\(l.desc)” is not in your stock list.").font(.caption).foregroundStyle(.red).lineLimit(1)
+                            Text("“\(l.desc)” is not in your stock list.").font(.caption).foregroundStyle(Theme.negative).lineLimit(1)
                             Button("Create this item") { newItemFor = l }.controlSize(.small)
                         }
                     }
@@ -314,7 +314,7 @@ struct PLine: Identifiable {
                 VStack(alignment: .leading, spacing: 2) {
                     if let pt = printedTotal {
                         Text("Printed on bill: \(Fmt.money(pt))").monospacedDigit().font(.callout)
-                            .foregroundStyle(mismatch ? Color.red : Color.secondary).fontWeight(mismatch ? .semibold : .regular)
+                            .foregroundStyle(mismatch ? Theme.negative : Color.secondary).fontWeight(mismatch ? .semibold : .regular)
                     }
                     if let p { Text(Fmt.money(p, "total")).font(.system(.title, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(.teal) }
                 }
@@ -326,7 +326,7 @@ struct PLine: Identifiable {
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(busy || p == nil)
             }
-            if let errorText { Text(errorText).foregroundStyle(.red).font(.callout) }
+            if let errorText { Text(errorText).foregroundStyle(Theme.negative).font(.callout) }
         }
         .padding(10)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 10))
