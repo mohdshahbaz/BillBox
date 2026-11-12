@@ -1,5 +1,8 @@
 import SwiftUI
 import UIKit
+#if canImport(Charts)
+import Charts
+#endif
 
 /// Sleeps for a number of milliseconds.
 func pause(ms: Int) async { try? await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000) }
@@ -77,6 +80,65 @@ struct BarChartView: View {
     @State private var picked: String?
 
     var body: some View {
+        #if canImport(Charts)
+        chart
+        #else
+        legacy
+        #endif
+    }
+
+    #if canImport(Charts)
+    /// Swift Charts (iOS 16): grouped bars with a value axis; tap a day to read its figures.
+    private var chart: some View {
+        let names = showThird ? ["Sales", "Purchases", "Profit"] : ["Sales", "Purchases"]
+        return VStack(spacing: 4) {
+            Chart {
+                ForEach(data) { d in
+                    ForEach(names.indices, id: \.self) { k in
+                        BarMark(x: .value("Day", d.label), y: .value("Amount", k == 0 ? d.a : (k == 1 ? d.b : d.c)))
+                            .foregroundStyle(by: .value("Series", names[k]))
+                            .position(by: .value("Series", names[k]))
+                            .cornerRadius(2)
+                            .opacity(picked == nil || picked == d.id ? 1 : 0.35)
+                    }
+                }
+            }
+            .chartForegroundStyleScale(domain: names, range: Array(colors.prefix(names.count)))
+            .chartLegend(.hidden)
+            .chartYAxis {
+                AxisMarks(position: .leading) { v in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let n = v.as(Double.self) { Text(Fmt.short(n)).font(.system(size: 9)) }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks { v in
+                    AxisValueLabel {
+                        if let s = v.as(String.self) { Text(s).font(.system(size: 9)) }
+                    }
+                }
+            }
+            .chartOverlay { proxy in
+                GeometryReader { g in
+                    Rectangle().fill(Color.clear).contentShape(Rectangle())
+                        .onTapGesture { p in
+                            let x = p.x - g[proxy.plotAreaFrame].origin.x
+                            if let label = proxy.value(atX: x, as: String.self), let d = data.first(where: { $0.label == label }) {
+                                picked = picked == d.id ? nil : d.id
+                            }
+                        }
+                }
+            }
+            if let p = picked, let d = data.first(where: { $0.id == p }) {
+                Text(tip(d)).font(.caption2).frame(maxWidth: .infinity, alignment: .leading).lineLimit(2)
+            }
+        }
+    }
+    #endif
+
+    private var legacy: some View {
         let top = max(1, data.map { max($0.a, max($0.b, showThird ? $0.c : 0)) }.max() ?? 1)
         VStack(spacing: 4) {
             HStack(alignment: .bottom, spacing: 4) {
@@ -114,6 +176,18 @@ struct BarChartView: View {
                 .frame(height: max(v > 0 ? 2 : 0, g.size.height * CGFloat(max(0, v) / top)))
                 .frame(maxHeight: .infinity, alignment: .bottom)
         }
+    }
+}
+
+extension Fmt {
+    /// Short axis figure: 1.2k, 3.4 L (lakh), 1.5 Cr (crore).
+    static func short(_ v: Double) -> String {
+        func t(_ x: Double) -> String { let s = String(format: "%.1f", x); return s.hasSuffix(".0") ? String(s.dropLast(2)) : s }
+        let a = abs(v), sign = v < 0 ? "-" : ""
+        if a >= 1e7 { return sign + t(a / 1e7) + " Cr" }
+        if a >= 1e5 { return sign + t(a / 1e5) + " L" }
+        if a >= 1e3 { return sign + t(a / 1e3) + "k" }
+        return sign + t(a)
     }
 }
 

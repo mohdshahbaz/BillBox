@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(Charts)
+import Charts
+#endif
 
 /// Everything the dashboard shows, worked out once per load (not on every redraw): the figures for each period, the chart
 /// bars and the list rows with their amounts already formatted.
@@ -379,6 +382,57 @@ extension DashboardView {
     let pick: (String) -> Void
 
     var body: some View {
+        #if canImport(Charts)
+        chart
+        #else
+        legacy
+        #endif
+    }
+
+    #if canImport(Charts)
+    /// Swift Charts (iOS 16): one bar per month, the chosen month full colour with its figure above; tap a bar to choose it.
+    private var chart: some View {
+        Chart {
+            ForEach(values.indices, id: \.self) { i in
+                let v = values[i]
+                let on = v.id == selected
+                BarMark(x: .value("Month", v.label), y: .value("Amount", v.value))
+                    .foregroundStyle(v.value < 0 ? Color.red : color)
+                    .cornerRadius(4)
+                    .opacity(on ? 1 : 0.45)
+                    .annotation(position: .top) {
+                        if on { Text(Fmt.money(v.value)).font(.system(size: 9).weight(.semibold)).lineLimit(1).fixedSize() }
+                    }
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading) { a in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let n = a.as(Double.self) { Text(Fmt.short(n)).font(.system(size: 9)) }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks { a in
+                AxisValueLabel {
+                    if let s = a.as(String.self) { Text(s).font(.system(size: 10)) }
+                }
+            }
+        }
+        .chartOverlay { proxy in
+            GeometryReader { g in
+                Rectangle().fill(Color.clear).contentShape(Rectangle())
+                    .onTapGesture { p in
+                        let x = p.x - g[proxy.plotAreaFrame].origin.x
+                        if let label = proxy.value(atX: x, as: String.self), let v = values.first(where: { $0.label == label }) { pick(v.id) }
+                    }
+            }
+        }
+    }
+    #endif
+
+    private var legacy: some View {
         let top = max(1, values.map { abs($0.value) }.max() ?? 1)
         // one measurement for the whole chart (a GeometryReader in each bar made every redraw lay out twelve times)
         GeometryReader { g in
