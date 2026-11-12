@@ -77,7 +77,7 @@ import SwiftUI
 
     @ViewBuilder private func chrome<V: View>(_ v: V) -> some View {
         v
-        .navigationTitle("Parties")
+        .navigationTitle("")   // the tab bar already says which tab this is
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "Search name, phone or GSTIN")
         .onChange(of: query) { _ in searchDelay.run { await load() } }   // typing loads once, 250 ms after the last key

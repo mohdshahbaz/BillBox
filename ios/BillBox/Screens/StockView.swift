@@ -94,7 +94,7 @@ import SwiftUI
 
     @ViewBuilder private func chrome<V: View>(_ v: V) -> some View {
         v
-        .navigationTitle("Stock")
+        .navigationTitle("")   // the tab bar already says which tab this is
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "Search item or HSN")
         .onSubmit(of: .search) { Task { await load() } }

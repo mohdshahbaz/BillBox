@@ -68,7 +68,7 @@ import SwiftUI
                         NavigationLink(value: MoreRoute.page(p)) { Label(p.title, systemImage: p.symbol) }
                     }
                 }
-                .navigationTitle("More")
+                .navigationTitle("")   // the tab bar already says More
                 .navigationBarTitleDisplayMode(.inline)   // like Settings: the list starts below the bar with the same gap
                 .companyYearToolbar()
                 .navigationDestination(for: MoreRoute.self) { r in

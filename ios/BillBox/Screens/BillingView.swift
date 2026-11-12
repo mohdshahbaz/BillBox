@@ -143,7 +143,7 @@ struct BillLine: Identifiable {
             bottomBar
         }
         .background(Theme.page)
-        .navigationTitle(editingId != nil ? "Editing \(editingNo)" : "Billing")
+        .navigationTitle(editingId != nil ? "Editing \(editingNo)" : "")   // the tab bar already says which tab this is
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {

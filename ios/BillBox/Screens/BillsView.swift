@@ -28,7 +28,7 @@ import SwiftUI
             footer
         }
         .background(Theme.page)
-        .navigationTitle("All Bills")
+        .navigationTitle("")   // the tab bar already says which tab this is
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "Search bill no or party")
         .toolbar {
