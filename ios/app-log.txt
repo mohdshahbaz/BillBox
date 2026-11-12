@@ -1,7 +1,40 @@
 Timestamp               Ty Process[PID:TID]
-2026-11-01 04:19:06.584 E  BillBox[18655:db6d] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
-2026-11-01 04:19:07.429 E  BillBox[18655:db68] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
-2026-11-01 04:19:17.849 E  BillBox[18800:de5a] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
-2026-11-01 04:19:18.345 E  BillBox[18800:de5a] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
-2026-11-01 04:19:37.874 E  BillBox[20230:ebbe] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
-2026-11-01 04:19:38.584 E  BillBox[20230:ebbe] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-12 16:01:46.820 E  BillBox[18298:daf4] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
+2026-11-12 16:01:47.296 E  BillBox[18298:daf7] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:01:47.766 E  BillBox[18298:daf9] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:01.950 E  BillBox[20591:e557] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-12 16:02:02.014 E  BillBox[20591:e556] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-12 16:02:02.881 E  BillBox[20591:e557] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:02.926 E  BillBox[20591:e557] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:03.401 E  BillBox[20591:e51a] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-11-12 16:02:03.401 E  BillBox[20591:e51a] (libCoreFSCache.dylib) Errors found! Invalidating cache...
+2026-11-12 16:02:04.049 E  BillBox[20591:e51a] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-11-12 16:02:04.049 E  BillBox[20591:e51a] (libCoreFSCache.dylib) Errors found! Invalidating cache...
+2026-11-12 16:02:04.117 F  BillBox[20591:e51a] [com.apple.renderbox:error] building pipeline path_exterior-jba6la8feba4 took 0.717747 seconds
+2026-11-12 16:02:15.608 E  BillBox[21520:edb0] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
+2026-11-12 16:02:15.788 E  BillBox[21520:edb0] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:15.832 E  BillBox[21520:edb2] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:26.941 E  BillBox[22055:f3ee] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-12 16:02:28.193 E  BillBox[22055:f3ee] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:28.243 E  BillBox[22055:f3f7] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:28.510 E  BillBox[22055:f3ee] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-12 16:02:39.538 E  BillBox[22210:f5ae] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:39.582 E  BillBox[22210:f5b9] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:50.937 E  BillBox[22880:fbc2] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:02:50.999 E  BillBox[22880:fbc2] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:06.321 E  BillBox[23535:101fa] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:06.373 E  BillBox[23535:101fa] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:21.007 E  BillBox[24368:10980] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:21.484 E  BillBox[24368:10982] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:34.098 E  BillBox[25370:112f4] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-12 16:03:35.121 E  BillBox[25370:112f4] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:35.143 E  BillBox[25370:112f4] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-12 16:03:35.174 E  BillBox[25370:112f2] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:46.671 E  BillBox[25729:116e6] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:46.733 E  BillBox[25729:1171c] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:58.816 E  BillBox[26218:11bd7] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:03:58.862 E  BillBox[26218:11bd8] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:04:19.354 E  BillBox[26938:1237e] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:04:19.414 E  BillBox[26938:1237c] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:04:37.077 E  BillBox[27569:129fd] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-12 16:04:37.123 E  BillBox[27569:129fd] [com.apple.network:connection] nw_socket_set_connection_idle [C1.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
