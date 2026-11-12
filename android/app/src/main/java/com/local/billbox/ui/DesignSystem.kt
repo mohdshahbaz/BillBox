@@ -44,7 +44,9 @@ data class SummaryItem(val label: String, val value: String, val strong: Boolean
 fun SummaryCard(items: List<SummaryItem>, modifier: Modifier = Modifier) {
     val ui = LocalUi.current
     FlowRow(
+        // on screens with a floating button the card sits above it, so the button never covers a total
         modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = DS.space8)
+            .padding(bottom = if (LocalFabSpace.current > 0.dp) 72.dp else 0.dp)
             .clip(RoundedCornerShape(DS.radiusCard * ui.cornerFactor))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(horizontal = DS.cardPad, vertical = 10.dp),

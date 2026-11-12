@@ -119,6 +119,16 @@ object SelfTest {
             app.section = p
             shot(p.name)
         }
+        // the main screens again in dark mode (Settings › Appearance › Dark), then the phone's own setting back
+        (ctx as? com.local.billbox.BillBoxApp)?.ui?.let { ui ->
+            val was = ui.appearance
+            ui.set("appearance", "dark")
+            for (p in listOf(Page.Billing, Page.Bills, Page.Parties, Page.Dashboard, Page.Reports)) {
+                app.section = p
+                shot("dark_" + p.name)
+            }
+            ui.set("appearance", was)
+        }
         // page 1 of a printed bill, as the PDF that goes to the printer
         runCatching {
             var inv: J? = null
