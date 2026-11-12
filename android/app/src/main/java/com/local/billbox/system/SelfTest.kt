@@ -47,6 +47,8 @@ object SelfTest {
     /** True while the session is being replayed (the screen shows a short note instead of the app). */
     var replaying by androidx.compose.runtime.mutableStateOf(false)
     private var started = false
+    /** The emulator self-test is running (no "new version" banner over its screenshots). */
+    val active: Boolean get() = started
     private var current: java.lang.ref.WeakReference<Activity>? = null
 
     /** Runs once per app launch, on the app's own scope: Android may recreate the screen while it runs (the first run was

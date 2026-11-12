@@ -1,5 +1,7 @@
 package com.local.billbox.screens
 
+import com.local.billbox.ui.SummaryCard
+import com.local.billbox.ui.SummaryItem
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -211,15 +213,13 @@ fun BillsScreen() {
                         Col("Due", "due", 110, end = true) { r -> val due = r.num("total") - r.num("paid"); Cell(Fmt.money(due), if (due > 0.5) Bad else Color.Unspecified, bold = true, end = true) },
                     ))
             }
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-                FlowRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("${rows.size} bills", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Sales ${Fmt.money(totals, "sales")}")
-                    Text("Purchases ${Fmt.money(totals, "purchases")}")
-                    if (totals.num("debit_notes") > 0) Text("Debit notes ${Fmt.money(totals, "debit_notes")}")
-                    Text("Due ${Fmt.money(totals, "due")}", fontWeight = FontWeight.Bold)
-                }
-            }
+            SummaryCard(listOfNotNull(
+                SummaryItem("Bills", "${rows.size}"),
+                SummaryItem("Sales", Fmt.money(totals, "sales")),
+                SummaryItem("Purchases", Fmt.money(totals, "purchases")),
+                if (totals.num("debit_notes") > 0) SummaryItem("Debit notes", Fmt.money(totals, "debit_notes")) else null,
+                SummaryItem("Due", Fmt.money(totals, "due"), strong = true, tint = if (totals.num("due") > 0.5) Bad else null),
+            ))
         }
     }
 

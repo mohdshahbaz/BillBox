@@ -94,7 +94,7 @@ class AppState(private val context: Context) {
         scope.launch {
             try {
                 val u = Api.get("/update", mapOf("version" to com.local.billbox.system.Updater.version, "edition" to com.local.billbox.engine.Edition.NAME, "platform" to "android"))
-                if (u.bool("available")) notify("BillBox ${u.str("latest")} is available: Settings › Updates installs it.")
+                if (u.bool("available") && !com.local.billbox.system.SelfTest.active) notify("BillBox ${u.str("latest")} is available: Settings › Updates installs it.")
             } catch (_: Exception) {}
         }
     }
