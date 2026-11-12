@@ -212,7 +212,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
             ForEach(Array(cols.enumerated()), id: \.element.id) { i, c in
                 ZStack(alignment: .trailing) {
                     Text(c.title).font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.8)
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 8)
                         .frame(width: w[i], alignment: c.align)
                         .frame(minHeight: 34)
                         .accessibilityAddTraits(.isHeader)
@@ -266,7 +266,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                         } else { c.cell(row) }
                     }
                     .lineLimit(1)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 8)
                     .frame(width: w[i], alignment: c.align)
                     .frame(minHeight: rh)
                     .clipped()
