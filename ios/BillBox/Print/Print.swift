@@ -124,7 +124,7 @@ func compactPrint(_ co: JSON) -> Bool { co.str("print_compact") != "0" }
 /// behind a ruled line, and the footer keeps one line of terms: the room saved goes to item rows.
 func signatureInBand(_ co: JSON) -> Bool { compactPrint(co) && co.str("print_signature") != "0" }
 /// Width of that signature block in the totals band.
-func signatureBandWidth(_ g: Spec) -> CGFloat { 108 * g.cw }
+func signatureBandWidth(_ g: Spec) -> CGFloat { 96 * g.cw }
 
 /// The bank details printed above the amount in words, one per line, in this order; empty ones are left out.
 let bankFields: [(key: String, label: String, title: String)] = [
@@ -556,10 +556,10 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                                 t("Amount in words", 5.5, bold: true).foregroundStyle(muted)
                                 t(inv.str("amount_words"), 7, weight: .semibold).lineLimit(2).minimumScaleFactor(0.65).fixedSize(horizontal: false, vertical: true)
                             }
-                            .frame(width: bankTab ? leftW * (1 - bankSize(co).width - 0.02) : nil, alignment: .topLeading)
+                            .frame(width: bankTab ? leftW * (1 - bankShare - 0.02) : nil, alignment: .topLeading)
                         }
                         // the bank details start right after the words (Settings › Printing › Bank details size sets how much room they get)
-                        if bankTab { bankTabBlock.frame(width: leftW * bankSize(co).width, alignment: .topLeading).padding(.leading, leftW * 0.02) }
+                        if bankTab { bankTabBlock.frame(width: leftW * bankShare, alignment: .topLeading).padding(.leading, leftW * 0.02) }
                     }
                 }
             }
@@ -589,6 +589,8 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
     private var bankTab: Bool { page == pages - 1 && bankTabFits(co, inv, g) }
     /// The signature prints in the totals band (last page) instead of the footer.
     private var sigHere: Bool { page == pages - 1 && signatureInBand(co) }
+    /// The bank block's share of the band's left side; with the signature beside it the words wrap narrower so the bank keeps its width.
+    private var bankShare: CGFloat { sigHere ? min(0.8, bankSize(co).width + 0.12) : bankSize(co).width }
 
     /// The bank details as a small table: one column when every row fits the free height of the band (above and beside "Amount in
     /// words"), else two; labels, a tab, then the values, lined up, behind a fine divider.
