@@ -48,7 +48,7 @@ const ok = async (name, fn) => { try { await fn(); n++; console.log('  ok  ', na
 let key;
 await ok('config: prices and the public Razorpay key; live has no gateway yet', async () => {
   const c = (await call('GET', 'test/config')).j;
-  assert.strictEqual(c.key_id, 'rzp_test_X'); assert.strictEqual(c.plans.yearly_inr.amount, 149900); assert.strictEqual(c.plans.lifetime_inr.amount, 399900); assert.strictEqual(c.plans.yearly_usd.currency, 'USD');
+  assert.strictEqual(c.key_id, 'rzp_test_X'); assert.strictEqual(c.plans.yearly_inr.amount, 149900); assert.strictEqual(c.plans.lifetime_inr.amount, 399900); assert.strictEqual(c.plans.yearly_usd, undefined, 'no international plan for now');
   assert.strictEqual((await call('POST', 'live/order', { plan: 'yearly_inr', email: 'a@b.in' })).status, 503);
 });
 await ok('order, then a forged payment is refused and a real one gives the licence key', async () => {
@@ -91,7 +91,7 @@ await ok('direct UPI / bank: claim waits, owner confirms, key found by e-mail + 
   const A = { authorization: 'Bearer adm1n' };
   const c = (await call('GET', 'test/config')).j;
   assert.strictEqual(c.upi_vpa, 'ak@upi'); assert.deepStrictEqual(c.bank, { name: 'AK Enterprises', account: '1234567890', ifsc: 'SBIN0000001', bank: 'SBI' });
-  assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_usd', email: 'u@v.in', method: 'upi', ref: '123456789012' })).status, 400, 'rupees only');
+  assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_usd', email: 'u@v.in', method: 'upi', ref: '123456789012' })).status, 400, 'no such plan');
   assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_inr', email: 'u@v.in', method: 'upi', ref: '12' })).status, 400, 'short ref');
   const r = (await call('POST', 'test/claim', { plan: 'lifetime_inr', email: 'U@v.in', name: 'Shop', method: 'upi', ref: '4321 5678 9012' })).j;
   assert.deepStrictEqual(r, { status: 'pending', ref: '432156789012' });
@@ -114,7 +114,7 @@ await ok('direct UPI / bank: claim waits, owner confirms, key found by e-mail + 
   assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_inr', email: 'b@k.in', method: 'bank', ref: 'SBIN26111200002' })).status, 503, 'bank not set up');
   assert.strictEqual((await call('GET', 'test/config')).j.bank, null);
 });
-await ok('prices: ₹1,499 yearly, ₹3,999 lifetime, $29 yearly', async () => {
-  assert.deepStrictEqual([PLANS.yearly_inr.amount, PLANS.lifetime_inr.amount, PLANS.yearly_usd.amount], [149900, 399900, 2900]);
+await ok('prices: ₹1,499 yearly, ₹3,999 lifetime', async () => {
+  assert.deepStrictEqual([PLANS.yearly_inr.amount, PLANS.lifetime_inr.amount], [149900, 399900]);
 });
 console.log(`${n} licence server checks passed`);

@@ -28,7 +28,6 @@
 export const PLANS = {
   yearly_inr: { plan: 'yearly', amount: 149900, currency: 'INR', label: 'BillBox — 1 year', days: 365 },
   lifetime_inr: { plan: 'lifetime', amount: 399900, currency: 'INR', label: 'BillBox — lifetime', days: null },
-  yearly_usd: { plan: 'yearly', amount: 2900, currency: 'USD', label: 'BillBox — 1 year', days: 365 },
 };
 const DEVICES = 2;
 const DAY = 86400000;

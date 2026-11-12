@@ -202,7 +202,7 @@ private fun LicencePage() {
             if (state != "licensed") {
                 SectionHeader("Buy")
                 DriveBtn("Buy a licence…", prominent = true) { com.local.billbox.system.Platform.openUrl(s.str("buy_url")) }
-                Hint("Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking) · Yearly \$29 outside India. The licence key arrives on the page after paying; enter it below.")
+                Hint("Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking). The licence key arrives on the page after paying; enter it below.")
             }
             SectionHeader("Licence")
             if (state == "licensed") {

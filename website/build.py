@@ -104,7 +104,7 @@ FAQ = [
     ("How many devices does one licence cover?", "Two devices — any mix of Mac, Windows, Linux, iPhone and Android. Remove the licence from one device (Settings › Licence) to move it to another."),
     ("Can I move my books from Marg ERP?", "Yes. BillBox imports items, parties, batches and opening balances from a Marg backup (Mac, iPhone and Android; Windows and Linux soon)."),
     ("Where is my data stored?", "Only on your devices, in a SQLite database per company. Backups go to a folder you choose and, if you switch it on, to your own Google Drive. We never see your books."),
-    ("Which payment methods do you accept?", "UPI, cards, net banking and wallets through Razorpay, or direct UPI / bank transfer with no fees. Outside India: international cards in US dollars."),
+    ("Which payment methods do you accept?", "UPI, cards, net banking and wallets through Razorpay, or direct UPI / bank transfer with no fees. Payments from outside India are not taken for now."),
 ]
 
 def head(title, desc, path, extra_ld=None, image=None):
@@ -168,8 +168,7 @@ def software_ld(p=None):
     return {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "BillBox" + (f" for {names[0]}" if p else ""),
             "applicationCategory": "BusinessApplication", "operatingSystem": ", ".join(os_[n] for n in names),
             "description": (PLATFORMS[p]["desc"] if p else "GST billing, stock and accounts software for FMCG distributors and wholesalers."),
-            "offers": [{"@type": "Offer", "price": "1499", "priceCurrency": "INR", "name": "1 year"}, {"@type": "Offer", "price": "3999", "priceCurrency": "INR", "name": "Lifetime"},
-                       {"@type": "Offer", "price": "29", "priceCurrency": "USD", "name": "1 year (outside India)"}],
+            "offers": [{"@type": "Offer", "price": "1499", "priceCurrency": "INR", "name": "1 year"}, {"@type": "Offer", "price": "3999", "priceCurrency": "INR", "name": "Lifetime"}],
             "publisher": {"@type": "Organization", "name": SELLER}}
 
 # ---------------------------------------------------------------- home
@@ -232,9 +231,6 @@ def pricing_cards():
     <div class="price best reveal"><div class="tag">Best value</div><h3>Lifetime</h3><div class="amt">₹3,999<small> once</small></div>
       <ul><li>Every feature, every app</li><li>2 devices</li><li>Never expires</li><li>UPI, cards, net banking</li></ul>
       <a class="btn" href="/buy.html?plan=lifetime_inr">Buy lifetime</a></div>
-    <div class="price reveal"><div class="tag">Outside India</div><h3>Yearly</h3><div class="amt">$29<small> / year</small></div>
-      <ul><li>Every feature, every app</li><li>2 devices</li><li>All updates during the year</li><li>International cards</li></ul>
-      <a class="btn" href="/buy.html?plan=yearly_usd">Buy in US dollars</a></div>
   </div>"""
 
 # ---------------------------------------------------------------- platform pages
@@ -277,7 +273,7 @@ def platform(k):
 
 # ---------------------------------------------------------------- pricing, buy
 def pricing():
-    s = head("BillBox pricing — ₹1,499 a year or ₹3,999 for life", "BillBox costs ₹1,499 a year or ₹3,999 for life in India ($29 a year elsewhere). Every feature, every app, two devices, 15-day free trial.", "/pricing/", [software_ld()])
+    s = head("BillBox pricing — ₹1,499 a year or ₹3,999 for life", "BillBox costs ₹1,499 a year or ₹3,999 for life. Every feature, every app, two devices, 15-day free trial.", "/pricing/", [software_ld()])
     s += f"""<section class="hero"><div class="wrap center"><p class="eyebrow">Pricing</p><h1>Pay once a year.<br class="d"> <span class="grad">Or never again.</span></h1>
   <p class="lead">Every feature on every app. Try it free for 15 days — no card needed.</p>{pricing_cards()}
   <p style="color:var(--muted);margin-top:28px;font-size:15px">Prices include GST where it applies. Pay by UPI, cards, net banking or wallets (Razorpay), or by direct UPI or bank transfer with no fees. <a href="/refunds/">Refunds</a>.</p>
@@ -285,7 +281,7 @@ def pricing():
     write("/pricing/", s + FOOT)
 
 def buy():
-    s = head("Buy BillBox — licence key in a minute", "Buy a BillBox licence: yearly ₹1,499, lifetime ₹3,999, or $29 a year outside India. The licence key is shown right after paying.", "/buy.html")
+    s = head("Buy BillBox — licence key in a minute", "Buy a BillBox licence: yearly ₹1,499, or lifetime ₹3,999. The licence key is shown right after paying.", "/buy.html")
     s += """<section class="hero" style="padding-bottom:96px"><div class="wrap" style="max-width:640px">
   <div class="center"><p class="eyebrow">Buy a licence</p><h2>Your key, in a minute.</h2>
   <p class="lead">Pay, copy the key, paste it in BillBox › Settings › Licence.</p></div>
@@ -295,7 +291,6 @@ def buy():
     <div class="choices" id="plans">
       <label class="choice"><input type="radio" name="plan" value="yearly_inr" checked><b>Yearly</b><span>₹1,499</span></label>
       <label class="choice"><input type="radio" name="plan" value="lifetime_inr"><b>Lifetime</b><span>₹3,999</span></label>
-      <label class="choice"><input type="radio" name="plan" value="yearly_usd"><b>Yearly, outside India</b><span>$29</span></label>
     </div>
     <label for="email">E-mail (your licence is kept for it)</label><input id="email" type="email" autocomplete="email" required placeholder="you@business.in">
     <label for="name">Business name (optional)</label><input id="name" autocomplete="organization" placeholder="Your business">

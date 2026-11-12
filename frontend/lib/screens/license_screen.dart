@@ -82,7 +82,7 @@ class _LicenseTabState extends State<LicenseTab> {
             if (state.isNotEmpty && state != 'unlimited') ...[
               if (state != 'licensed') ...[
                 _btn('Buy a licence…', Icons.shopping_cart_outlined, () => launchUrl(Uri.parse('${s['buy_url']}')), primary: true),
-                const Text('Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking) · Yearly \$29 outside India. The licence key arrives on the page after paying; enter it below.', style: TextStyle(color: Palette.muted, fontSize: 12)),
+                const Text('Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking). The licence key arrives on the page after paying; enter it below.', style: TextStyle(color: Palette.muted, fontSize: 12)),
                 const SizedBox(height: 12),
                 AppField(controller: keyCtl, label: 'Licence key (BB1.…)'),
                 const SizedBox(height: 8),

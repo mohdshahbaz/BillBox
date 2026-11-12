@@ -33,7 +33,7 @@ import SwiftUI
                 if state != "licensed" {
                     Section {
                         DriveButton("Buy a licence…", "cart", prominent: true) { if let u = URL(string: s.str("buy_url")) { openURL(u) } }
-                        Text("Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking) · Yearly $29 outside India. The licence key arrives on the page after paying; enter it below.")
+                        Text("Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking). The licence key arrives on the page after paying; enter it below.")
                             .font(.caption).foregroundStyle(.secondary)
                     } header: { Text("Buy") }
                 }

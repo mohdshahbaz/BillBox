@@ -54,7 +54,7 @@
   function direct(m) {
     const p = config && config.plans[plan()];
     if (!p) return null;
-    if (p.currency !== 'INR') { msg('msg', 'UPI and bank transfer work in rupees only. Choose Yearly or Lifetime, or pay by card in US dollars.', 'warn'); return null; }
+    if (p.currency !== 'INR') { msg('msg', 'UPI and bank transfer work in rupees only. Choose Yearly or Lifetime.', 'warn'); return null; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($('email').value.trim())) { msg('msg', 'Enter your e-mail address first: your licence key is kept for it.', 'err'); return null; }
     msg('msg', ''); method = m;
     $('upi').hidden = m !== 'upi'; $('bank').hidden = m !== 'bank'; $('claim').hidden = false; $('cmsg').innerHTML = '';
