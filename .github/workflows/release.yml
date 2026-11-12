@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       edition:
-        description: 'Which builds: both, public (website, live licences) or admin (your test build: test licences, Razorpay test mode)'
+        description: 'Which builds: both, public (website, live licences) or admin (your test build: test licences)'
         type: choice
         options: [both, public, admin]
         default: both

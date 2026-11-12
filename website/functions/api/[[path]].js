@@ -1,23 +1,21 @@
 /**
  * BillBox licence server (Cloudflare Pages Functions, at billbox-app.pages.dev/api/…). Two separate worlds:
  *
- *   /api/live/…   the public apps and the website: live Razorpay keys, licences signed with the live key
- *   /api/test/…   the owner's admin (test) apps: Razorpay test mode, licences signed with the test key
+ *   /api/live/…   the public apps and the website: licences signed with the live key
+ *   /api/test/…   the owner's admin (test) apps: licences signed with the test key
  *
- *   GET  /api/<env>/config                         prices, the Razorpay key id (public) and the UPI id for the buy page
- *   POST /api/<env>/order      {plan, email, name, device}         a Razorpay order for that plan
- *   POST /api/<env>/verify     {order_id, payment_id, signature}   checks the payment, returns the licence key
+ * Payments are direct UPI or bank transfer (no gateway, no fees): the buyer sends the reference, the owner confirms it.
+ *
+ *   GET  /api/<env>/config                         prices, the UPI id and bank details for the buy page
  *   POST /api/<env>/claim      {plan, email, name, method, ref}    a direct UPI / bank transfer (no fees), waits for the owner
- *   POST /api/<env>/lookup     {email, payment_id}                 the licence key of a payment (or a confirmed UPI/bank ref) again
+ *   POST /api/<env>/lookup     {email, payment_id}                 the licence key of a confirmed UPI/bank reference
  *   POST /api/<env>/activate   {key, device, name}                 an activation for one device (at most `devices`)
  *   POST /api/<env>/deactivate {key, device}                       frees that device's place
- *   POST /api/<env>/webhook    (Razorpay: payment.captured)         issues the licence even if the buyer closed the page
  *   POST /api/<env>/admin/issue  {plan, email, name, days?, devices?, note?}   (Authorization: Bearer ADMIN_TOKEN)
  *   POST /api/<env>/admin/revoke {id}     GET /api/<env>/admin/list
  *   GET  /api/<env>/admin/claims   POST /api/<env>/admin/approve {ref}   POST /api/<env>/admin/reject {ref}
  *
- * Bindings: KV namespace LICENSES; secrets RZP_KEY_ID_LIVE, RZP_KEY_SECRET_LIVE, RZP_KEY_ID_TEST, RZP_KEY_SECRET_TEST,
- * RZP_WEBHOOK_SECRET (optional), LICENSE_KEY_LIVE, LICENSE_KEY_TEST (Ed25519 private keys, PKCS#8 in base64),
+ * Bindings: KV namespace LICENSES; secrets LICENSE_KEY_LIVE, LICENSE_KEY_TEST (Ed25519 private keys, PKCS#8 in base64),
  * ADMIN_TOKEN, UPI_VPA and BANK_DETAILS (optional: direct UPI and bank transfer, no fees; BANK_DETAILS is
  * "Name|Account number|IFSC|Bank").
  *
@@ -37,7 +35,6 @@ const enc = new TextEncoder();
 const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const fromB64url = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4)), (c) => c.charCodeAt(0));
 const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
 class Fail extends Error { constructor(status, message, code) { super(message); this.status = status; this.code = code; } }
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' } });
@@ -67,28 +64,11 @@ async function read(env, which, token) {
   const ok = await crypto.subtle.verify({ name: 'Ed25519' }, (await keys(env, which)).pub, fromB64url(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`));
   return ok ? p : null;
 }
-async function hmac(secret, text) {
-  const k = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  return hex(await crypto.subtle.sign('HMAC', k, enc.encode(text)));
-}
 function same(a, b) { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; }
 
 // ---------------------------------------------------------------- store
 const kvGet = async (env, k) => { const v = await env.LICENSES.get(k); return v ? JSON.parse(v) : null; };
 const kvPut = (env, k, v) => env.LICENSES.put(k, JSON.stringify(v));
-
-function rzp(env, which) {
-  const id = env[which === 'live' ? 'RZP_KEY_ID_LIVE' : 'RZP_KEY_ID_TEST'], secret = env[which === 'live' ? 'RZP_KEY_SECRET_LIVE' : 'RZP_KEY_SECRET_TEST'];
-  return { id, secret, auth: 'Basic ' + btoa(`${id}:${secret}`) };
-}
-async function rzpCall(env, which, method, path, body) {
-  const r = rzp(env, which);
-  if (!r.id || !r.secret) throw new Fail(503, 'Online payment is not set up yet. Pay by UPI and send the reference to the seller, or try again later.', 'NO_GATEWAY');
-  const res = await fetch(`https://api.razorpay.com/v1${path}`, { method, headers: { authorization: r.auth, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Fail(502, `Razorpay: ${(j.error && j.error.description) || res.status}`);
-  return j;
-}
 
 const cleanRef = (r) => String(r || '').replace(/[\s-]+/g, '').toUpperCase().slice(0, 30);
 const bank = (env) => { const b = String(env.BANK_DETAILS || '').split('|').map((x) => x.trim()); return b[0] && b[1] && b[2] ? { name: b[0], account: b[1], ifsc: b[2], bank: b[3] || '' } : null; };
@@ -118,44 +98,8 @@ async function handle(request, env, which, path) {
   const body = method === 'POST' ? await request.clone().json().catch(() => ({})) : {};
 
   if (path === 'config' && method === 'GET') {
-    return json({ env: which, key_id: rzp(env, which).id || '', upi_vpa: env.UPI_VPA || '', bank: bank(env), devices: DEVICES,
+    return json({ env: which, upi_vpa: env.UPI_VPA || '', bank: bank(env), devices: DEVICES,
       plans: Object.fromEntries(Object.entries(PLANS).map(([k, p]) => [k, { plan: p.plan, amount: p.amount, currency: p.currency, label: p.label }])) });
-  }
-
-  if (path === 'order' && method === 'POST') {
-    const p = PLANS[body.plan];
-    if (!p) throw new Fail(400, 'Choose a plan.');
-    const email = cleanEmail(body.email);
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Fail(400, 'Enter your e-mail address: the licence key is kept for it.');
-    const o = await rzpCall(env, which, 'POST', '/orders', { amount: p.amount, currency: p.currency, receipt: `bb_${Date.now()}`,
-      notes: { plan_key: body.plan, plan: p.plan, email, name: String(body.name || '').slice(0, 80), device: String(body.device || '').slice(0, 40) } });
-    return json({ order_id: o.id, key_id: rzp(env, which).id, amount: o.amount, currency: o.currency, label: p.label, email });
-  }
-
-  if (path === 'verify' && method === 'POST') {
-    const { order_id, payment_id, signature } = body;
-    if (!order_id || !payment_id || !signature) throw new Fail(400, 'The payment details are missing.');
-    const expect = await hmac(rzp(env, which).secret || '', `${order_id}|${payment_id}`);
-    if (!same(expect, String(signature))) throw new Fail(400, 'The payment could not be confirmed. If money was taken, write to the seller with the payment ID.');
-    const o = await rzpCall(env, which, 'GET', `/orders/${encodeURIComponent(order_id)}`);
-    const p = PLANS[o.notes && o.notes.plan_key];
-    if (!p || o.amount !== p.amount || o.currency !== p.currency) throw new Fail(400, 'The order does not match a BillBox plan.');
-    const rec = await issue(env, which, { plan: p.plan, days: p.days, email: o.notes.email, name: o.notes.name, payment: payment_id, order: order_id });
-    return json(out(rec));
-  }
-
-  if (path === 'webhook' && method === 'POST') {
-    const raw = await request.text();
-    if (!env.RZP_WEBHOOK_SECRET) return json({ ok: true, skipped: 'no webhook secret' });
-    if (!same(await hmac(env.RZP_WEBHOOK_SECRET, raw), String(request.headers.get('x-razorpay-signature') || ''))) throw new Fail(400, 'bad signature');
-    const ev = JSON.parse(raw);
-    const pay = ev.payload && ev.payload.payment && ev.payload.payment.entity;
-    if ((ev.event === 'payment.captured' || ev.event === 'order.paid') && pay && pay.order_id) {
-      const o = await rzpCall(env, which, 'GET', `/orders/${encodeURIComponent(pay.order_id)}`);
-      const p = PLANS[o.notes && o.notes.plan_key];
-      if (p && o.amount === p.amount) await issue(env, which, { plan: p.plan, days: p.days, email: o.notes.email, name: o.notes.name, payment: pay.id, order: o.id });
-    }
-    return json({ ok: true });
   }
 
   if (path === 'claim' && method === 'POST') {

@@ -1,4 +1,4 @@
-// Buy page: Razorpay checkout → licence key on the page; direct UPI / bank transfer (no fees, owner confirms); find a key again.
+// Buy page: direct UPI / bank transfer (no fees) → the buyer sends the reference, the owner confirms; find the key.
 (function () {
   const q = new URLSearchParams(location.search);
   const ENV = q.get('test') === '1' ? 'test' : 'live';
@@ -25,30 +25,6 @@
     $('done').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   $('copy').addEventListener('click', () => { navigator.clipboard.writeText($('key').textContent).then(() => { $('copy').textContent = 'Copied ✓'; }); });
-
-  $('pay').addEventListener('click', async () => {
-    const email = $('email').value.trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return msg('msg', 'Enter your e-mail address: your licence key is kept for it.', 'err');
-    msg('msg', 'Opening the payment window…');
-    $('pay').disabled = true;
-    try {
-      const o = await post('/order', { plan: plan(), email, name: $('name').value.trim(), device: q.get('device') || '' });
-      if (!window.Razorpay) throw new Error('The payment window could not load. Check the internet connection and try again.');
-      const rz = new window.Razorpay({
-        key: o.key_id, order_id: o.order_id, amount: o.amount, currency: o.currency, name: 'BillBox', description: o.label,
-        image: location.origin + '/assets/icon-192.png', prefill: { email }, theme: { color: '#4f46e5' },
-        handler: async (p) => {
-          msg('msg', 'Payment received. Making your licence key…');
-          try { showKey(await post('/verify', { order_id: p.razorpay_order_id, payment_id: p.razorpay_payment_id, signature: p.razorpay_signature })); msg('msg', ''); }
-          catch (e) { msg('msg', `${esc(e.message)}<br>Your payment ID is <b>${esc(p.razorpay_payment_id)}</b>: use “Find my licence key” below in a minute, or write to us.`, 'err'); }
-        },
-        modal: { ondismiss: () => { msg('msg', ''); $('pay').disabled = false; } },
-      });
-      rz.on('payment.failed', (r) => msg('msg', esc((r.error && r.error.description) || 'The payment did not go through. Nothing was charged.'), 'err'));
-      rz.open();
-    } catch (e) { msg('msg', esc(e.message), 'err'); }
-    $('pay').disabled = false;
-  });
 
   let method = 'upi';
   function direct(m) {

@@ -1,4 +1,4 @@
-// The licence server against a fake Razorpay and a fake KV store, and its tokens checked by the apps' engine:
+// The licence server against a fake KV store, and its tokens checked by the apps' engine:
 //   node website/test/server.test.mjs
 import assert from 'node:assert';
 import crypto from 'node:crypto';
@@ -19,17 +19,11 @@ L.KEYS.live = live.x; L.KEYS.test = test.x;
 const store = new Map();
 const env = {
   LICENSES: { get: async (k) => store.get(k) ?? null, put: async (k, v) => { store.set(k, v); }, list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })) }) },
-  LICENSE_KEY_LIVE: live.der, LICENSE_KEY_TEST: test.der, RZP_KEY_ID_TEST: 'rzp_test_X', RZP_KEY_SECRET_TEST: 'sekret', ADMIN_TOKEN: 'adm1n', UPI_VPA: 'ak@upi', BANK_DETAILS: 'AK Enterprises|1234567890|SBIN0000001|SBI',
+  LICENSE_KEY_LIVE: live.der, LICENSE_KEY_TEST: test.der, ADMIN_TOKEN: 'adm1n', UPI_VPA: 'ak@upi', BANK_DETAILS: 'AK Enterprises|1234567890|SBIN0000001|SBI',
 };
-const orders = {};
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, opts = {}) => {
   const u = String(url);
-  if (u.startsWith('https://api.razorpay.com/v1/orders')) {
-    assert.strictEqual(opts.headers.authorization, 'Basic ' + btoa('rzp_test_X:sekret'));
-    if (opts.method === 'POST') { const b = JSON.parse(opts.body); const id = 'order_' + Object.keys(orders).length; orders[id] = { id, ...b, status: 'created' }; return new Response(JSON.stringify(orders[id])); }
-    const id = decodeURIComponent(u.split('/').pop()); return orders[id] ? new Response(JSON.stringify(orders[id])) : new Response('{}', { status: 404 });
-  }
   if (u.startsWith('https://billbox-app.pages.dev/api/')) {   // the engine calling the licence server
     const p = u.slice('https://billbox-app.pages.dev/api/'.length).split('/');
     return onRequest({ request: new Request(u, opts), env, params: { path: p } });
@@ -40,28 +34,24 @@ const call = async (method, p, body, headers = {}) => {
   const r = await onRequest({ request: new Request(`https://billbox-app.pages.dev/api/${p}`, { method, headers: { 'content-type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined }), env, params: { path: p.split('/') } });
   return { status: r.status, j: await r.json() };
 };
-const hmac = (k, t) => crypto.createHmac('sha256', k).update(t).digest('hex');
 
 let n = 0;
 const ok = async (name, fn) => { try { await fn(); n++; console.log('  ok  ', name); } catch (e) { console.log('  FAIL', name, '\n      ', e.stack); process.exitCode = 1; } };
 
 let key;
-await ok('config: prices and the public Razorpay key; live has no gateway yet', async () => {
+await ok('config: prices, UPI id and bank; no gateway endpoints', async () => {
   const c = (await call('GET', 'test/config')).j;
-  assert.strictEqual(c.key_id, 'rzp_test_X'); assert.strictEqual(c.plans.yearly_inr.amount, 149900); assert.strictEqual(c.plans.lifetime_inr.amount, 399900); assert.strictEqual(c.plans.yearly_usd, undefined, 'no international plan for now');
-  assert.strictEqual((await call('POST', 'live/order', { plan: 'yearly_inr', email: 'a@b.in' })).status, 503);
+  assert.strictEqual(c.plans.yearly_inr.amount, 149900); assert.strictEqual(c.plans.lifetime_inr.amount, 399900); assert.strictEqual(c.plans.yearly_usd, undefined, 'no international plan for now');
+  assert.strictEqual(c.key_id, undefined); assert.strictEqual(c.upi_vpa, 'ak@upi');
+  for (const p of ['order', 'verify', 'webhook']) assert.strictEqual((await call('POST', `test/${p}`, {})).status, 404, p);
 });
-await ok('order, then a forged payment is refused and a real one gives the licence key', async () => {
-  const o = (await call('POST', 'test/order', { plan: 'yearly_inr', email: 'Shop@Example.in', name: 'AK', device: 'D1' })).j;
-  assert.ok(o.order_id && o.amount === 149900 && o.email === 'shop@example.in');
-  assert.strictEqual((await call('POST', 'test/verify', { order_id: o.order_id, payment_id: 'pay_1', signature: 'nope' })).status, 400);
-  const r = (await call('POST', 'test/verify', { order_id: o.order_id, payment_id: 'pay_1', signature: hmac('sekret', `${o.order_id}|pay_1`) })).j;
-  assert.ok(r.license_key.startsWith('BB1.')); assert.strictEqual(r.plan, 'yearly'); assert.ok(r.expires);
+await ok('a UPI payment confirmed by the owner gives the licence key', async () => {
+  assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_inr', email: 'Shop@Example.in', name: 'AK', method: 'upi', ref: '111122223333' })).j.status, 'pending');
+  const r = (await call('POST', 'test/admin/approve', { ref: '111122223333' }, { authorization: 'Bearer adm1n' })).j;
+  assert.ok(r.license_key.startsWith('BB1.')); assert.strictEqual(r.plan, 'yearly'); assert.ok(r.expires); assert.strictEqual(r.email, 'shop@example.in');
   key = r.license_key;
-  const again = (await call('POST', 'test/verify', { order_id: o.order_id, payment_id: 'pay_1', signature: hmac('sekret', `${o.order_id}|pay_1`) })).j;
-  assert.strictEqual(again.license_key, key, 'the same payment gives the same licence');
-  assert.strictEqual((await call('POST', 'test/lookup', { email: 'shop@example.in', payment_id: 'pay_1' })).j.license_key, key);
-  assert.strictEqual((await call('POST', 'test/lookup', { email: 'x@y.in', payment_id: 'pay_1' })).status, 404);
+  assert.strictEqual((await call('POST', 'test/lookup', { email: 'shop@example.in', payment_id: '111122223333' })).j.license_key, key);
+  assert.strictEqual((await call('POST', 'test/lookup', { email: 'x@y.in', payment_id: '111122223333' })).status, 404);
 });
 await ok('the app engine checks the key and activates through the server; 2 devices, then refused', async () => {
   const s = await L.activate({ key });
@@ -90,7 +80,7 @@ await ok('admin: issue (for a UPI or cash sale), list, revoke; wrong token refus
 await ok('direct UPI / bank: claim waits, owner confirms, key found by e-mail + reference; bad ones refused', async () => {
   const A = { authorization: 'Bearer adm1n' };
   const c = (await call('GET', 'test/config')).j;
-  assert.strictEqual(c.upi_vpa, 'ak@upi'); assert.deepStrictEqual(c.bank, { name: 'AK Enterprises', account: '1234567890', ifsc: 'SBIN0000001', bank: 'SBI' });
+  assert.deepStrictEqual(c.bank, { name: 'AK Enterprises', account: '1234567890', ifsc: 'SBIN0000001', bank: 'SBI' });
   assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_usd', email: 'u@v.in', method: 'upi', ref: '123456789012' })).status, 400, 'no such plan');
   assert.strictEqual((await call('POST', 'test/claim', { plan: 'yearly_inr', email: 'u@v.in', method: 'upi', ref: '12' })).status, 400, 'short ref');
   const r = (await call('POST', 'test/claim', { plan: 'lifetime_inr', email: 'U@v.in', name: 'Shop', method: 'upi', ref: '4321 5678 9012' })).j;

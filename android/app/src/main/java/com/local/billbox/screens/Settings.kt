@@ -197,12 +197,12 @@ private fun LicencePage() {
             "expired" -> (if (s.str("reason").isEmpty()) "" else s.str("reason") + ". ") + "Your books are safe: they can still be seen, printed, exported and backed up. Buy a licence or enter your key to add and change things again."
             else -> "This copy of BillBox is not limited."
         })
-        if (s.str("edition") == "admin") Hint("Admin (test) edition: test licence keys and Razorpay test payments only.", color = Color(0xFFEF6C00))
+        if (s.str("edition") == "admin") Hint("Admin (test) edition: test licence keys only.", color = Color(0xFFEF6C00))
         if (state != "unlimited" && state.isNotEmpty()) {
             if (state != "licensed") {
                 SectionHeader("Buy")
                 DriveBtn("Buy a licence…", prominent = true) { com.local.billbox.system.Platform.openUrl(s.str("buy_url")) }
-                Hint("Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking). The licence key arrives on the page after paying; enter it below.")
+                Hint("Yearly ₹1,499 · Lifetime ₹3,999 by UPI or bank transfer. Send the reference on the buy page; your licence key is ready there once the payment is confirmed (usually within a few hours). Enter it below.")
             }
             SectionHeader("Licence")
             if (state == "licensed") {

@@ -49,7 +49,7 @@ jobs:
         working-directory: backend
         run: node --disable-warning=ExperimentalWarning test/numbering.js && node --disable-warning=ExperimentalWarning test/sync.js && node --disable-warning=ExperimentalWarning test/sync_merge.js
 
-      - name: Licence server (website/functions) against a fake Razorpay, checked by the engine
+      - name: Licence server (website/functions) checked by the engine
         run: node --disable-warning=ExperimentalWarning website/test/server.test.mjs
 
       - name: Swift toolchain

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Deploys website static assets and the licence server (functions/) to Cloudflare Pages project "billbox-app" (billbox-app.pages.dev).
-# Needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID; copies the licence and Razorpay secrets that are set.
+# Needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID; copies the licence and payment secrets that are set.
 set -uo pipefail
 cd "$(dirname "$0")"
 BRANCH="${1:-main}"
@@ -42,7 +42,7 @@ else
 fi
 
 step "Secrets"
-for s in LICENSE_KEY_LIVE LICENSE_KEY_TEST ADMIN_TOKEN RZP_KEY_ID_LIVE RZP_KEY_SECRET_LIVE RZP_KEY_ID_TEST RZP_KEY_SECRET_TEST RZP_WEBHOOK_SECRET UPI_VPA BANK_DETAILS; do
+for s in LICENSE_KEY_LIVE LICENSE_KEY_TEST ADMIN_TOKEN UPI_VPA BANK_DETAILS; do
   v="${!s:-}"
   if [ -n "$v" ]; then
     if printf '%s' "$v" | W pages secret put "$s" --project-name "${PROJECT_NAME}" >/dev/null 2>secret.err; then echo "set $s"; else echo "::warning::secret $s: $(tail -3 secret.err | tr '\n' ' ')"; fi

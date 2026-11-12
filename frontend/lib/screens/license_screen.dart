@@ -77,12 +77,12 @@ class _LicenseTabState extends State<LicenseTab> {
                 Text(detail, style: const TextStyle(color: Palette.muted, fontSize: 12)),
               ])),
             ]),
-            if (s['edition'] == 'admin') const Padding(padding: EdgeInsets.only(top: 8), child: Text('Admin (test) edition: test licence keys and Razorpay test payments only.', style: TextStyle(color: Colors.orange, fontSize: 12))),
+            if (s['edition'] == 'admin') const Padding(padding: EdgeInsets.only(top: 8), child: Text('Admin (test) edition: test licence keys only.', style: TextStyle(color: Colors.orange, fontSize: 12))),
             const SizedBox(height: 14),
             if (state.isNotEmpty && state != 'unlimited') ...[
               if (state != 'licensed') ...[
                 _btn('Buy a licence…', Icons.shopping_cart_outlined, () => launchUrl(Uri.parse('${s['buy_url']}')), primary: true),
-                const Text('Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking). The licence key arrives on the page after paying; enter it below.', style: TextStyle(color: Palette.muted, fontSize: 12)),
+                const Text('Yearly ₹1,499 · Lifetime ₹3,999 by UPI or bank transfer. Send the reference on the buy page; your licence key is ready there once the payment is confirmed (usually within a few hours). Enter it below.', style: TextStyle(color: Palette.muted, fontSize: 12)),
                 const SizedBox(height: 12),
                 AppField(controller: keyCtl, label: 'Licence key (BB1.…)'),
                 const SizedBox(height: 8),

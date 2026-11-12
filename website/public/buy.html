@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Buy BillBox — licence key in a minute</title>
-<meta name="description" content="Buy a BillBox licence: yearly ₹1,499, or lifetime ₹3,999. The licence key is shown right after paying.">
+<title>Buy BillBox — pay by UPI or bank transfer</title>
+<meta name="description" content="Buy a BillBox licence: yearly ₹1,499 or lifetime ₹3,999, by UPI or bank transfer. Your licence key is ready once the payment is confirmed.">
 <link rel="canonical" href="https://billbox-app.pages.dev/buy.html"><meta name="robots" content="noindex">
 <meta name="theme-color" content="#4f46e5">
-<meta property="og:type" content="website"><meta property="og:site_name" content="BillBox"><meta property="og:title" content="Buy BillBox — licence key in a minute">
-<meta property="og:description" content="Buy a BillBox licence: yearly ₹1,499, or lifetime ₹3,999. The licence key is shown right after paying."><meta property="og:url" content="https://billbox-app.pages.dev/buy.html"><meta property="og:image" content="https://billbox-app.pages.dev/videos/mac.jpg">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Buy BillBox — licence key in a minute"><meta name="twitter:description" content="Buy a BillBox licence: yearly ₹1,499, or lifetime ₹3,999. The licence key is shown right after paying."><meta name="twitter:image" content="https://billbox-app.pages.dev/videos/mac.jpg">
+<meta property="og:type" content="website"><meta property="og:site_name" content="BillBox"><meta property="og:title" content="Buy BillBox — pay by UPI or bank transfer">
+<meta property="og:description" content="Buy a BillBox licence: yearly ₹1,499 or lifetime ₹3,999, by UPI or bank transfer. Your licence key is ready once the payment is confirmed."><meta property="og:url" content="https://billbox-app.pages.dev/buy.html"><meta property="og:image" content="https://billbox-app.pages.dev/videos/mac.jpg">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Buy BillBox — pay by UPI or bank transfer"><meta name="twitter:description" content="Buy a BillBox licence: yearly ₹1,499 or lifetime ₹3,999, by UPI or bank transfer. Your licence key is ready once the payment is confirmed."><meta name="twitter:image" content="https://billbox-app.pages.dev/videos/mac.jpg">
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/assets/icon-32.png"><link rel="apple-touch-icon" href="/assets/icon-180.png">
 <link rel="manifest" href="/site.webmanifest">
 <link rel="stylesheet" href="/assets/style.css">
@@ -24,9 +24,9 @@
 </div></nav>
 <main>
 <section class="hero" style="padding-bottom:96px"><div class="wrap" style="max-width:640px">
-  <div class="center"><p class="eyebrow">Buy a licence</p><h2>Your key, in a minute.</h2>
-  <p class="lead">Pay, copy the key, paste it in BillBox › Settings › Licence.</p></div>
-  <div id="testmode" class="notice warn" hidden><b>Test mode.</b> Payments go through Razorpay's test mode and give test licence keys, which work only in the admin (test) BillBox.</div>
+  <div class="center"><p class="eyebrow">Buy a licence</p><h2>Pay by UPI or bank.</h2>
+  <p class="lead">Pay, send the reference, then paste your key in BillBox › Settings › Licence.</p></div>
+  <div id="testmode" class="notice warn" hidden><b>Test mode.</b> Keys bought here are test licence keys, which work only in the admin (test) BillBox.</div>
   <form class="card" id="buy" style="margin-top:28px" onsubmit="return false">
     <label>Plan</label>
     <div class="choices" id="plans">
@@ -35,7 +35,7 @@
     </div>
     <label for="email">E-mail (your licence is kept for it)</label><input id="email" type="email" autocomplete="email" required placeholder="you@business.in">
     <label for="name">Business name (optional)</label><input id="name" autocomplete="organization" placeholder="Your business">
-    <div class="btns" style="justify-content:flex-start"><button class="btn" id="pay" type="button">Pay with Razorpay</button><button class="btn ghost" id="upiBtn" type="button">UPI direct (no fees)</button><button class="btn ghost" id="bankBtn" type="button" hidden>Bank transfer (no fees)</button></div>
+    <div class="btns" style="justify-content:flex-start"><button class="btn" id="upiBtn" type="button">Pay by UPI</button><button class="btn ghost" id="bankBtn" type="button" hidden>Bank transfer</button></div>
     <div id="msg"></div>
   </form>
   <div class="card" id="done" hidden style="margin-top:28px"><h3>Thank you! Here is your licence key</h3>
@@ -52,10 +52,9 @@
     <div class="btns" style="justify-content:flex-start"><button class="btn" id="claimBtn" type="button">I have paid</button></div><div id="cmsg"></div></div>
   <div class="card" id="find" style="margin-top:28px"><h3>Find my licence key</h3>
     <label for="femail">E-mail used when paying</label><input id="femail" type="email">
-    <label for="fpay">Razorpay payment ID (pay_…) or your UPI / bank reference</label><input id="fpay">
+    <label for="fpay">UPI / bank reference you sent</label><input id="fpay">
     <div class="btns" style="justify-content:flex-start"><button class="btn" id="findBtn" type="button">Show my key</button></div><div id="fmsg"></div></div>
 </div></section>
-<script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 <script src="/assets/buy.js" defer></script>
 </main>

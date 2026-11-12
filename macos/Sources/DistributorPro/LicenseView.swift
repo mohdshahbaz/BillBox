@@ -24,7 +24,7 @@ import SwiftUI
                 }
                 .padding(.vertical, 4)
                 if s.str("edition") == "admin" {
-                    Label("Admin (test) edition: test licence keys and Razorpay test payments only.", systemImage: "wrench.and.screwdriver")
+                    Label("Admin (test) edition: test licence keys only.", systemImage: "wrench.and.screwdriver")
                         .font(.caption).foregroundStyle(.orange)
                 }
             } header: { Text("This device") }
@@ -33,7 +33,7 @@ import SwiftUI
                 if state != "licensed" {
                     Section {
                         DriveButton("Buy a licence…", "cart", prominent: true) { if let u = URL(string: s.str("buy_url")) { openURL(u) } }
-                        Text("Yearly ₹1,499 · Lifetime ₹3,999 (India: UPI, cards, net banking). The licence key arrives on the page after paying; enter it below.")
+                        Text("Yearly ₹1,499 · Lifetime ₹3,999 by UPI or bank transfer. Send the reference on the buy page; your licence key is ready there once the payment is confirmed (usually within a few hours). Enter it below.")
                             .font(.caption).foregroundStyle(.secondary)
                     } header: { Text("Buy") }
                 }

@@ -3,8 +3,8 @@
  * iPhone has the Swift copy in BillBoxCore/License.swift).
  *
  * Editions (set by the app that starts the engine, BILLBOX_EDITION):
- *   public  the apps on the website: live licence keys, real payments (Razorpay live), licence server /api/live
- *   admin   the owner's test build: test keys, Razorpay test mode, licence server /api/test, plus "reset trial"
+ *   public  the apps on the website: live licence keys, real payments, licence server /api/live
+ *   admin   the owner's test build: test keys, licence server /api/test, plus "reset trial"
  *   (none)  developer runs and the automatic checks: no licence needed, nothing is limited
  *
  * A licence key (bought on the website, or issued by the owner for a UPI or cash sale) is turned into an activation for

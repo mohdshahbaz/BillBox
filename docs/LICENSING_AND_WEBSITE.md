@@ -4,8 +4,8 @@
 
 | Edition | Who | Licence keys | Payments | How it is built |
 |---|---|---|---|---|
-| **public** | everyone (website downloads) | live keys (`/api/live`) | Razorpay **live** | every normal release (`./github.sh release 15.8.0`) |
-| **admin** | you, for testing | test keys (`/api/test`) | Razorpay **test mode** | a release whose version ends in `-admin` (`./github.sh release 15.8.0-admin`): a pre-release, never shown as "latest" on the website |
+| **public** | everyone (website downloads) | live keys (`/api/live`) | real UPI / bank payments | every normal release (`./github.sh release 15.8.0`) |
+| **admin** | you, for testing | test keys (`/api/test`) | test claims (confirm them yourself) | a release whose version ends in `-admin` (`./github.sh release 15.8.0-admin`): a pre-release, never shown as "latest" on the website |
 
 Developer runs and the automatic checks have no edition: nothing is limited.
 
@@ -15,14 +15,14 @@ The admin edition also has **Start the trial again** for testing.
 
 ## Prices (website/functions/api/[[path]].js → `PLANS`)
 
-Yearly ₹1,499 · Lifetime ₹3,999 · Yearly $29 (outside India). Change them there and on the website (website/build.py).
+Yearly ₹1,499 · Lifetime ₹3,999 (no international plan for now). Change them there and on the website (website/build.py).
 
 ## Payments
 
-- **Razorpay** (cards, UPI, net banking, wallets; international cards in USD once enabled on your Razorpay account).
-  Razorpay charges its fee per payment.
-- **Direct UPI, no fees**: the buy page shows a UPI QR for `UPI_VPA`; the buyer e-mails you the UPI reference and you
-  issue the key on **billbox-app.pages.dev/admin.html** (Issue a licence).
+No payment gateway, no fees: **direct UPI** (QR / UPI app link for `UPI_VPA`) and **bank transfer** (`BANK_DETAILS`).
+The buyer pays, enters the UTR on the buy page, and it waits on **billbox-app.pages.dev/admin.html › Payments to confirm**.
+Check the reference in your bank / UPI app, press **Confirm**: the licence is made and the buyer gets the key with
+**Find my licence key** (e-mail + reference). **Not received** rejects it.
 
 ## GitHub secrets (Settings › Secrets and variables › Actions)
 
@@ -31,16 +31,14 @@ Yearly ₹1,499 · Lifetime ₹3,999 · Yearly $29 (outside India). Change them 
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | deploy to Cloudflare Pages (token from the "Edit Cloudflare Workers" template) |
 | `LICENSE_KEY_LIVE`, `LICENSE_KEY_TEST` | the licence signing keys (from the file you were given; never share them) |
 | `ADMIN_TOKEN` | password of admin.html and `/api/*/admin/*` |
-| `RZP_KEY_ID_TEST`, `RZP_KEY_SECRET_TEST` | Razorpay Dashboard › Test mode › Account & Settings › API keys |
-| `RZP_KEY_ID_LIVE`, `RZP_KEY_SECRET_LIVE` | the same in Live mode (after Razorpay activates your account) |
-| `RZP_WEBHOOK_SECRET` | optional: Razorpay › Webhooks › `https://billbox-app.pages.dev/api/live/webhook` (and `/api/test/webhook` in test mode), events `payment.captured`, `order.paid` |
-| `UPI_VPA` | optional: your UPI ID for direct UPI payments, e.g. `akenterprises@okhdfc` |
+| `UPI_VPA` | your UPI ID for direct UPI payments, e.g. `akenterprises@okhdfc` |
+| `BANK_DETAILS` | optional, for bank transfer: `Name|Account number|IFSC|Bank` |
 
 After adding or changing secrets: **Actions › Website › Run workflow** (main).
 
 Testing a purchase end to end: install an admin build, Settings › Licence › Buy a licence (opens `buy.html?test=1`),
-pay with Razorpay's test card `4111 1111 1111 1111` (any future date, any CVV) or test UPI `success@razorpay`,
-paste the key in the app.
+choose UPI, enter any 12-digit reference, confirm it on admin.html with **Test** selected, then Find my licence key
+and paste the key in the app.
 
 ## Website
 
