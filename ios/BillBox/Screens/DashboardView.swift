@@ -186,26 +186,29 @@ struct DashSnap {
 
     private func alerts(_ x: JSON) -> some View {
         let chips: [(String, String, Color, () -> Void)] = [
-            x.int("unprinted_bills") > 0 ? ("\(x.int("unprinted_bills")) bills to print", "printer", Color.blue, { app.openUnprinted = true; go(.bills) }) : nil,
-            x.int("low_stock_count") > 0 ? ("\(x.int("low_stock_count")) items low on stock", "exclamationmark.triangle", Color.red, { go(.stock) }) : nil,
-            x.int("expiring_30d") > 0 ? ("\(x.int("expiring_30d")) batches expire within \(x.has("expiry_days") ? x.int("expiry_days") : 30) days", "clock.badge.exclamationmark", Color.orange, { go(.reports) }) : nil,
-            x.int("expired_stock") > 0 ? ("\(x.int("expired_stock")) expired batches in stock", "xmark.octagon", Color.red, { go(.reports) }) : nil,
+            x.int("unprinted_bills") > 0 ? ("\(x.int("unprinted_bills")) bills to print", "printer", Theme.info, { app.openUnprinted = true; go(.bills) }) : nil,
+            x.int("low_stock_count") > 0 ? ("\(x.int("low_stock_count")) items low on stock", "exclamationmark.triangle", Theme.negative, { go(.stock) }) : nil,
+            x.int("expiring_30d") > 0 ? ("\(x.int("expiring_30d")) batches expire within \(x.has("expiry_days") ? x.int("expiry_days") : 30) days", "clock.badge.exclamationmark", Theme.warning, { go(.reports) }) : nil,
+            x.int("expired_stock") > 0 ? ("\(x.int("expired_stock")) expired batches in stock", "xmark.octagon", Theme.negative, { go(.reports) }) : nil,
         ].compactMap { $0 }
+        // one line when they fit, otherwise one under another: a chip is never cut off at the screen edge
+        func chip(_ c: (String, String, Color, () -> Void)) -> some View {
+            Button(action: c.3) {
+                Label(c.0, systemImage: c.1).font(.callout.weight(.medium)).lineLimit(1)
+                    .padding(.horizontal, DS.Space.s).padding(.vertical, 7)
+                    .frame(minHeight: DS.hitTarget - 8)
+                    .foregroundStyle(c.2).background(c.2.opacity(DS.tint), in: Capsule())
+                    .overlay(Capsule().stroke(c.2.opacity(0.25), lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+        }
         return Group {
             if !chips.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(chips.indices, id: \.self) { i in
-                            let c = chips[i]
-                            Button(action: c.3) {
-                                Label(c.0, systemImage: c.1).font(.callout.weight(.medium)).padding(.horizontal, 12).padding(.vertical, 7)
-                                    .foregroundStyle(c.2).background(c.2.opacity(0.12), in: Capsule())
-                                    .overlay(Capsule().stroke(c.2.opacity(0.25), lineWidth: 0.5))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: DS.Space.xs) { ForEach(chips.indices, id: \.self) { chip(chips[$0]) } }
+                    VStack(alignment: .leading, spacing: DS.Space.xs) { ForEach(chips.indices, id: \.self) { chip(chips[$0]) } }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -226,7 +229,7 @@ struct DashSnap {
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
             Kpi(title: "Sales", symbol: "indianrupeesign.circle", value: Fmt.money(sales), note: "\(Int(bills)) bills \(periodWord)", tint: Theme.accent) { go(.bills) }
             Kpi(title: "Profit", symbol: "chart.line.uptrend.xyaxis", value: Fmt.money(profit),
-                note: period == "year" ? "Margin \(Fmt.qty(x.num("fy_margin_pct")))%" : "Before expenses, \(periodWord)", tint: profit >= 0 ? .green : .red) { go(.reports) }
+                note: period == "year" ? "Margin \(Fmt.qty(x.num("fy_margin_pct")))%" : "Before expenses, \(periodWord)", tint: profit >= 0 ? Theme.positive : Theme.negative) { go(.reports) }
             Kpi(title: "Collections", symbol: "banknote", value: Fmt.money(collected), note: "Payments received \(periodWord)", tint: Theme.accent) { go(.parties) }
             Kpi(title: "Purchases", symbol: "shippingbox", value: Fmt.money(purchases), note: "Supplier bills \(periodWord)", tint: Theme.accent) { go(.purchases) }
             Kpi(title: "To receive", symbol: "person.crop.circle.badge.exclamationmark", value: Fmt.money(x.num("receivable")),

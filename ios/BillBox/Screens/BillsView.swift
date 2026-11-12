@@ -100,7 +100,7 @@ import SwiftUI
             GridColumn("Type", id: "type", min: 70, ideal: 80, sort: { (r: JSON) -> Any? in r.str("type") }) { (r: JSON) in
                 StatusPill(text: billTypeName(r), tint: billTypeColor(r))
             }
-            GridColumn("Bill no", id: "no", min: 110, ideal: 130) { (r: JSON) in Text(r.str("no")).monospacedDigit() }
+            GridColumn("Bill no", id: "no", min: 110, ideal: 150) { (r: JSON) in Text(r.str("no")).monospacedDigit().lineLimit(1).truncationMode(.middle) }
             GridColumn("Supplier bill", id: "ref", min: 80, ideal: 110) { (r: JSON) in Text(r.str("ref")) }
             GridColumn("Party", id: "party", min: 140, ideal: 200) { (r: JSON) in Text(r.str("party")).lineLimit(2) }
             GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).monospacedDigit() }

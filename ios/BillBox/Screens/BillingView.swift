@@ -504,15 +504,18 @@ struct BillLine: Identifiable {
                     .buttonStyle(.plain)
                     .accessibilityLabel(detailsOpen ? "Hide party, payment and totals" : "Show party, payment and totals")
                     Spacer(minLength: 4)
-                    VStack(alignment: .trailing, spacing: 0) {
-                        ProgressView().controlSize(.mini).opacity(calculating ? 1 : 0)
-                        Text(t.map { Fmt.money($0.total) } ?? "₹0.00").font(.title3.weight(.bold)).monospacedDigit().foregroundStyle(Theme.accent)
-                            .lineLimit(1).minimumScaleFactor(0.5)
-                    }
-                    saveButton(ready: ready)
+                    // the total stays on one baseline; the "working" spinner sits beside it instead of pushing it down
+                    Text(t.map { Fmt.money($0.total) } ?? "₹0.00").font(.dsMoney.weight(.bold)).monospacedDigit().foregroundStyle(Theme.accent)
+                        .lineLimit(1).minimumScaleFactor(0.5)
+                        .layoutPriority(1)
+                        .overlay(alignment: .topTrailing) {
+                            ProgressView().controlSize(.mini).opacity(calculating ? 1 : 0).offset(x: 6, y: -10)
+                        }
+                        .accessibilityLabel("Bill total \(t.map { Fmt.money($0.total) } ?? "₹0.00")")
+                    saveButton(ready: ready, compact: true)
                 }
             }
-            .padding(10)
+            .padding(.horizontal, DS.Space.s).padding(.vertical, 10)
             .background(Theme.card)
         }
     }
@@ -624,10 +627,14 @@ struct BillLine: Identifiable {
         }
     }
 
-    private func saveButton(ready: Bool) -> some View {
+    /// `compact`: the bar under the bill on a phone, where "Save & print" was cut off; there it reads "Save" and never shrinks.
+    private func saveButton(ready: Bool, compact: Bool = false) -> some View {
         Button { Task { await save() } } label: {
-            Label(editingId != nil ? "Update" : "Save & print", systemImage: "printer").lineLimit(1)
+            Label(editingId != nil ? "Update" : (compact ? "Save" : "Save & print"), systemImage: "printer").lineLimit(1)
+                .fixedSize()
+                .frame(minHeight: compact ? 30 : nil)
         }
+        .accessibilityLabel(editingId != nil ? "Update bill" : "Save and print bill")
         .buttonStyle(.borderedProminent)
         .keyboardShortcut("s", modifiers: .command)
         .disabled(busy || lines.isEmpty || (!ready && errorText != nil))
