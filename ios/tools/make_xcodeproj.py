@@ -75,12 +75,18 @@ def phase(kind, target, files):
 
 app_src = phase('Sources', 'app', build_files('app', app_sources + core_sources))
 app_res = phase('Resources', 'app', build_files('app', [assets, pdfreader]))
-# ---- Swift packages: Pow (EmergeTools, MIT) for the dashboard and billing effects
-pow_pkg, pow_dep, pow_build = uid('package', 'Pow'), uid('packagedep', 'app', 'Pow'), uid('build', 'app', 'Pow')
-add(pow_pkg, f'{pow_pkg} /* XCRemoteSwiftPackageReference "Pow" */ = {{isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/EmergeTools/Pow"; requirement = {{kind = upToNextMajorVersion; minimumVersion = 1.0.0; }}; }};')
-add(pow_dep, f'{pow_dep} /* Pow */ = {{isa = XCSwiftPackageProductDependency; package = {pow_pkg} /* XCRemoteSwiftPackageReference "Pow" */; productName = Pow; }};')
-add(pow_build, f'{pow_build} /* Pow in Frameworks */ = {{isa = PBXBuildFile; productRef = {pow_dep} /* Pow */; }};')
-app_fw = phase('Frameworks', 'app', [pow_build])
+# ---- Swift packages (MIT): Pow (EmergeTools) for effects, PopupView (exyte) for toasts
+packages = [('Pow', 'https://github.com/EmergeTools/Pow', '1.0.0'), ('PopupView', 'https://github.com/exyte/PopupView.git', '4.0.0')]
+pkg_ids, dep_ids, pkg_builds = [], [], []
+for name, url, version in packages:
+    pkg, dep, bld = uid('package', name), uid('packagedep', 'app', name), uid('build', 'app', name)
+    add(pkg, f'{pkg} /* XCRemoteSwiftPackageReference "{name}" */ = {{isa = XCRemoteSwiftPackageReference; repositoryURL = "{url}"; requirement = {{kind = upToNextMajorVersion; minimumVersion = {version}; }}; }};')
+    add(dep, f'{dep} /* {name} */ = {{isa = XCSwiftPackageProductDependency; package = {pkg} /* XCRemoteSwiftPackageReference "{name}" */; productName = {name}; }};')
+    add(bld, f'{bld} /* {name} in Frameworks */ = {{isa = PBXBuildFile; productRef = {dep} /* {name} */; }};')
+    pkg_ids.append(pkg); dep_ids.append(dep); pkg_builds.append(bld)
+pkg_list = ''.join(f'\n\t\t\t\t{i},' for i in pkg_ids)
+dep_list = ''.join(f'\n\t\t\t\t{i},' for i in dep_ids)
+app_fw = phase('Frameworks', 'app', pkg_builds)
 test_src = phase('Sources', 'tests', build_files('tests', core_sources + test_sources + ['BillBox/Shared/BillMath.swift']))
 test_res = phase('Resources', 'tests', build_files('tests', [golden]))
 test_fw = phase('Frameworks', 'tests', [])
@@ -104,9 +110,9 @@ def config_list(owner, debug, release):
     return i
 
 proj_debug = config('Debug', 'project', {**common, 'DEBUG_INFORMATION_FORMAT': 'dwarf', 'ONLY_ACTIVE_ARCH': 'YES', 'SWIFT_OPTIMIZATION_LEVEL': '-Onone',
-                                         'SWIFT_ACTIVE_COMPILATION_CONDITIONS': 'DEBUG', 'ENABLE_TESTABILITY': 'YES', 'GCC_OPTIMIZATION_LEVEL': '0'})
+                                         'SWIFT_ACTIVE_COMPILATION_CONDITIONS': 'DEBUG XCODE_BUILD', 'ENABLE_TESTABILITY': 'YES', 'GCC_OPTIMIZATION_LEVEL': '0'})
 proj_release = config('Release', 'project', {**common, 'DEBUG_INFORMATION_FORMAT': 'dwarf-with-dsym', 'SWIFT_OPTIMIZATION_LEVEL': '-O',
-                                             'SWIFT_COMPILATION_MODE': 'wholemodule', 'VALIDATE_PRODUCT': 'YES'})
+                                             'SWIFT_COMPILATION_MODE': 'wholemodule', 'SWIFT_ACTIVE_COMPILATION_CONDITIONS': 'XCODE_BUILD', 'VALIDATE_PRODUCT': 'YES'})
 proj_list = config_list('project', proj_debug, proj_release)
 
 app_settings = {'PRODUCT_NAME': 'BillBox', 'PRODUCT_BUNDLE_IDENTIFIER': 'com.local.billbox', 'INFOPLIST_FILE': plist,
@@ -123,8 +129,7 @@ add(app_target, f'''{app_target} /* BillBox */ = {{isa = PBXNativeTarget; buildC
 				{app_src} /* Sources */,
 				{app_fw} /* Frameworks */,
 				{app_res} /* Resources */,
-			); buildRules = (); dependencies = (); name = BillBox; packageProductDependencies = (
-				{pow_dep} /* Pow */,
+			); buildRules = (); dependencies = (); name = BillBox; packageProductDependencies = ({dep_list}
 			); productName = BillBox; productReference = {app_product} /* BillBox.app */; productType = "com.apple.product-type.application"; }};''')
 add(test_target, f'''{test_target} /* BillBoxTests */ = {{isa = PBXNativeTarget; buildConfigurationList = {test_list}; buildPhases = (
 				{test_src} /* Sources */,
@@ -136,8 +141,7 @@ project = uid('project')
 root_group = group_for('')[0]
 add(project, f'''{project} /* Project object */ = {{isa = PBXProject; attributes = {{BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1420; LastUpgradeCheck = 1420; TargetAttributes = {{ {app_target} = {{CreatedOnToolsVersion = 14.2;}}; {test_target} = {{CreatedOnToolsVersion = 14.2;}}; }}; }};
 			buildConfigurationList = {proj_list}; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, );
-			mainGroup = {root_group}; packageReferences = (
-				{pow_pkg} /* XCRemoteSwiftPackageReference "Pow" */,
+			mainGroup = {root_group}; packageReferences = ({pkg_list}
 			); productRefGroup = {products_group} /* Products */; projectDirPath = ""; projectRoot = ""; targets = (
 				{app_target} /* BillBox */,
 				{test_target} /* BillBoxTests */,

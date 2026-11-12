@@ -167,15 +167,17 @@ struct DashSnap {
             }
         }
         .foregroundStyle(.white)
-        .padding(16)
-        .background(LinearGradient(colors: [Theme.accent, Theme.accent.opacity(0.72)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: 16))
+        .padding(18)
+        // the glow is drawn from the header's shape only (a shadow on the whole content redrew every text while scrolling)
+        .background(HeroBackground().clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: Theme.accent.opacity(0.28), radius: 18, y: 8))
     }
 
     private func quick(_ title: String, _ symbol: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Label(title, systemImage: symbol).font(.callout.weight(.medium)).padding(.horizontal, 12).padding(.vertical, 8)
-                .background(Color.white.opacity(0.2), in: Capsule())
+            Label(title, systemImage: symbol).font(.callout.weight(.medium)).padding(.horizontal, 13).padding(.vertical, 8)
+                .background(Color.white.opacity(0.18), in: Capsule())
+                .overlay(Capsule().stroke(Color.white.opacity(0.28), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
     }
@@ -196,8 +198,9 @@ struct DashSnap {
                         ForEach(chips.indices, id: \.self) { i in
                             let c = chips[i]
                             Button(action: c.3) {
-                                Label(c.0, systemImage: c.1).font(.callout).padding(.horizontal, 12).padding(.vertical, 7)
+                                Label(c.0, systemImage: c.1).font(.callout.weight(.medium)).padding(.horizontal, 12).padding(.vertical, 7)
                                     .foregroundStyle(c.2).background(c.2.opacity(0.12), in: Capsule())
+                                    .overlay(Capsule().stroke(c.2.opacity(0.25), lineWidth: 0.5))
                             }
                             .buttonStyle(.plain)
                         }

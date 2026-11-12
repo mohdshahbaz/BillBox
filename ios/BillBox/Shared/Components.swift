@@ -288,13 +288,16 @@ enum BulkOutcome { case deleted, archived, failed(label: String, reason: String)
     var tint: Color = .orange
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: symbol).foregroundStyle(tint)
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(tint)
+                .frame(width: 26, height: 26).background(tint.opacity(0.16), in: Circle())
             Text(text).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 3)
         }
         .font(.callout)
-        .padding(10)
-        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .padding(12)
+        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(tint.opacity(0.22), lineWidth: 0.5))
     }
 }
 

@@ -270,7 +270,8 @@ struct CardBackground: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: r, style: .continuous)
                     .fill(Theme.card)
-                    .shadow(color: Color.black.opacity(style == "soft" ? 0.08 : 0), radius: style == "soft" ? 7 : 0, x: 0, y: style == "soft" ? 3 : 0)
+                    .shadow(color: Color.black.opacity(style == "soft" ? 0.05 : 0), radius: style == "soft" ? 1.5 : 0, x: 0, y: style == "soft" ? 1 : 0)
+                    .shadow(color: Color.black.opacity(style == "soft" ? 0.07 : 0), radius: style == "soft" ? 14 : 0, x: 0, y: style == "soft" ? 6 : 0)
             )
             .overlay(RoundedRectangle(cornerRadius: r, style: .continuous).stroke(Color.primary.opacity(style == "outline" ? 0.16 : 0.06), lineWidth: style == "outline" ? 1 : 0.5))
     }

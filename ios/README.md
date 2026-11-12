@@ -1,6 +1,6 @@
 # BillBox for iPhone
 
-The iPhone version of BillBox, with the same functions as BillBox for macOS v14.11. It is native Swift and SwiftUI, needs iOS 18 or later and runs on iPhone XR and newer. It uses Swift Charts for the dashboard and [Pow](https://github.com/EmergeTools/Pow) (MIT, added by Swift Package Manager) for its effects.
+The iPhone version of BillBox, with the same functions as BillBox for macOS v14.11. It is native Swift and SwiftUI, needs iOS 18 or later and runs on iPhone XR and newer. It uses Swift Charts for the dashboard [Pow](https://github.com/EmergeTools/Pow) for its effects and [PopupView](https://github.com/exyte/PopupView) for its message banners (both MIT, added by Swift Package Manager). Code for the real iOS SDK sits behind `#if XCODE_BUILD`, a flag only the Xcode project sets.
 
 Everything runs on the phone. There is no server and no Node. The app keeps the same SQLite files as the Mac (one per company plus `registry.db`), so backups move between Mac and iPhone in both directions.
 

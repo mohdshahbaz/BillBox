@@ -50,6 +50,7 @@
 		05DB26F7B5AF09F4BD87C4A2 /* Drive.swift in tests */ = {isa = PBXBuildFile; fileRef = B3E2778F050256C8F92E41FC /* Drive.swift */; };
 		0743B07A3C3626701E820707 /* PDFParser.swift in app */ = {isa = PBXBuildFile; fileRef = 3F61CCFECB1C77CC4A2C7DA7 /* PDFParser.swift */; };
 		09A533E4A1E6CF1F22AEC845 /* Years.swift in tests */ = {isa = PBXBuildFile; fileRef = 322E879B56127D33215A7C14 /* Years.swift */; };
+		09F7A6ED251DF783CE28D4E6 /* PopupView */ = {isa = XCSwiftPackageProductDependency; package = D7F918EA27743E36A943D8EA /* XCRemoteSwiftPackageReference "PopupView" */; productName = PopupView; };
 		0B980B0AB648CE196376EDE1 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "ARCHITECTURE.md"; sourceTree = "<group>"; };
 		0BF809BD56B5D91BF6950DA4 = {isa = PBXGroup; children = (
 				27C97B3281ECA04BAB0996F5,
@@ -132,7 +133,8 @@
 		46F86FAA6BBF9AC94A7E4595 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1420; LastUpgradeCheck = 1420; TargetAttributes = { ACC9652797AB670E77D9DAEA = {CreatedOnToolsVersion = 14.2;}; EAD339D2F2744DEFF36925C1 = {CreatedOnToolsVersion = 14.2;}; }; };
 			buildConfigurationList = A1806D8FE767B99D399E13F3; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, );
 			mainGroup = 0BF809BD56B5D91BF6950DA4; packageReferences = (
-				ABAA20748FF56AFAFDCDCF43 /* XCRemoteSwiftPackageReference "Pow" */,
+				ABAA20748FF56AFAFDCDCF43,
+				D7F918EA27743E36A943D8EA,
 			); productRefGroup = 2AC8BA37DAC32D5437812408 /* Products */; projectDirPath = ""; projectRoot = ""; targets = (
 				ACC9652797AB670E77D9DAEA /* BillBox */,
 				EAD339D2F2744DEFF36925C1 /* BillBoxTests */,
@@ -199,7 +201,9 @@
 		5989315B529B6F684F52F4B3 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Components.swift"; sourceTree = "<group>"; };
 		59DE0218B6395D0461ADFEA9 /* DriveBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DriveBackup.swift"; sourceTree = "<group>"; };
 		5AD91CE2D9B2DAC1863578A9 /* ItemsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ItemsAPI.swift"; sourceTree = "<group>"; };
+		5ADBFB384328E3CE195018EC /* PopupView in Frameworks */ = {isa = PBXBuildFile; productRef = 09F7A6ED251DF783CE28D4E6 /* PopupView */; };
 		5BB153421891C2461FBF2EE1 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel.swift"; sourceTree = "<group>"; };
+		5D8F46AD4CF5EA8C5B522A05 /* DesignSystem.swift in app */ = {isa = PBXBuildFile; fileRef = AE4F86D200A479AFDE431F9C /* DesignSystem.swift */; };
 		5DB981CBB122016133860C3C /* ItemToolsView.swift in app */ = {isa = PBXBuildFile; fileRef = 403A2FF73505346220CDA30A /* ItemToolsView.swift */; };
 		5EFECA87EDB6D40348F6D7C5 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -237,6 +241,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = "18.0";
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = XCODE_BUILD;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = "5.0";
@@ -295,6 +300,7 @@
 			}; name = Release; };
 		A0FF3588B4527748ED8FDEE6 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (
 				B586A997BD27B810FB1A365A,
+				5ADBFB384328E3CE195018EC,
 			); runOnlyForDeploymentPostprocessing = 0; };
 		A1420CF0BD24443ED276F7D7 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReportsView.swift"; sourceTree = "<group>"; };
 		A14F96B8ED7550269C638103 /* PrintOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PrintOptions.swift"; sourceTree = "<group>"; };
@@ -359,6 +365,7 @@
 				FD8B534FFAEC34F5CC0AE0A3,
 				7C91FA706ED864FCB686B9D2,
 				A9255E448A712D94BEFD8F9E,
+				5D8F46AD4CF5EA8C5B522A05,
 				F6C438F6DE7774DB20512993,
 				A56674B117135AC87488BAA4,
 				F7143331A61F6240F988EF23,
@@ -408,10 +415,12 @@
 				A0FF3588B4527748ED8FDEE6 /* Frameworks */,
 				F585E51B91F5C982DE0847BD /* Resources */,
 			); buildRules = (); dependencies = (); name = BillBox; packageProductDependencies = (
-				8BE8E923763221BF4DE7D2E2 /* Pow */,
+				8BE8E923763221BF4DE7D2E2,
+				09F7A6ED251DF783CE28D4E6,
 			); productName = BillBox; productReference = F91288DB192297DC903FE08C /* BillBox.app */; productType = "com.apple.product-type.application"; };
 		AD79EDCE3FD30F731DDA0C2E /* PDFText.swift in app */ = {isa = PBXBuildFile; fileRef = 33A7C9C17650BADA28AE7BA6 /* PDFText.swift */; };
 		AE10AA8BCDFEF7C1BDA3AF71 /* AppModel.swift in app */ = {isa = PBXBuildFile; fileRef = 5BB153421891C2461FBF2EE1 /* AppModel.swift */; };
+		AE4F86D200A479AFDE431F9C /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DesignSystem.swift"; sourceTree = "<group>"; };
 		AE7714EA600DB73CB2C20041 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardView.swift"; sourceTree = "<group>"; };
 		AF95DB3CB75B57F5E2BB067B /* PaymentPhotoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaymentPhotoView.swift"; sourceTree = "<group>"; };
 		B3E2778F050256C8F92E41FC /* Drive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Drive.swift"; sourceTree = "<group>"; };
@@ -445,6 +454,7 @@
 				EE4A22BA34F46CD4F85C9443,
 				5989315B529B6F684F52F4B3,
 				DA7B2602F3D4924A70009CD8,
+				AE4F86D200A479AFDE431F9C,
 				59DE0218B6395D0461ADFEA9,
 				988DC8802A21C56A6F652167,
 				44C473AE553C953FE620B9F6,
@@ -511,7 +521,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG XCODE_BUILD";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = "5.0";
 				TARGETED_DEVICE_FAMILY = 1;
@@ -520,6 +530,7 @@
 		D5400806AFA697D620185B72 /* BillBoxTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BillBoxTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D5A8CC12CAC203888072D10B /* PartiesView.swift in app */ = {isa = PBXBuildFile; fileRef = CEE33F11B69EAB99C4684126 /* PartiesView.swift */; };
 		D712C3B4FFA27BFA8D5C8D38 /* SimSelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SimSelfTest.swift"; sourceTree = "<group>"; };
+		D7F918EA27743E36A943D8EA /* XCRemoteSwiftPackageReference "PopupView" */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/exyte/PopupView.git"; requirement = {kind = upToNextMajorVersion; minimumVersion = 4.0.0; }; };
 		D8F9EF8E05820AF0088B4C50 = {isa = PBXGroup; children = (
 				A709B4725F9AFEB274F070DE,
 				4A52D54F351D8221E704736C,
