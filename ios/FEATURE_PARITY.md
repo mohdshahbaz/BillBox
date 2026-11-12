@@ -794,7 +794,7 @@ The "Server is not running" screen, Start server, Choose backend folder, `server
   - beat: active parties on that salesman's routes visiting that weekday (the `days` list or the old `day_of_week`); outstanding up to the FY end; last order up to the FY end; total outstanding
 - [x] ✅ **13.10 GST outward**:
   - per rate from invoice lines of the month
-  - the IGST column carries CGST + SGST + IGST
+  - the IGST column carries only IGST (inter-state); total tax = CGST + SGST + IGST
   - B2B (party GSTIN not empty) and B2C splits
   - invoice count, round off
   - input credit = purchase taxes of the month
