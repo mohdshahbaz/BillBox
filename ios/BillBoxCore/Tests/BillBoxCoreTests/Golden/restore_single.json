@@ -1,0 +1,1 @@
+[{"method": "POST", "path": "/backup/restore", "body": {"file": "{macbackup}/AK_Enterprises_2025-26_4.db", "company_id": 1}}, {"op": "dump"}]

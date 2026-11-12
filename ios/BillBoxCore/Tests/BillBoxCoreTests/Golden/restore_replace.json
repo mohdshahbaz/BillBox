@@ -1,0 +1,1 @@
+[{"method": "POST", "path": "/backup/restore", "body": {"folder": "{macbackup}"}}, {"op": "dump"}]
