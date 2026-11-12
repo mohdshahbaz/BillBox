@@ -50,7 +50,7 @@ import SwiftUI
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             DataGrid(rows, layoutKey: "book-\(type)") {
-                GridColumn("Date", id: "date", min: 104, ideal: 108) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
+                GridColumn("Date", id: "date", min: 122, ideal: 124) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
                 GridColumn(sales ? "Invoice" : type == "debit" ? "Note no" : "Our ref", id: "no", min: 90, ideal: 120) { (r: JSON) in Text(r.str("no")).mono() }
                 GridColumn(type == "debit" ? "Against bill" : "Supplier bill", id: "ref", min: 80, ideal: 110) { (r: JSON) in Text(r.str("ref")) }
                 GridColumn("Party", id: "party", min: 140, ideal: 220) { (r: JSON) in Text(r.str("party")).lineLimit(2) }

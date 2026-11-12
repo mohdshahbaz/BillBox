@@ -64,7 +64,7 @@ struct DNLine: Identifiable, Equatable {
             Divider()
             Button(role: .destructive) { deleting = r } label: { Label("Delete…", systemImage: "trash") }
         }) }) {
-            GridColumn("Date", id: "date", min: 104, ideal: 108) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
+            GridColumn("Date", id: "date", min: 122, ideal: 124) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
             GridColumn("Note no", id: "no", min: 120, ideal: 140, sort: { (r: JSON) -> Any? in r.str("note_no") }) { (r: JSON) in Text(r.str("note_no")).monospacedDigit() }
             GridColumn("Supplier", id: "party", min: 140, ideal: 200) { (r: JSON) in Text(r.str("party")).lineLimit(2) }
             GridColumn("Against bill", id: "ref", min: 90, ideal: 120, sort: { (r: JSON) -> Any? in r.str("against_bill") }) { (r: JSON) in Text(r.str("against_bill")) }

@@ -351,7 +351,7 @@ extension PartiesView {
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 DataGrid(entries, layoutKey: "ledger", onOpen: { askDelete($0) }, menu: { AnyView(rowMenu($0)) }) {
-                    GridColumn("Date", id: "date", min: 104, ideal: 108) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
+                    GridColumn("Date", id: "date", min: 122, ideal: 124) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
                     GridColumn("Type", id: "type", min: 70, ideal: 90) { (r: JSON) in Text(r.str("type")) }
                     GridColumn("Reference", id: "ref", min: 80, ideal: 120, sort: { (r: JSON) -> Any? in r.str("ref_no") }) { (r: JSON) in Text(r.str("ref_no")) }
                     GridColumn("Narration", id: "narration", min: 120, ideal: 220) { (r: JSON) in Text(r.str("narration")).lineLimit(1) }

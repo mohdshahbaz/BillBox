@@ -95,7 +95,7 @@ import SwiftUI
                 Button(role: .destructive) { confirmBulkDelete = true } label: { Label("Delete \(selection.count) selected…", systemImage: "trash") }
             }
         }) }) {
-            GridColumn("Date", id: "date", min: 104, ideal: 108) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
+            GridColumn("Date", id: "date", min: 122, ideal: 124) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
             GridColumn("Type", id: "type", min: 70, ideal: 80, sort: { (r: JSON) -> Any? in r.str("type") }) { (r: JSON) in
                 StatusPill(text: billTypeName(r), tint: billTypeColor(r))
             }
