@@ -115,6 +115,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      # the Swift packages (Pow, PopupView) are kept between runs instead of cloned each time
+      - uses: actions/cache@v4
+        with:
+          path: ios/build/spm
+          key: spm-${{ runner.os }}-${{ hashFiles('ios/tools/make_xcodeproj.py') }}
+          restore-keys: spm-${{ runner.os }}-
       - name: Build BillBox.ipa (unsigned)
         working-directory: ios
         run: |
@@ -123,7 +129,8 @@ jobs:
           mkdir -p build
           plutil -replace BillBoxEdition -string "${{ inputs.edition }}" BillBox/Info.plist
           xcodebuild archive -project BillBox.xcodeproj -scheme BillBox -configuration Release -destination "generic/platform=iOS" \
-            -archivePath build/BillBox.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            -archivePath build/BillBox.xcarchive -clonedSourcePackagesDirPath build/spm CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO DEBUG_INFORMATION_FORMAT=dwarf \
             MARKETING_VERSION=${{ inputs.version }} CURRENT_PROJECT_VERSION=${{ inputs.code }} > build/archive.log 2>&1 || { grep -E "error:" build/archive.log | sort -u | head -20 | sed 's/^/::error::/'; tail -60 build/archive.log; exit 1; }
           test -d build/BillBox.xcarchive/Products/Applications/BillBox.app
           mkdir -p build/ipa/Payload ../dist
