@@ -425,7 +425,8 @@ class MargSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val pa
         val sums = mutableListOf(lab("SUB TOTAL", "Taxable Amount", "Gross Amount") to inv.num("subtotal"))
         if (inv.num("discount") > 0) sums.add(lab("LESS DISCOUNT", "Less : Discount", "Scheme / Discount") to -inv.num("discount"))
         if (inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005) sums.add(lab("TAXABLE VALUE", "Taxable Value", "Taxable Value") to inv.num("taxable"))
-        if (inter) sums.add(lab("IGST PAYABLE", "Add : IGST", "IGST") to inv.num("igst"))
+        if (gstByRate(co)) gstRateLines(inv).forEach { (k, v) -> sums.add(lab(k.uppercase(), "Add : $k", k) to v) }
+        else if (inter) sums.add(lab("IGST PAYABLE", "Add : IGST", "IGST") to inv.num("igst"))
         else { sums.add(lab("SGST PAYABLE", "Add : SGST", "SGST") to inv.num("sgst")); sums.add(lab("CGST PAYABLE", "Add : CGST", "CGST") to inv.num("cgst")) }
         // the total stays rounded; the round-off line is not printed
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) sums.add("PAID" to inv.num("paid"))

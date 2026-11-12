@@ -73,8 +73,11 @@ data class Spec(val w: Float, val h: Float, val m: Float, val rowH: Float, val t
         val f = fs
         var n = 1
         if (inv.num("discount") > 0) n += 2
-        if (inv.num("cgst") > 0) n += 2
-        if (inv.num("igst") > 0) n += 1
+        if (gstByRate(co)) n += gstRateLines(inv).size
+        else {
+            if (inv.num("cgst") > 0) n += 2
+            if (inv.num("igst") > 0) n += 1
+        }
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) n += 1
         val right = 4 + n * 9f * f + 4 + 19f * f
         val left = leftOther(co, inv, f)
@@ -153,6 +156,21 @@ fun bankTabPer(co: J, inv: J, g: Spec): Int {
 fun bankTabFits(co: J, inv: J, g: Spec): Boolean = bankTabHeight(co, g.fs) > 0f && leftOther(co, inv, g.fs) + 2 <= g.totals + 0.5f
 
 /** One row of the HSN-wise GST summary: an HSN code at one GST rate, its taxable value and tax. */
+/** Settings › Printing › GST in the totals: "rate" prints one line per GST rate ("GST @5%", "IGST @5%") instead of CGST and SGST. */
+fun gstByRate(co: J): Boolean = co.str("print_gst_lines") == "rate"
+
+/** The bill's tax as one line per GST rate, lowest rate first: ("GST @5%", 1917.75), or IGST on a bill to another state. */
+fun gstRateLines(inv: J): List<Pair<String, Double>> {
+    val amt = linkedMapOf<Double, Double>(); val inter = mutableSetOf<Double>()
+    for (l in inv.list("lines")) {
+        val r = l.num("gst_rate"); val tax = l.num("cgst") + l.num("sgst") + l.num("igst")
+        if (kotlin.math.abs(tax) < 0.005) continue
+        amt[r] = (amt[r] ?: 0.0) + tax
+        if (l.num("igst") > 0) inter.add(r)
+    }
+    return amt.keys.sorted().map { r -> ((if (r in inter) "IGST" else "GST") + " @${Fmt.qty(r)}%") to (amt[r] ?: 0.0) }
+}
+
 data class HsnGst(val hsn: String, val rate: Double, val taxable: Double, val cgst: Double, val sgst: Double, val igst: Double) { val gst get() = cgst + sgst + igst }
 
 /** The bill's items grouped by HSN and GST rate, in the order they first appear. */
@@ -481,8 +499,11 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         sum("Items total", inv.num("subtotal"))
         if (inv.num("discount") > 0) sum("Less discount", -inv.num("discount"))
         if (!compactPrint(co) || inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005) sum("Taxable value", inv.num("taxable"))
-        if (inv.num("cgst") > 0) { sum("CGST", inv.num("cgst")); sum("SGST", inv.num("sgst")) }
-        if (inv.num("igst") > 0) sum("IGST", inv.num("igst"))
+        if (gstByRate(co)) gstRateLines(inv).forEach { (k, v) -> sum(k, v) }
+        else {
+            if (inv.num("cgst") > 0) { sum("CGST", inv.num("cgst")); sum("SGST", inv.num("sgst")) }
+            if (inv.num("igst") > 0) sum("IGST", inv.num("igst"))
+        }
         // the total stays rounded; the round-off line is not printed
         if (inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005) sum("Paid", inv.num("paid"))
         val gh = 19f * fs

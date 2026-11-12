@@ -1002,6 +1002,8 @@ private fun PrintOptions() {
     SectionHeader("Bank details")
     SwitchRow("Print the bank details", flag("print_bank_block", true), { setFlag("print_bank_block", it) })
     SwitchRow("Compact totals (more item rows on each page)", flag("print_compact", true), { setFlag("print_compact", it) })
+    val (gstLines, setGstLines) = settingChoice("print_gst_lines", "split")
+    Choice("GST in the totals", listOf("split" to "CGST and SGST", "rate" to "One line per rate (GST @5%)"), gstLines, setGstLines)
     val (bankSz, setBankSz) = settingChoice("print_bank_size", "m")
     Choice("Bank details size", listOf("s" to "Small", "m" to "Normal", "l" to "Large", "xl" to "Extra large"), bankSz, setBankSz)
     listOf("bank_name" to "Bank name", "bank_ac_name" to "Account name", "bank_ac_no" to "Account number", "bank_ifsc" to "IFSC code",

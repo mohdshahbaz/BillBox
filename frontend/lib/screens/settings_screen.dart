@@ -260,6 +260,7 @@ class _PrintingState extends State<_Printing> {
   late PrintLayout layout;
   late bool auto;
   String printerName = '';
+  String gstLines = 'split';
 
   @override
   void initState() {
@@ -268,6 +269,7 @@ class _PrintingState extends State<_Printing> {
     layout = PrintLayoutInfo.parse(s['print_layout'] as String?);
     auto = s['print_auto'] == '1';
     printerName = '${s['print_printer'] ?? ''}';
+    gstLines = s['print_gst_lines'] == 'rate' ? 'rate' : 'split';
     _scan();
   }
 
@@ -307,6 +309,14 @@ class _PrintingState extends State<_Printing> {
               options: {'': 'Ask every time', for (final p in printers) p.name: p.name},
               onChanged: (v) => printerName = v ?? '',
             ),
+          const SizedBox(height: 12),
+          AppDropdown<String>(
+            width: 480,
+            label: 'GST in the totals',
+            value: gstLines,
+            options: const {'split': 'CGST and SGST', 'rate': 'One line per rate (GST @5%)'},
+            onChanged: (v) => gstLines = v ?? gstLines,
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Print straight after saving a bill'),
@@ -317,7 +327,7 @@ class _PrintingState extends State<_Printing> {
           const SizedBox(height: 8),
           FilledButton(
             onPressed: () => guard(context, () async {
-              await AppScope.read(context).saveSettings({'print_layout': layout.name, 'print_printer': printerName, 'print_auto': auto ? '1' : '0'});
+              await AppScope.read(context).saveSettings({'print_layout': layout.name, 'print_printer': printerName, 'print_auto': auto ? '1' : '0', 'print_gst_lines': gstLines});
               if (context.mounted) toast(context, 'Printing settings saved for this company');
             }),
             child: const Text('Save'),

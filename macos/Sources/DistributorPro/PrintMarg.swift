@@ -630,7 +630,8 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
         var rows: [(String, Double)] = [(busy ? "Taxable Amount" : bizom ? "Gross Amount" : "SUB TOTAL", inv.num("subtotal"))]
         if inv.num("discount") > 0 { rows.append((busy ? "Less : Discount" : bizom ? "Scheme / Discount" : "LESS DISCOUNT", -inv.num("discount"))) }
         if inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005 { rows.append((busy || bizom ? "Taxable Value" : "TAXABLE VALUE", inv.num("taxable"))) }
-        if inter { rows.append((busy ? "Add : IGST" : bizom ? "IGST" : "IGST PAYABLE", inv.num("igst"))) }
+        if gstByRate(co) { for r in gstRateLines(inv) { rows.append((busy ? "Add : " + r.0 : bizom ? r.0 : r.0.uppercased(), r.1)) } }
+        else if inter { rows.append((busy ? "Add : IGST" : bizom ? "IGST" : "IGST PAYABLE", inv.num("igst"))) }
         else { rows.append((busy ? "Add : SGST" : bizom ? "SGST" : "SGST PAYABLE", inv.num("sgst"))); rows.append((busy ? "Add : CGST" : bizom ? "CGST" : "CGST PAYABLE", inv.num("cgst"))) }
         // the total stays rounded; the round-off line is not printed
         if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { rows.append(("PAID", inv.num("paid"))) }

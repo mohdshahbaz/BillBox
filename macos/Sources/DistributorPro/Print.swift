@@ -80,8 +80,11 @@ struct Spec {
         let f = fs
         var n = 1                                                               // items total
         if inv.num("discount") > 0 { n += 2 }                                   // less discount, taxable value
-        if inv.num("cgst") > 0 { n += 2 }
-        if inv.num("igst") > 0 { n += 1 }
+        if gstByRate(co) { n += gstRateLines(inv).count }
+        else {
+            if inv.num("cgst") > 0 { n += 2 }
+            if inv.num("igst") > 0 { n += 1 }
+        }
         if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { n += 1 }
         let right = CGFloat(n) * 9 * f + 6 + 17 * f
         let left = leftOther(co, inv, f)
@@ -191,6 +194,22 @@ func bankRows(_ co: JSON) -> [(String, String)] {
 }
 
 /// One row of the HSN-wise GST summary: an HSN code at one GST rate, its taxable value and tax.
+/// Settings › Printing › GST in the totals: "rate" prints one line per GST rate ("GST @5%", "IGST @5%") instead of CGST and SGST.
+func gstByRate(_ co: JSON) -> Bool { co.str("print_gst_lines") == "rate" }
+
+/// The bill's tax as one line per GST rate, lowest rate first: ("GST @5%", 1917.75), or IGST on a bill to another state.
+func gstRateLines(_ inv: JSON) -> [(String, Double)] {
+    var rates: [Double] = [], amt: [Double: Double] = [:], inter: [Double: Bool] = [:]
+    for l in inv.list("lines") {
+        let r = l.num("gst_rate"), tax = l.num("cgst") + l.num("sgst") + l.num("igst")
+        if abs(tax) < 0.005 { continue }
+        if amt[r] == nil { rates.append(r) }
+        amt[r, default: 0] += tax
+        if l.num("igst") > 0 { inter[r] = true }
+    }
+    return rates.sorted().map { r in ((inter[r] == true ? "IGST" : "GST") + " @\(Fmt.qty(r))%", amt[r] ?? 0) }
+}
+
 struct HsnGst { let hsn: String; let rate, taxable, cgst, sgst, igst: Double; var gst: Double { cgst + sgst + igst } }
 
 /// The bill's items grouped by HSN and GST rate, in the order they first appear.
@@ -626,8 +645,12 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                     if inv.num("discount") > 0 { sumRow("Less discount", -inv.num("discount")) }
                     // compact: the taxable value only when it differs from the items total
                     if !compactPrint(co) || inv.num("discount") > 0 || abs(inv.num("taxable") - inv.num("subtotal")) > 0.005 { sumRow("Taxable value", inv.num("taxable")) }
-                    if inv.num("cgst") > 0 { sumRow("CGST", inv.num("cgst")); sumRow("SGST", inv.num("sgst")) }
-                    if inv.num("igst") > 0 { sumRow("IGST", inv.num("igst")) }
+                    if gstByRate(co) {
+                        ForEach(Array(gstRateLines(inv).enumerated()), id: \.offset) { _, r in sumRow(r.0, r.1) }
+                    } else {
+                        if inv.num("cgst") > 0 { sumRow("CGST", inv.num("cgst")); sumRow("SGST", inv.num("sgst")) }
+                        if inv.num("igst") > 0 { sumRow("IGST", inv.num("igst")) }
+                    }
                     // the total stays rounded; the round-off line is not printed
                     if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { sumRow("Paid", inv.num("paid")) }
                 }

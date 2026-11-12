@@ -215,6 +215,21 @@ List<(String, bool)> _partyLines(Json inv) {
   return out;
 }
 
+/// The bill's tax as one line per GST rate, lowest rate first: ('GST @5%', 1917.75), or IGST on a bill to another state
+/// (Settings › Printing › GST in the totals: one line per rate, setting print_gst_lines = rate).
+List<(String, num)> _gstRateLines(Json inv) {
+  final amt = <num, num>{}, inter = <num>{};
+  for (final l in (inv['lines'] as List? ?? const []).cast<Json>()) {
+    final r = _n(l['gst_rate']), tax = _n(l['cgst']) + _n(l['sgst']) + _n(l['igst']);
+    if (tax.abs() < 0.005) continue;
+    amt[r] = (amt[r] ?? 0) + tax;
+    if (_n(l['igst']) > 0) inter.add(r);
+  }
+  final rates = amt.keys.toList()..sort();
+  String pct(num r) => r == r.roundToDouble() ? '${r.round()}' : '$r';
+  return [for (final r in rates) ('${inter.contains(r) ? 'IGST' : 'GST'} @${pct(r)}%', amt[r]!)];
+}
+
 /// The bill's items grouped by HSN and GST rate, in the order they first appear: (hsn, rate, taxable, cgst, sgst, igst).
 List<({String hsn, num rate, num taxable, num cgst, num sgst, num igst})> _hsnGst(Json inv) {
   final acc = <String, ({String hsn, num rate, num taxable, num cgst, num sgst, num igst})>{};
@@ -360,7 +375,9 @@ pw.Widget _totals(Json inv, Json co) {
             kv('Items total', _m(inv['subtotal'])),
             kv('Discount', '- ${_m(inv['discount'])}'),
             kv('Taxable value', _m(inv['taxable'])),
-            if (intra) ...[kv('CGST', _m(inv['cgst'])), kv('SGST', _m(inv['sgst']))] else kv('IGST', _m(inv['igst'])),
+            if (co['print_gst_lines'] == 'rate')
+              for (final r in _gstRateLines(inv)) kv(r.$1, _m(r.$2))
+            else if (intra) ...[kv('CGST', _m(inv['cgst'])), kv('SGST', _m(inv['sgst']))] else kv('IGST', _m(inv['igst'])),
             kv('Invoice total (Rs.)', _m(inv['total']), big: true),
             kv('Paid ${_m(inv['paid'])}', 'Balance ${_m(due)}'),
           ]),
