@@ -223,15 +223,19 @@ extension Router {
         let k = (kept.isEmpty ? all : kept).joined(separator: " ")
         return k.count >= 3 ? " \(k) " : nil
     }
+    /// Every place a beat lists: "Khajrana, New Palasia / Rajwada" → [" KHAJRANA ", " NEW PALASIA ", " RAJWADA "].
+    static func routeKeys(_ name: String) -> [String] {
+        name.split(whereSeparator: { ",;/&+|".contains($0) }).compactMap { routeKey(String($0)) }
+    }
 
     /// {matches: [{party_id, party_name, address, route_id, route_name}], unclear, unmatched, assigned}; apply → also assigns them.
     func autoAssignRoutes(_ db: Database, _ b: Row) throws -> Any {
         let apply = JS.truthy(b["apply"] ?? nil)
         let only: Set<Double>? = (unwrap(b["party_ids"] ?? nil) as? [Any]).map { ids in Set(ids.map { JS.number($0) }) }
-        let routes: [(id: Any?, name: String, words: [String], key: String?)] = try db.prepare("SELECT id, name FROM routes").all().compactMap { r in
+        let routes: [(id: Any?, name: String, words: [String], keys: [String])] = try db.prepare("SELECT id, name FROM routes").all().compactMap { r in
             let name = JS.string(r.v("name"))
             let w = Router.routePlaceWords(name)
-            return w.isEmpty ? nil : (id: r.v("id"), name: name, words: w, key: Router.routeKey(name))
+            return w.isEmpty ? nil : (id: r.v("id"), name: name, words: w, keys: Router.routeKeys(name))
         }
         let parties = try db.prepare("SELECT id, name, address FROM parties WHERE active=1 AND route_id IS NULL AND type <> 'SUPPLIER' ORDER BY name").all()
         var matches: [Row] = []
@@ -247,7 +251,7 @@ extension Router {
                 let inName = r.words.filter { nameW.contains($0) }.count
                 let inAddr = r.words.filter { !nameW.contains($0) && addrW.contains($0) }.count
                 if inName + inAddr == 0 { continue }
-                let phrase = r.key.map { text.contains($0) ? $0.count : 0 } ?? 0
+                let phrase = r.keys.filter { text.contains($0) }.map { $0.count }.max() ?? 0
                 scored.append((i: i, s: [inName, inAddr, phrase]))
             }
             if scored.isEmpty { unmatched += 1; continue }

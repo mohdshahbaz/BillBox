@@ -1,13 +1,14 @@
 /**
  * Auto-assign outlets to routes: a party with no route gets the route that shares a word with the party's name or
  * address (whole words, case and punctuation ignored), so route "Civil Lines Beat" takes "Gupta Store, Civil Hospital".
+ * A beat may list several places, "Khajrana, New Palasia / Rajwada": each place counts (split at , ; / & + |).
  * Words that say nothing about the place are not used: ROUTE, BEAT, weekdays, ROAD, NAGAR, MARKET, NEAR, MAIN… and
  * words under 3 letters or only digits.
  *
  * When several routes share words, the best is the one with
  *   1. more of its words in the party's name, then
  *   2. more of its words in the address, then
- *   3. its whole name written in the name or address, the longest such name first ("New Palasia" over "Palasia").
+ *   3. one of its places written whole in the name or address, the longest such place first ("New Palasia" over "Palasia").
  * Routes still level after that are skipped as unclear (the owner picks by hand).
  * Ported to ios/BillBoxCore/Sources/BillBoxCore/PartiesAPI.swift (autoAssignRoutes).
  */
@@ -18,18 +19,20 @@ const GENERIC = new Set(['ROAD', 'NAGAR', 'MARG', 'CHOWK', 'CHAURAHA', 'BAZAR', 
 const words = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
 const placeWords = (name) => [...new Set(words(name).filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !FILLER.has(w) && !GENERIC.has(w)))];
 
-/** The route's whole name without ROUTE / BEAT / weekdays, as " A B " (for rule 3); null if under 3 letters. */
+/** A place's whole name without ROUTE / BEAT / weekdays, as " A B " (for rule 3); null if under 3 letters. */
 function routeKey(name) {
   const all = words(name);
   const kept = all.filter((w) => !FILLER.has(w));
   const k = (kept.length ? kept : all).join(' ');
   return k.length >= 3 ? ` ${k} ` : null;
 }
+/** Every place a beat lists: "Khajrana, New Palasia / Rajwada" → [" KHAJRANA ", " NEW PALASIA ", " RAJWADA "]. */
+const routeKeys = (name) => String(name || '').split(/[,;/&+|]+/).map(routeKey).filter(Boolean);
 
 /** {matches: [{party_id, party_name, address, route_id, route_name}], unclear, unmatched}; apply → also assigns them. */
 function autoAssignRoutes(db, { apply = false, party_ids } = {}) {
   const routes = db.prepare('SELECT id, name FROM routes').all()
-    .map((r) => ({ id: r.id, name: r.name, words: placeWords(r.name), key: routeKey(r.name) })).filter((r) => r.words.length);
+    .map((r) => ({ id: r.id, name: r.name, words: placeWords(r.name), keys: routeKeys(r.name) })).filter((r) => r.words.length);
   const parties = db.prepare("SELECT id, name, address FROM parties WHERE active=1 AND route_id IS NULL AND type <> 'SUPPLIER' ORDER BY name").all();
   const only = Array.isArray(party_ids) ? new Set(party_ids.map(Number)) : null;
   const matches = [];
@@ -41,7 +44,7 @@ function autoAssignRoutes(db, { apply = false, party_ids } = {}) {
     const scored = routes.map((r) => {
       const inName = r.words.filter((w) => nameW.has(w)).length;
       const inAddr = r.words.filter((w) => !nameW.has(w) && addrW.has(w)).length;
-      return { r, s: [inName, inAddr, r.key && text.includes(r.key) ? r.key.length : 0] };
+      return { r, s: [inName, inAddr, Math.max(0, ...r.keys.filter((k) => text.includes(k)).map((k) => k.length))] };
     }).filter((x) => x.s[0] + x.s[1] > 0);
     if (!scored.length) { unmatched++; continue; }
     const cmp = (a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.s[2] - b.s[2];
@@ -57,4 +60,4 @@ function autoAssignRoutes(db, { apply = false, party_ids } = {}) {
   return { matches, unclear, unmatched, assigned: apply ? matches.length : 0 };
 }
 
-module.exports = { autoAssignRoutes, routeKey, placeWords };
+module.exports = { autoAssignRoutes, routeKey, routeKeys, placeWords };

@@ -359,9 +359,10 @@ put('/backup/drive/client', {'client_id': ' 1-a.apps.googleusercontent.com ', 'c
 post('/backup/drive/connect'); post('/backup/drive/upload'); post('/backup/drive/disconnect'); get('/backup/drive'); post('/backup/drive/nope')
 
 # ---------------- Parties › Assign routes: customers without a route get the route named in their name or address
+post('/routes', {'name': 'Kotdwar, Najibabad / Dhampur & A1', 'salesman_id': 1, 'days': '4'}, company=1)
 for n, ad in [('Verma Store', 'Near railway station, Bijnor'), ('Civil Lines Medical', ''), ('Stationwala Kirana', 'Main bazaar'),
               ('Nagina Road Agency', 'Nagina Road, near Civil Lines'), ('Patel Medical', 'Opp. Civil Hospital'), ('Yadav Dairy', 'Station Road 12'),
-              ('No Match Traders', 'Kotdwar')]:
+              ('Kotdwar Traders', 'Kotdwar'), ('Sharma Agency', 'Station Road, Dhampur'), ('No Match Traders', 'Haridwar')]:
     post('/parties', {'name': n, 'address': ad}, company=1)
 post('/routes/auto-assign', {}, company=1); post('/routes/auto-assign', {'apply': False}, company=1)
 post('/routes/auto-assign', {'apply': True, 'party_ids': [0]}, company=1); post('/routes/auto-assign', {'apply': True}, company=1)

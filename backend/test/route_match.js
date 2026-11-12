@@ -2,7 +2,7 @@
 const os = require('os'), fs = require('fs'), path = require('path'), assert = require('assert');
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'routematch-'));
 const db = require('../src/db');
-const { autoAssignRoutes, routeKey, placeWords } = require('../src/utils/routematch');
+const { autoAssignRoutes, routeKey, routeKeys, placeWords } = require('../src/utils/routematch');
 let passed = 0;
 const ok = (name, fn) => { db.withCompany(db.firstCompanyId(), fn); passed++; console.log('  ok  ', name); };
 const route = (name) => Number(db.prepare('INSERT INTO routes(name) VALUES(?)').run(name).lastInsertRowid);
@@ -45,6 +45,17 @@ ok('any word of the route counts; the name counts before the address; ROAD alone
   const road = party('YADAV DAIRY', 'Station Road');
   autoAssignRoutes(db, { apply: true });
   assert.strictEqual(routeOf(n), ng); assert.strictEqual(routeOf(both), cl); assert.strictEqual(routeOf(one), cl); assert.strictEqual(routeOf(road), null);
+});
+ok('a beat listing several places, comma separated: each place counts', () => {
+  assert.deepStrictEqual(routeKeys('Mon - Sukhliya, New Palasia / Vijay Nagar & A1'), [' SUKHLIYA ', ' NEW PALASIA ', ' VIJAY NAGAR ']);
+  const a = route('Sukhliya, New Rani Bagh, Vijay Nagar'), b = route('Rani Bagh, Bhawarkua');
+  const p1 = party('SAINI KIRANA', 'Sukhliya main road');
+  const p2 = party('RAO STORE', 'Vijay Nagar sq.');
+  const p3 = party('AHUJA MART', '5 New Rani Bagh');                // A: NEW RANI BAGH beats B: RANI BAGH
+  const p4 = party('KHAN GENERAL', 'Rani Bagh');                    // level on words; B lists Rani Bagh whole
+  const p5 = party('DUBEY DAIRY', 'Bhawarkua');
+  autoAssignRoutes(db, { apply: true });
+  assert.deepStrictEqual([p1, p2, p3, p4, p5].map(routeOf), [a, a, a, b, b]);
 });
 ok('two routes level on every rule: unclear, skipped', () => {
   route('RAJWADA'); route('Rajwada');
