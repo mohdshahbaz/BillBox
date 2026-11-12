@@ -1,2 +1,0 @@
-step 542 dump .dump.app_settings: 3 items on Mac, 5 on iOS
-543 steps compared, 1 with differences
