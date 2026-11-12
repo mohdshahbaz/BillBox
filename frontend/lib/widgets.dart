@@ -8,20 +8,34 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'api.dart';
 
+/// Colours from docs/DESIGN_SYSTEM.md (the "Clean" theme, the default on every BillBox). The old names are kept so every
+/// screen picks the new values up: `teal` is the accent, `turmeric` the warning, `brick` the negative and `leaf` the
+/// positive role. Each text colour has at least 4.5:1 contrast on white and on `paper`.
 class Palette {
-  static const ink = Color(0xFF1B2A2F);
-  static const teal = Color(0xFF0F4C5C);
-  static const paper = Color(0xFFF5F6F2);
-  static const turmeric = Color(0xFFD99A1E);
-  static const brick = Color(0xFFB3392F);
-  static const leaf = Color(0xFF2E7D5B);
-  static const line = Color(0xFFD9DDD6); // borders and dividers
-  static const muted = Color(0xFF5E6B70); // secondary text
+  static const ink = Color(0xFF18181B); // text
+  static const teal = Color(0xFF4F46E5); // accent
+  static const paper = Color(0xFFF6F6F7); // page
+  static const turmeric = Color(0xFFC2410C); // warning: not printed, expiring, low stock
+  static const brick = Color(0xFFDC2626); // negative: due, loss, errors
+  static const leaf = Color(0xFF15803D); // positive: profit, paid
+  static const info = Color(0xFF2563EB); // notices, bills to print
+  static const line = Color(0xFFE4E4E7); // borders and dividers
+  static const muted = Color(0xFF6B6B74); // secondary text
+  static const headerBand = Color(0xFFF1F1FD); // table heading: the accent at 6% over white
+}
+
+/// Design tokens (docs/DESIGN_SYSTEM.md §4), the same numbers as the iPhone's `DS` and Android's `DS`.
+class DS {
+  static const double s4 = 4, s8 = 8, s12 = 12, s16 = 16, s20 = 20, s24 = 24, s32 = 32;
+  static const double cardPad = 14, cardGap = 12, cellPad = 8;
+  static const double radiusCard = 14, radiusHero = 22, radiusControl = 12;
+  static const double hitTarget = 48;
+  static const double tint = 0.13;
 }
 
 /// One height for every text box and dropdown in the app.
 const double kFieldH = 44;
-const double kRadius = 8;
+const double kRadius = DS.radiusControl;
 
 /// Screens narrower than this switch to the compact layout (icon-only navigation, stacked forms).
 const double kNarrow = 900;
@@ -68,13 +82,14 @@ ThemeData buildTheme() {
     filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: btnSize, shape: btnShape, padding: const EdgeInsets.symmetric(horizontal: 16))),
     outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: btnSize, shape: btnShape, side: const BorderSide(color: Palette.line), foregroundColor: Palette.teal, padding: const EdgeInsets.symmetric(horizontal: 16))),
     textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(minimumSize: const Size(48, 40), shape: btnShape, foregroundColor: Palette.teal)),
-    cardTheme: CardThemeData(color: Colors.white, elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Palette.line))),
+    cardTheme: CardThemeData(color: Colors.white, elevation: 0, margin: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DS.radiusCard), side: const BorderSide(color: Palette.line))),
     dialogTheme: DialogThemeData(backgroundColor: Colors.white, surfaceTintColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
     dividerTheme: const DividerThemeData(color: Palette.line, space: 1, thickness: 1),
+    // tables: the heading band tinted with the accent, upper-case small semibold labels in the secondary colour
     dataTableTheme: const DataTableThemeData(
-      headingTextStyle: TextStyle(fontWeight: FontWeight.w600, color: Palette.ink, fontSize: 13),
+      headingTextStyle: TextStyle(fontWeight: FontWeight.w600, color: Palette.muted, fontSize: 12, letterSpacing: .4),
       dataTextStyle: TextStyle(color: Palette.ink, fontSize: 13.5),
-      headingRowColor: WidgetStatePropertyAll(Color(0xFFEEF1EC)),
+      headingRowColor: WidgetStatePropertyAll(Palette.headerBand),
       dividerThickness: .6,
     ),
     snackBarTheme: SnackBarThemeData(behavior: SnackBarBehavior.floating, shape: btnShape),
@@ -411,7 +426,7 @@ class Stat extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         width: 210,
         padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(kRadius), border: Border(left: BorderSide(color: color, width: 4), top: const BorderSide(color: Palette.line), right: const BorderSide(color: Palette.line), bottom: const BorderSide(color: Palette.line))),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(DS.radiusCard), border: Border(left: BorderSide(color: color, width: 4), top: const BorderSide(color: Palette.line), right: const BorderSide(color: Palette.line), bottom: const BorderSide(color: Palette.line))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Palette.muted, fontSize: 13)),
           const SizedBox(height: 4),
@@ -433,7 +448,7 @@ Widget table(List<String> cols, List<List<Widget>> rows, {Set<int> numeric = con
               dataRowMinHeight: 40,
               dataRowMaxHeight: 48,
               columnSpacing: 22,
-              columns: [for (var i = 0; i < cols.length; i++) DataColumn(label: Text(cols[i]), numeric: numeric.contains(i))],
+              columns: [for (var i = 0; i < cols.length; i++) DataColumn(label: Text(cols[i].toUpperCase()), numeric: numeric.contains(i))],
               rows: [
                 for (final r in rows)
                   DataRow(cells: [for (final c in r) DataCell(ConstrainedBox(constraints: BoxConstraints(maxWidth: maxCell), child: c))])
@@ -508,7 +523,7 @@ class Panel extends StatelessWidget {
         padding: padding,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(DS.radiusCard),
           border: Border.all(color: Palette.line),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -524,4 +539,50 @@ class Panel extends StatelessWidget {
           child,
         ]),
       );
+}
+
+
+/// Totals under a table (docs/DESIGN_SYSTEM.md §5): label above figure, as many per line as fit; one can be the main one.
+class SumItem {
+  final String label, value;
+  final bool strong;
+  final Color? tint;
+  const SumItem(this.label, this.value, {this.strong = false, this.tint});
+}
+
+class SummaryCard extends StatelessWidget {
+  final List<SumItem> items;
+  const SummaryCard(this.items, {super.key});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(top: DS.s8),
+        padding: const EdgeInsets.symmetric(horizontal: DS.cardPad, vertical: 10),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(DS.radiusCard), border: Border.all(color: Palette.line)),
+        child: Wrap(spacing: 18, runSpacing: DS.s8, children: [
+          for (final it in items)
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 104),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text(it.label, style: const TextStyle(color: Palette.muted, fontSize: 12)),
+                Text(it.value, style: tabular.copyWith(fontSize: 14.5, fontWeight: it.strong ? FontWeight.w700 : FontWeight.w500, color: it.tint ?? Palette.ink)),
+              ]),
+            ),
+        ]),
+      );
+}
+
+/// A small coloured label for a state (Sale, Not yet, Retailer…).
+class StatusPill extends StatelessWidget {
+  final String text;
+  final Color tint;
+  const StatusPill(this.text, {super.key, this.tint = Palette.teal});
+  @override
+  Widget build(BuildContext context) => text.isEmpty
+      ? const SizedBox.shrink()
+      : Container(
+          padding: const EdgeInsets.symmetric(horizontal: DS.s8, vertical: 3),
+          decoration: BoxDecoration(color: tint.withValues(alpha: DS.tint), borderRadius: BorderRadius.circular(999)),
+          child: Text(text, maxLines: 1, style: TextStyle(color: tint, fontSize: 12, fontWeight: FontWeight.w600)),
+        );
 }

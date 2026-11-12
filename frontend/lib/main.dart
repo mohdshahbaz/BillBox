@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:ui' show AppExitResponse;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -60,7 +61,8 @@ class Gate extends StatelessWidget {
         ),
       );
     }
-    return const Shell();
+    // window title "BillBox — Company" (docs/DESIGN_SYSTEM.md §7)
+    return Title(title: 'BillBox — ${app.companyName}', color: Palette.teal, child: const Shell());
   }
 }
 
@@ -172,7 +174,7 @@ class _ShellState extends State<Shell> {
                                 Icon(_nav[n].$1, size: 19, color: _i == n ? Colors.white : Colors.white60),
                                 const SizedBox(width: 12),
                                 Expanded(child: Text(_nav[n].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _i == n ? Colors.white : Colors.white70, fontWeight: _i == n ? FontWeight.w600 : FontWeight.w400))),
-                                if (n < 9) Text('⌘${n + 1}', style: const TextStyle(color: Colors.white24, fontSize: 11)),
+                                if (n < 9) Text('${Platform.isMacOS ? '⌘' : 'Ctrl+'}${n + 1}', style: const TextStyle(color: Colors.white38, fontSize: 11)),
                               ]),
                       ),
                     ),
@@ -194,7 +196,11 @@ class _ShellState extends State<Shell> {
     return Focus(
       autofocus: true,
       child: CallbackShortcuts(
-        bindings: {for (var n = 0; n < _nav.length; n++) SingleActivator(digits[n], meta: true): () => _go(n)},
+        // ⌘1… on a Mac keyboard, Ctrl+1… on Windows and Linux (the same screens as the Mac app's shortcuts)
+        bindings: {
+          for (var n = 0; n < _nav.length; n++) SingleActivator(digits[n], meta: true): () => _go(n),
+          for (var n = 0; n < _nav.length; n++) SingleActivator(digits[n], control: true): () => _go(n),
+        },
         child: Scaffold(
           body: Row(children: [
             _sidebar(app, MediaQuery.sizeOf(context).width < kNarrow),
