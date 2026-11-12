@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /** Per-phone look (Settings › Appearance): theme, light / dark, panels, corners, row height, text size, start screen. */
@@ -169,9 +170,24 @@ fun BillBoxTheme(prefs: UiPrefs, content: @Composable () -> Unit) {
     androidx.compose.runtime.CompositionLocalProvider(
         LocalDensity provides Density(base.density, base.fontScale * prefs.fontScale),
         LocalUi provides prefs,
+        LocalDark provides dark,
     ) {
         MaterialTheme(colorScheme = colors, typography = typeFor(prefs.fontStyle, prefs.fontWeight), content = content)
     }
 }
 
 val LocalUi = androidx.compose.runtime.staticCompositionLocalOf<UiPrefs> { error("UiPrefs not provided") }
+/** Dark mode as chosen in Settings › Appearance (or the system's), for the semantic colours in Components.kt. */
+val LocalDark = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** Design tokens from docs/DESIGN_SYSTEM.md, the same numbers as the iPhone's `DS`. */
+object DS {
+    val space4 = 4.dp; val space8 = 8.dp; val space12 = 12.dp; val space16 = 16.dp; val space20 = 20.dp; val space24 = 24.dp; val space32 = 32.dp
+    val screenPad = 16.dp; val screenPadWide = 20.dp; val cardPad = 14.dp; val cardGap = 12.dp; val cellPad = 8.dp
+    val radiusCard = 14.dp; val radiusHero = 22.dp; val radiusControl = 12.dp
+    val dateMin = 122.dp; val moneyMin = 90.dp
+    /** Smallest touch target on Android (48 dp). */
+    val hitTarget = 48.dp
+    /** Pill and badge background strength. */
+    const val tint = 0.13f
+}

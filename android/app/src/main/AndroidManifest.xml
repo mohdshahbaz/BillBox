@@ -11,6 +11,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:label="BillBox"
         android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.BillBox"
         android:localeConfig="@xml/locales_config">
 

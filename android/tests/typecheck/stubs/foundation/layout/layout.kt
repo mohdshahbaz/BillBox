@@ -14,7 +14,10 @@ object Arrangement {
     fun spacedBy(space: Dp, alignment: Alignment.Vertical): Vertical = TODO()
     fun spacedBy(space: Dp, alignment: Alignment.Horizontal): Horizontal = TODO()
 }
-class PaddingValues(all: Dp) { constructor(horizontal: Dp = Dp(0f), vertical: Dp = Dp(0f)) : this(Dp(0f)) }
+class PaddingValues(all: Dp) {
+    constructor(horizontal: Dp = Dp(0f), vertical: Dp = Dp(0f)) : this(Dp(0f))
+    constructor(start: Dp = Dp(0f), top: Dp = Dp(0f), end: Dp = Dp(0f), bottom: Dp = Dp(0f), unused: Unit = Unit) : this(Dp(0f))
+}
 
 interface RowScope { fun Modifier.weight(weight: Float, fill: Boolean = true): Modifier = this; fun Modifier.align(alignment: Alignment.Vertical): Modifier = this }
 interface ColumnScope { fun Modifier.weight(weight: Float, fill: Boolean = true): Modifier = this; fun Modifier.align(alignment: Alignment.Horizontal): Modifier = this }

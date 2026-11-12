@@ -120,7 +120,7 @@ fun Hint(text: String, modifier: Modifier = Modifier, color: Color = MaterialThe
 fun ErrorText(text: String?) { if (!text.isNullOrBlank()) Text(text, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
 
 @Composable
-fun Banner(text: String, icon: ImageVector = Icons.Default.Info, tint: Color = Color(0xFFE08A00)) {
+fun Banner(text: String, icon: ImageVector = Icons.Default.Info, tint: Color = Warn) {
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = 0.12f)).padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
         Icon(icon, null, tint = tint)
@@ -370,10 +370,17 @@ fun Modifier.combinedClick(onClick: () -> Unit, onLongClick: (() -> Unit)?): Mod
 @Composable
 fun SmallLabel(text: String) = Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-val Money = Color(0xFF0E8F6F)
-val Warn = Color(0xFFE08A00)
-val Bad = Color(0xFFD93025)
-val Good = Color(0xFF1E8E3E)
+// Semantic colour roles (docs/DESIGN_SYSTEM.md §2): a light / dark pair each, at least 4.5:1 on the card colour.
+// (The old fixed orange #E08A00 was about 2.4:1 on white.)
+val Money: Color @Composable get() = if (LocalDark.current) Color(0xFF34D399) else Color(0xFF047857)
+/** Not printed, expiring, low stock. */
+val Warn: Color @Composable get() = if (LocalDark.current) Color(0xFFFB923C) else Color(0xFFC2410C)
+/** Due, loss, errors. */
+val Bad: Color @Composable get() = if (LocalDark.current) Color(0xFFF87171) else Color(0xFFDC2626)
+/** Profit, paid, success. */
+val Good: Color @Composable get() = if (LocalDark.current) Color(0xFF4ADE80) else Color(0xFF15803D)
+/** Bills to print, notices. */
+val Info: Color @Composable get() = if (LocalDark.current) Color(0xFF60A5FA) else Color(0xFF2563EB)
 
 @Composable
 fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) {

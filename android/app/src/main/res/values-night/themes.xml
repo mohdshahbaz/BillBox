@@ -4,5 +4,8 @@
         <item name="android:windowBackground">@color/window</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- Android 12 splash screen: the page colour and the app icon, so the app opens without a flash -->
+        <item name="android:windowSplashScreenBackground">@color/window</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
 </resources>
