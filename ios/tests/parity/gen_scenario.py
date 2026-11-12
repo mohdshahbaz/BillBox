@@ -358,6 +358,14 @@ put('/backup/drive/client', {'json': '{"installed": {"client_id": "5-j.apps.goog
 put('/backup/drive/client', {'client_id': ' 1-a.apps.googleusercontent.com ', 'client_secret': ' s '})
 post('/backup/drive/connect'); post('/backup/drive/upload'); post('/backup/drive/disconnect'); get('/backup/drive'); post('/backup/drive/nope')
 
+# ---------------- Parties › Assign routes: customers without a route get the route named in their name or address
+for n, ad in [('Verma Store', 'Near railway station, Bijnor'), ('Civil Lines Medical', ''), ('Stationwala Kirana', 'Main bazaar'),
+              ('Nagina Road Agency', 'Nagina Road, near Civil Lines'), ('No Match Traders', 'Kotdwar')]:
+    post('/parties', {'name': n, 'address': ad}, company=1)
+post('/routes/auto-assign', {}, company=1); post('/routes/auto-assign', {'apply': False}, company=1)
+post('/routes/auto-assign', {'apply': True, 'party_ids': [0]}, company=1); post('/routes/auto-assign', {'apply': True}, company=1)
+get('/parties', {'kind': 'CUSTOMER'}, company=1); get('/routes', company=1)
+
 # ---------------- deleting a company (a throwaway one, so the books above stay for the backup tests)
 post('/companies', {'name': 'Temp Traders'}); get('/companies')
 post('/companies/5/delete', {}); post('/companies/5/delete', {'confirm': 'Wrong Name'}); post('/companies/99/delete', {'confirm': 'x'})

@@ -229,8 +229,10 @@ extension Router {
         for p in parties {
             if let only, !only.contains(JS.number(p.v("id"))) { continue }
             let addr = p.v("address") == nil ? "" : JS.string(p.v("address"))
-            let text = " " + Router.routeWords("\(JS.string(p.v("name"))) \(addr)").joined(separator: " ") + " "
-            let hit = routes.filter { text.contains($0.key) }
+            let inName = " " + Router.routeWords(JS.string(p.v("name"))).joined(separator: " ") + " "
+            let inAddress = " " + Router.routeWords(addr).joined(separator: " ") + " "
+            var hit = routes.filter { inName.contains($0.key) }
+            if hit.isEmpty { hit = routes.filter { inAddress.contains($0.key) } }
             if hit.isEmpty { unmatched += 1; continue }
             let len = hit.map { $0.key.count }.max() ?? 0
             let best = hit.filter { $0.key.count == len }

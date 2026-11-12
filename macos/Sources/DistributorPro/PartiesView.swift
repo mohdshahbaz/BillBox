@@ -455,7 +455,7 @@ extension PartiesView {
                      : "\(matches.count) customers without a route have a route name in their name or address. Untick any that are wrong.")
                     .foregroundStyle(.secondary)
                 if p.int("unclear") > 0 || p.int("unmatched") > 0 {
-                    Text("Left as they are: \(p.int("unmatched")) with no route name found\(p.int("unclear") > 0 ? ", \(p.int("unclear")) matching two routes of the same name" : "").")
+                    Text("Left as they are: \(p.int("unmatched")) with no route name found\(p.int("unclear") > 0 ? ", \(p.int("unclear")) matching more than one route" : "").")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 ForEach(matches) { m in

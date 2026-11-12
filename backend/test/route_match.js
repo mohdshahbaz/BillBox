@@ -37,10 +37,16 @@ ok('matches by name or address, whole words, longest route wins; suppliers and a
   assert.strictEqual(autoAssignRoutes(db, { apply: true }).assigned, 2, 'the rest');
   assert.strictEqual(routeOf(b), kh); assert.strictEqual(routeOf(d), pal);
 });
-ok('two routes with the same name: unclear, skipped', () => {
+ok('a route in the name comes first; two equally long routes are unclear, skipped', () => {
+  const ng = route('Nagina Road'); route('Civil Lines');
+  const n = party('NAGINA ROAD AGENCY', 'near Civil Lines');
+  const both = party('PATEL STORES', 'Nagina Road, near Civil Lines');
+  const r0 = autoAssignRoutes(db, { apply: true });
+  assert.strictEqual(routeOf(n), ng); assert.strictEqual(routeOf(both), null); assert.ok(r0.unclear >= 1);
+
   route('RAJWADA'); route('Rajwada');
   const p = party('SONI STORE', 'Rajwada');
   const r = autoAssignRoutes(db, { apply: true });
-  assert.strictEqual(r.unclear, 1); assert.strictEqual(routeOf(p), null);
+  assert.strictEqual(r.unclear, 2, "Patel Stores and Soni Store"); assert.strictEqual(routeOf(p), null);
 });
 console.log(`${passed} route matching checks passed`);

@@ -1,8 +1,8 @@
 /**
  * Auto-assign outlets to routes: a party with no route gets the route whose name appears in the party's name or
- * address (whole words, case and punctuation ignored). "ROUTE", "BEAT" and weekday words in a route name are ignored
+ * address (whole words, case and punctuation ignored); a route in the name comes before one in the address. "ROUTE", "BEAT" and weekday words in a route name are ignored
  * ("KHAJRANA ROUTE (MON)" matches "SHARMA STORE, KHAJRANA"). When several routes match, the longest name wins
- * ("PALASIA" vs "NEW PALASIA"); two different routes with the same longest name are skipped as unclear.
+ * ("PALASIA" vs "NEW PALASIA"); two routes left equally long are skipped as unclear.
  * Ported to ios/BillBoxCore/Sources/BillBoxCore/PartiesAPI.swift (autoAssignRoutes).
  */
 const FILLER = new Set(['ROUTE', 'ROUTES', 'BEAT', 'MON', 'TUE', 'TUES', 'WED', 'THU', 'THUR', 'THURS', 'FRI', 'SAT', 'SUN',
@@ -26,8 +26,9 @@ function autoAssignRoutes(db, { apply = false, party_ids } = {}) {
   let unclear = 0, unmatched = 0;
   for (const p of parties) {
     if (only && !only.has(Number(p.id))) continue;
-    const text = ` ${words(`${p.name} ${p.address || ''}`).join(' ')} `;
-    const hit = routes.filter((r) => text.includes(r.key));
+    const inName = ` ${words(p.name).join(' ')} `, inAddress = ` ${words(p.address).join(' ')} `;
+    let hit = routes.filter((r) => inName.includes(r.key));
+    if (!hit.length) hit = routes.filter((r) => inAddress.includes(r.key));
     if (!hit.length) { unmatched++; continue; }
     const len = Math.max(...hit.map((r) => r.key.length));
     const best = hit.filter((r) => r.key.length === len);

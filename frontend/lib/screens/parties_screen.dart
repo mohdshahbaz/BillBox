@@ -79,7 +79,7 @@ class _PartiesState extends State<PartiesScreen> {
                   if (unclear > 0 || unmatched > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text('Left as they are: $unmatched with no route name found${unclear > 0 ? ', $unclear matching two routes of the same name' : ''}.',
+                      child: Text('Left as they are: $unmatched with no route name found${unclear > 0 ? ', $unclear matching more than one route' : ''}.',
                           style: Theme.of(ctx).textTheme.bodySmall),
                     ),
                   const SizedBox(height: 8),

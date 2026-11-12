@@ -222,7 +222,7 @@ fun AutoRouteForm(onDismiss: () -> Unit, done: suspend () -> Unit) {
         Hint(if (matches.isEmpty()) "No customer without a route has a route name in their name or address."
              else "${matches.size} customers without a route have a route name in their name or address. Untick any that are wrong.")
         if (p.int("unclear") > 0 || p.int("unmatched") > 0)
-            Hint("Left as they are: ${p.int("unmatched")} with no route name found" + (if (p.int("unclear") > 0) ", ${p.int("unclear")} matching two routes of the same name" else "") + ".")
+            Hint("Left as they are: ${p.int("unmatched")} with no route name found" + (if (p.int("unclear") > 0) ", ${p.int("unclear")} matching more than one route" else "") + ".")
         matches.forEach { m ->
             val id = m.int("party_id")
             Row(Modifier.fillMaxWidth().clickable { if (id in skip) skip.remove(id) else skip.add(id) }, verticalAlignment = Alignment.CenterVertically) {
