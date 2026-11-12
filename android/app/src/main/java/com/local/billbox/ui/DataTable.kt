@@ -75,7 +75,9 @@ class Col<R>(val title: String, val id: String = title, val width: Int = 100, va
 @Composable
 fun Cell(text: String, color: Color = Color.Unspecified, bold: Boolean = false, end: Boolean = false, lines: Int = 1) {
     Text(text, color = color, fontWeight = if (bold) FontWeight.SemiBold else null, maxLines = lines, overflow = TextOverflow.Ellipsis,
-        style = MaterialTheme.typography.bodyMedium, textAlign = if (end) TextAlign.End else TextAlign.Start, modifier = Modifier.fillMaxWidth())
+        // right-aligned cells are amounts and counts: tabular figures so the digits line up down the column
+        style = if (end) MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum") else MaterialTheme.typography.bodyMedium,
+        textAlign = if (end) TextAlign.End else TextAlign.Start, modifier = Modifier.fillMaxWidth())
 }
 
 /** A row's long-press menu entry. */

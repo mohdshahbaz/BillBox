@@ -56,7 +56,7 @@ fun SummaryCard(items: List<SummaryItem>, modifier: Modifier = Modifier) {
         items.forEach { it ->
             Column(Modifier.widthIn(min = 104.dp)) {
                 Text(it.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                Text(it.value, style = MaterialTheme.typography.bodyLarge, fontWeight = if (it.strong) FontWeight.Bold else FontWeight.Medium,
+                Text(it.value, style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"), fontWeight = if (it.strong) FontWeight.Bold else FontWeight.Medium,
                     color = it.tint ?: MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
