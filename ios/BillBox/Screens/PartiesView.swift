@@ -171,7 +171,10 @@ import SwiftUI
     @State private var f: [String: String] = [:]
     @State private var type = ""
     @State private var tier = ""
-    @State private var route = ""
+    /// Ids of the routes this party is on (a party can be on several).
+    @State private var routeSet = Set<Int>()
+    @State private var addNew = false
+    @State private var routesOpen = false
     @State private var newRoute = ""
     @State private var newSalesman = ""
     @State private var newDays = "1"
@@ -184,6 +187,15 @@ import SwiftUI
         Binding(get: { f[k] ?? (party?.has(k) == true ? party!.str(k) : d) }, set: { f[k] = $0 })
     }
     private var isSupplier: Bool { type == "SUPPLIER" }
+    private func routeLabel(_ r: JSON) -> String {
+        let days = dayList(r.str("days"))
+        if !days.isEmpty { return r.str("name") + " · " + days }
+        return r.str("name") + (r.has("day_of_week") ? " · \(String(dayNames[min(6, max(0, r.int("day_of_week")))].prefix(3)))" : "")
+    }
+    private var routeSummary: String {
+        let names = routes.filter { routeSet.contains($0.id) }.map { $0.str("name") } + (addNew ? ["new route"] : [])
+        return names.isEmpty ? "Delivery / sales routes: none" : "Routes (\(names.count)): " + names.joined(separator: "; ")
+    }
 
     var body: some View {
         FormSheet(title: party == nil ? "New party" : "Edit \(party!.str("name"))", width: 580, canSave: !b("name").wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty, onSave: save) {
@@ -217,14 +229,15 @@ import SwiftUI
                 }
                 Field("Credit limit (0 = no limit)", text: b("credit_limit", "0")).keyboardType(.decimalPad)
                 Field("Credit days", text: b("credit_days", "0")).keyboardType(.numberPad)
-                Picker("Delivery / sales route", selection: $route) {
-                    Text("No route").tag("")
+                DisclosureGroup(routeSummary, isExpanded: $routesOpen) {
                     ForEach(routes) { r in
-                        Text(r.str("name") + (dayList(r.str("days")).isEmpty ? (r.has("day_of_week") ? " · \(String(dayNames[min(6, max(0, r.int("day_of_week")))].prefix(3)))" : "") : " · " + dayList(r.str("days")))).tag(String(r.id))
+                        Toggle(routeLabel(r), isOn: Binding(get: { routeSet.contains(r.id) }, set: { on in
+                            if on { routeSet.insert(r.id) } else { routeSet.remove(r.id) }
+                        }))
                     }
-                    Text("+ New route…").tag("__new__")
+                    Toggle("+ New route…", isOn: $addNew)
                 }
-                if route == "__new__" {
+                if addNew {
                     Field("New route name", text: $newRoute)
                     Picker("Salesman for this route", selection: $newSalesman) {
                         Text("Not assigned yet").tag("")
@@ -252,7 +265,10 @@ import SwiftUI
                 if !app.settings.str("party_default_limit").isEmpty { f["credit_limit"] = app.settings.str("party_default_limit") }
                 if !app.settings.str("party_default_days").isEmpty { f["credit_days"] = app.settings.str("party_default_days") }
             }
-            route = party?.has("route_id") == true ? party!.str("route_id") : ""
+            let ids = party?.str("route_ids") ?? ""
+            routeSet = Set(ids.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) })
+            if routeSet.isEmpty, party?.has("route_id") == true { routeSet = [party!.int("route_id")] }
+            routesOpen = routeSet.isEmpty
         }
     }
 
@@ -263,9 +279,9 @@ import SwiftUI
         }
         body["type"] = type
         body["price_tier"] = tier
-        body["route_id"] = route == "__new__" ? "" : route
+        body["route_ids"] = isSupplier ? [Int]() : routes.map { $0.id }.filter { routeSet.contains($0) }
         if party == nil { body["opening_balance"] = b("opening_balance", "0").wrappedValue }
-        if route == "__new__" {
+        if addNew && !isSupplier {
             if newRoute.trimmingCharacters(in: .whitespaces).isEmpty { throw APIError(message: "Enter a name for the new route", status: 0, code: nil) }
             var sid = newSalesman
             if newSalesman == "__new__" {
@@ -438,62 +454,44 @@ extension PartiesView {
     }
 }
 
-/// Outlets without a route get the route sharing a word with their name or address (POST /routes/auto-assign): preview, untick, apply.
+/// Customers go on every route that lists a place (comma separated in the route's name) found in their name or address
+/// (POST /routes/auto-assign): preview, untick, apply. A customer can get several routes.
 @MainActor struct AutoRouteSheet: View {
     @EnvironmentObject private var app: AppModel
     let done: () async -> Void
     @State private var preview: JSON?
-    @State private var skip = Set<Int>()
-    /// A customer that matches two beats equally → the beat the owner picked (0 = leave without a route).
-    @State private var picks: [Int: Int] = [:]
+    /// Unticked "party-route" pairs.
+    @State private var skip = Set<String>()
 
     private var matches: [JSON] { preview?.list("matches") ?? [] }
-    private var choices: [JSON] { preview?.list("choices") ?? [] }
-    private var chosen: [Int] { matches.map { $0.int("party_id") }.filter { !skip.contains($0) } }
-    private var picked: [[String: Any]] { picks.filter { $0.value > 0 }.map { ["party_id": $0.key, "route_id": $0.value] } }
+    private func key(_ m: JSON) -> String { "\(m.int("party_id"))-\(m.int("route_id"))" }
+    private var chosen: [[String: Any]] {
+        matches.filter { !skip.contains(key($0)) }.map { ["party_id": $0.int("party_id"), "route_id": $0.int("route_id")] }
+    }
 
     var body: some View {
-        FormSheet(title: "Assign routes from name and address", saveLabel: "Assign \(chosen.count + picked.count)", width: 600, canSave: chosen.count + picked.count > 0, onSave: {
-            let r = try await API.obj("POST", "/routes/auto-assign", body: ["apply": true, "party_ids": chosen, "assignments": picked])
-            app.notify("\(r.int("assigned")) outlets assigned to routes.")
+        FormSheet(title: "Assign routes from name and address", saveLabel: "Assign \(chosen.count)", width: 600, canSave: chosen.count > 0, onSave: {
+            let r = try await API.obj("POST", "/routes/auto-assign", body: ["apply": true, "assignments": chosen])
+            app.notify("\(r.int("assigned")) routes assigned.")
             await done()
         }) {
             if let p = preview {
-                Text(matches.isEmpty ? "No customer without a route shares a word with a route name."
-                     : "\(matches.count) customers without a route share a word with a route name. Untick any that are wrong.")
+                Text(matches.isEmpty ? "No customer has a place of a route in its name or address (that it is not on already)."
+                     : "\(matches.count) routes to add. A customer goes on every route whose name lists a place (comma separated) found in the customer's name or address. Untick any that are wrong.")
                     .foregroundStyle(.secondary)
                 if p.int("unmatched") > 0 {
-                    Text("Left as they are: \(p.int("unmatched")) sharing no word with a route.")
+                    Text("Left without a route: \(p.int("unmatched")) customers matching no route.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 ForEach(matches) { m in
-                    let id = m.int("party_id")
-                    Toggle(isOn: Binding(get: { !skip.contains(id) }, set: { if $0 { skip.remove(id) } else { skip.insert(id) } })) {
-                        HStack(alignment: .firstTextBaseline) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(m.str("party_name")).fw(.medium)
-                                if !m.str("address").isEmpty { Text(m.str("address")).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-                            }
-                            Spacer()
-                            Text("→ \(m.str("route_name"))").fw(.semibold)
+                    let k = key(m)
+                    Toggle(isOn: Binding(get: { !skip.contains(k) }, set: { if $0 { skip.remove(k) } else { skip.insert(k) } })) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(m.str("party_name")).fw(.medium)
+                            if !m.str("address").isEmpty { Text(m.str("address")).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                            Text("→ \(m.str("route_name"))").font(.callout).fw(.semibold)
                         }
                     }
-                }
-                if !choices.isEmpty {
-                    Section {
-                        ForEach(choices) { c in
-                            let id = c.int("party_id")
-                            Picker(selection: Binding(get: { picks[id] ?? 0 }, set: { picks[id] = $0 })) {
-                                Text("Leave without a route").tag(0)
-                                ForEach(c.list("routes")) { r in Text(r.str("route_name")).tag(r.int("route_id")) }
-                            } label: {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(c.str("party_name")).fw(.medium)
-                                    if !c.str("address").isEmpty { Text(c.str("address")).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-                                }
-                            }
-                        }
-                    } header: { Text("Pick a beat (\(choices.count) match more than one equally)") }
                 }
             } else {
                 ProgressView()

@@ -2,6 +2,7 @@ const router = require('express').Router();
 const db = require('../db');
 const { h, HttpError, blank, today, normDays } = require('../utils/misc');
 const { r2 } = require('../utils/gst');
+const { ON_ROUTE } = require('../utils/partyroutes');
 
 router.get('/salesmen', h((req, res) => {
   res.json(db.prepare('SELECT * FROM salesmen WHERE active=1 ORDER BY name').all());
@@ -50,7 +51,7 @@ router.post('/salesmen/:id/merge', h((req, res) => {
 
 router.get('/routes', h((req, res) => {
   res.json(db.prepare(
-    `SELECT r.*, s.name salesman_name, (SELECT COUNT(*) FROM parties p WHERE p.route_id=r.id AND p.active=1) outlets
+    `SELECT r.*, s.name salesman_name, (SELECT COUNT(*) FROM parties p WHERE p.active=1 AND ${ON_ROUTE}) outlets
      FROM routes r LEFT JOIN salesmen s ON s.id=r.salesman_id ORDER BY r.days, r.name`
   ).all());
 }));
@@ -63,7 +64,7 @@ router.post('/routes', h((req, res) => {
   res.status(201).json({ id: Number(info.lastInsertRowid) });
 }));
 
-/** Outlets without a route get the route sharing a word with their name or address: {apply: false} previews, {apply: true, party_ids?} assigns. */
+/** Customers go on every route listing a place found in their name or address: {apply: false} previews, {apply: true, assignments? | party_ids?} adds the routes. */
 router.post('/routes/auto-assign', h((req, res) => {
   const b = req.body || {};
   res.json(require('../utils/routematch').autoAssignRoutes(db, { apply: !!b.apply, party_ids: b.party_ids, assignments: b.assignments }));
@@ -80,7 +81,10 @@ router.put('/routes/:id', h((req, res) => {
 }));
 router.delete('/routes/:id', h((req, res) => {
   db.transaction(() => {
-    db.prepare('UPDATE parties SET route_id=NULL WHERE route_id=?').run(req.params.id);   // outlets stay, just unassigned
+    // outlets stay: one that is on other routes too keeps those (the next becomes its first), the rest are just unassigned
+    db.prepare('DELETE FROM party_routes WHERE route_id=?').run(req.params.id);
+    db.prepare('UPDATE parties SET route_id=(SELECT x.route_id FROM party_routes x WHERE x.party_id=parties.id ORDER BY x.id LIMIT 1) WHERE route_id=?').run(req.params.id);
+    db.prepare('DELETE FROM party_routes WHERE route_id=(SELECT p.route_id FROM parties p WHERE p.id=party_routes.party_id)').run();
     db.prepare('DELETE FROM routes WHERE id=?').run(req.params.id);
   })();
   res.json({ ok: true });
@@ -89,12 +93,15 @@ router.delete('/routes/:id', h((req, res) => {
 /** Beat plan: outlets to visit for a salesman on a weekday (default today), with dues to collect. */
 router.get('/salesmen/:id/beat', h((req, res) => {
   const day = req.query.day !== undefined ? parseInt(req.query.day) : new Date().getDay();
+  // the salesman's routes of that day; an outlet on two of them shows once, with both names
+  const due = `r.salesman_id=@sm AND (',' || COALESCE(r.days, CAST(r.day_of_week AS TEXT), '') || ',') LIKE '%,' || @day || ',%' AND ${ON_ROUTE}`;
   const rows = db.prepare(
-    `SELECT p.id, p.name, p.phone, p.address, p.credit_limit, r.name route_name,
+    `SELECT p.id, p.name, p.phone, p.address, p.credit_limit,
+       (SELECT group_concat(name, '; ') FROM (SELECT r.name FROM routes r WHERE ${due} ORDER BY r.name, r.id)) route_name,
        COALESCE((SELECT SUM(debit)-SUM(credit) FROM ledger l WHERE l.party_id=p.id AND l.date <= @to),0) outstanding,
        (SELECT MAX(date) FROM invoices i WHERE i.party_id=p.id AND i.date <= @to) last_order
-     FROM parties p JOIN routes r ON r.id=p.route_id
-     WHERE r.salesman_id=@sm AND (',' || COALESCE(r.days, CAST(r.day_of_week AS TEXT), '') || ',') LIKE '%,' || @day || ',%' AND p.active=1 ORDER BY r.name, p.name`
+     FROM parties p
+     WHERE p.active=1 AND EXISTS (SELECT 1 FROM routes r WHERE ${due}) ORDER BY route_name, p.name`
   ).all({ sm: req.params.id, day: String(day), to: require('../utils/fy').fyRange(req.query.fy).to });   // as text: node:sqlite binds numbers as REAL, so 1 would match as '1.0' and no outlet would ever show
   res.json({ day, outlets: rows, total_outstanding: r2(rows.reduce((a, r) => a + r.outstanding, 0)) });
 }));

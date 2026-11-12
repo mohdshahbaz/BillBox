@@ -4,6 +4,92 @@ import Foundation
 
 extension Router {
     static let BAL_AT = "COALESCE((SELECT SUM(debit)-SUM(credit) FROM ledger l WHERE l.party_id=p.id AND l.date <= @to),0)"
+    // utils/partyroutes.js: a party can be on several routes. parties.route_id is the first one, party_routes holds the others.
+    /// SQL for "party p is on route r".
+    static let ON_ROUTE = "(r.id=p.route_id OR r.id IN (SELECT x.route_id FROM party_routes x WHERE x.party_id=p.id))"
+    /// Both in route-name order ("; " between names, as a route's own name has commas; ids as "3,7").
+    static let ROUTE_NAMES = "(SELECT group_concat(name, '; ') FROM (SELECT r.name FROM routes r WHERE \(Router.ON_ROUTE) ORDER BY r.name, r.id))"
+    static let ROUTE_IDS = "(SELECT group_concat(id) FROM (SELECT r.id FROM routes r WHERE \(Router.ON_ROUTE) ORDER BY r.name, r.id))"
+
+    /// [3, 7] from [3, "7"], "3,7" or 3: whole numbers, no repeats, in the order given.
+    static func idList(_ v: Any?) -> [Int] {
+        guard let u = unwrap(v) else { return [] }
+        let raw: [Any] = (u as? [Any]) ?? JS.string(u).split(separator: ",").map { String($0) as Any }
+        var out: [Int] = []
+        for x in raw {
+            let n = (x as? String).map { JS.number(JS.trim($0)) } ?? JS.number(x)
+            guard n.isFinite, n > 0, n < 9e15, n == n.rounded() else { continue }
+            if !out.contains(Int(n)) { out.append(Int(n)) }
+        }
+        return out
+    }
+
+    /// A party's routes become `wanted` (those that exist): the first stays in parties.route_id (the one it has now, if kept), the rest in party_routes.
+    @discardableResult
+    static func setPartyRoutes(_ db: Database, _ pid: Any?, _ wanted: [Int]) throws -> [Int] {
+        let have = Set(try db.prepare("SELECT id FROM routes").all().map { $0.i("id") })
+        var ids: [Int] = []
+        for id in wanted where have.contains(id) && !ids.contains(id) { ids.append(id) }
+        guard let cur = try db.prepare("SELECT route_id FROM parties WHERE id=?").get(pid) else { return [] }
+        let now: Int? = cur.has("route_id") ? cur.i("route_id") : nil
+        let first: Int? = (now != nil && ids.contains(now!)) ? now : ids.first
+        if now != first { try db.prepare("UPDATE parties SET route_id=? WHERE id=?").run(first, pid) }
+        var kept = Set<Int>()
+        for x in try db.prepare("SELECT id, route_id FROM party_routes WHERE party_id=? ORDER BY id").all(pid) {
+            let rid = x.i("route_id")
+            if rid != first && ids.contains(rid) && !kept.contains(rid) { kept.insert(rid) } else { try db.prepare("DELETE FROM party_routes WHERE id=?").run(x.v("id")) }
+        }
+        for rid in ids where rid != first && !kept.contains(rid) { try db.prepare("INSERT INTO party_routes(party_id,route_id) VALUES(?,?)").run(pid, rid) }
+        return ids
+    }
+
+    /// One more route for a party (its first when it has none). false: it is on that route already.
+    static func addPartyRoute(_ db: Database, _ pid: Any?, _ rid: Int) throws -> Bool {
+        guard let p = try db.prepare("SELECT route_id FROM parties WHERE id=?").get(pid) else { return false }
+        if !p.has("route_id") { try db.prepare("UPDATE parties SET route_id=? WHERE id=?").run(rid, pid); return true }
+        if p.i("route_id") == rid { return false }
+        let there = try db.prepare("SELECT 1 x FROM party_routes WHERE party_id=? AND route_id=?").get(pid, rid)
+        if there != nil { return false }
+        try db.prepare("INSERT INTO party_routes(party_id,route_id) VALUES(?,?)").run(pid, rid)
+        return true
+    }
+
+    /// Every route of a party, the first one first.
+    static func partyRoutes(_ db: Database, _ pid: Any?) throws -> [Int] {
+        var ids: [Int] = []
+        if let p = try db.prepare("SELECT route_id FROM parties WHERE id=?").get(pid), p.has("route_id") { ids.append(p.i("route_id")) }
+        for x in try db.prepare("SELECT route_id FROM party_routes WHERE party_id=? ORDER BY id").all(pid) {
+            let rid = x.i("route_id")
+            if !ids.contains(rid) { ids.append(rid) }
+        }
+        return ids
+    }
+
+    /// The routes a save asks for: route_ids (all of them), or the older route_id (changes the first, keeps the others; blank = none); a new_route is added.
+    func wantedRoutes(_ db: Database, _ b: Row, _ pid: Any?) throws -> [Int] {
+        var made: Int? = nil
+        if let nr = b["new_route"] as? Row, JS.blank(nr["name"] ?? nil) != nil {
+            let id = try resolveRoute(db, ["new_route": nr] as Row)
+            let n = JS.number(id)
+            if n.isFinite && n > 0 { made = Int(n) }
+        }
+        var ids: [Int]
+        if b.defined("route_ids") {
+            ids = Router.idList(b["route_ids"] ?? nil)
+        } else {
+            var now: [Int] = []
+            if pid != nil { now = try Router.partyRoutes(db, pid) }
+            if !b.defined("route_id") || made != nil {
+                ids = now
+            } else {
+                let one = Router.idList(b["route_id"] ?? nil)
+                ids = one.isEmpty ? [] : one + Array(now.dropFirst())   // "No route" from an older app clears them all
+            }
+        }
+        if let made { ids.append(made) }
+        return ids
+    }
+
     static let PARTY_GSTIN = rx("^\\d{2}[A-Z]{5}\\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
 
     /// ?kind=CUSTOMER | SUPPLIER (default: all). balance > 0 = they owe us, balance < 0 = we owe them.
@@ -11,7 +97,7 @@ extension Router {
         let like = "%\(JS.trim(q["q"] ?? ""))%"
         let kind = q["kind"] == "SUPPLIER" ? "AND p.type = 'SUPPLIER'" : (q["kind"] == "CUSTOMER" ? "AND p.type <> 'SUPPLIER'" : "")
         return try db.prepare("""
-        SELECT p.*, \(Router.BAL_AT) balance, r.name route_name FROM parties p LEFT JOIN routes r ON r.id=p.route_id
+        SELECT p.*, \(Router.BAL_AT) balance, \(Router.ROUTE_NAMES) route_name, \(Router.ROUTE_IDS) route_ids FROM parties p
              WHERE p.active=1 \(kind) AND (p.name LIKE @q OR p.phone LIKE @q OR p.gstin LIKE @q OR COALESCE(p.mobiles,'') LIKE @q OR COALESCE(p.tel,'') LIKE @q) ORDER BY p.name
         """).all(["q": like, "to": try FY.range(q["fy"]).to] as Row)
     }
@@ -85,13 +171,14 @@ extension Router {
     }
 
     func addParty(_ db: Database, _ b: Row) throws -> Reply {
-        var o = try Router.cleanParty(b, nil)
+        let o = try Router.cleanParty(b, nil)
         let id: Int = try db.transaction {
-            o["route_id"] = try resolveRoute(db, b) ?? NSNull()
+            let routes = try wantedRoutes(db, b, nil)
             let pid = try db.prepare("""
-            INSERT INTO parties(name,gstin,state_code,phone,tel,mobiles,address,fssai,pan,email,type,price_tier,credit_limit,credit_days,route_id)
-                   VALUES(@name,@gstin,@state_code,@phone,@tel,@mobiles,@address,@fssai,@pan,@email,@type,@price_tier,@credit_limit,@credit_days,@route_id)
+            INSERT INTO parties(name,gstin,state_code,phone,tel,mobiles,address,fssai,pan,email,type,price_tier,credit_limit,credit_days)
+                   VALUES(@name,@gstin,@state_code,@phone,@tel,@mobiles,@address,@fssai,@pan,@email,@type,@price_tier,@credit_limit,@credit_days)
             """).run(o).lastInsertRowid
+            try Router.setPartyRoutes(db, pid, routes)
             let ob = JS.number(b["opening_balance"] ?? nil)
             let opening = (ob.isNaN || ob == 0) ? 0 : ob   // positive = they owe us, negative = we owe them
             if opening != 0 {
@@ -107,14 +194,13 @@ extension Router {
         guard let cur = try db.prepare("SELECT * FROM parties WHERE id=?").get(id) else { throw HttpError(404, "Party not found") }
         var o = try Router.cleanParty(b, cur)
         try db.transaction {
-            var bb = b
-            if !b.defined("route_id") { bb["route_id"] = cur["route_id"] ?? NSNull() }
-            o["route_id"] = try resolveRoute(db, bb) ?? NSNull()
+            let routes = try wantedRoutes(db, b, cur.v("id"))
             o["id"] = cur["id"]
             try db.prepare("""
             UPDATE parties SET name=@name,gstin=@gstin,state_code=@state_code,phone=@phone,tel=@tel,mobiles=@mobiles,address=@address,
-                     fssai=@fssai,pan=@pan,email=@email,type=@type,price_tier=@price_tier,credit_limit=@credit_limit,credit_days=@credit_days,route_id=@route_id WHERE id=@id
+                     fssai=@fssai,pan=@pan,email=@email,type=@type,price_tier=@price_tier,credit_limit=@credit_limit,credit_days=@credit_days WHERE id=@id
             """).run(o)
+            try Router.setPartyRoutes(db, cur.v("id"), routes)
         }
         return ["ok": true] as Row
     }
@@ -125,7 +211,10 @@ extension Router {
         let used = try db.prepare("SELECT (SELECT COUNT(*) FROM ledger WHERE party_id=@i) + (SELECT COUNT(*) FROM invoices WHERE party_id=@i) + (SELECT COUNT(*) FROM purchases WHERE party_id=@i) + (SELECT COUNT(*) FROM debit_notes WHERE party_id=@i) n")
             .get(["i": p["id"]!] as Row)!.n("n")
         if used != 0 { try db.prepare("UPDATE parties SET active=0 WHERE id=?").run(p.v("id")); return ["result": "archived"] as Row }
-        try db.prepare("DELETE FROM parties WHERE id=?").run(p.v("id"))
+        try db.transaction {
+            try db.prepare("DELETE FROM party_routes WHERE party_id=?").run(p.v("id"))
+            try db.prepare("DELETE FROM parties WHERE id=?").run(p.v("id"))
+        }
         return ["result": "deleted"] as Row
     }
 
@@ -201,7 +290,7 @@ extension Router {
         return ["ok": true, "into": into.v("id"), "moved": moved] as Row
     }
 
-    // utils/routematch.js: outlets without a route get the route that shares a word with their name or address.
+    // utils/routematch.js: a customer goes on every route that lists a place (comma separated) found in its name or address.
     static let ROUTE_FILLER: Set<String> = ["ROUTE", "ROUTES", "BEAT", "MON", "TUE", "TUES", "WED", "THU", "THUR", "THURS", "FRI", "SAT", "SUN",
         "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
     static let ROUTE_GENERIC: Set<String> = ["ROAD", "NAGAR", "MARG", "CHOWK", "CHAURAHA", "BAZAR", "BAZAAR", "MARKET", "COLONY", "STREET",
@@ -210,81 +299,81 @@ extension Router {
         let up = s.uppercased().unicodeScalars.map { ($0 >= "A" && $0 <= "Z") || ($0 >= "0" && $0 <= "9") ? Character($0) : " " }
         return String(up).split(separator: " ").map(String.init)
     }
-    static func routePlaceWords(_ name: String) -> [String] {
-        var seen = Set<String>(), out: [String] = []
-        for w in routeWords(name) where w.count >= 3 && !w.allSatisfy({ $0.isASCII && $0.isNumber }) && !ROUTE_FILLER.contains(w) && !ROUTE_GENERIC.contains(w) {
-            if seen.insert(w).inserted { out.append(w) }
-        }
-        return out
-    }
+    /// A place as " A B " (ROUTE / BEAT / weekdays dropped); nil if under 3 letters or only one common word.
     static func routeKey(_ name: String) -> String? {
         let all = routeWords(name)
         let kept = all.filter { !ROUTE_FILLER.contains($0) }
-        let k = (kept.isEmpty ? all : kept).joined(separator: " ")
-        return k.count >= 3 ? " \(k) " : nil
+        let list = kept.isEmpty ? all : kept
+        let k = list.joined(separator: " ")
+        if k.count < 3 || (list.count == 1 && ROUTE_GENERIC.contains(list[0])) { return nil }
+        return " \(k) "
     }
-    /// Every place a beat lists: "Khajrana, New Palasia / Rajwada" → [" KHAJRANA ", " NEW PALASIA ", " RAJWADA "].
+    /// Every place a route lists: "Khajrana, New Palasia / Rajwada" → [" KHAJRANA ", " NEW PALASIA ", " RAJWADA "].
     static func routeKeys(_ name: String) -> [String] {
-        name.split(whereSeparator: { ",;/&+|".contains($0) }).compactMap { routeKey(String($0)) }
+        var out: [String] = []
+        for part in name.split(whereSeparator: { ",;/&+|".contains($0) }) {
+            if let k = routeKey(String(part)), !out.contains(k) { out.append(k) }
+        }
+        return out
     }
 
-    /// {matches: [{party_id, party_name, address, route_id, route_name}], unclear, unmatched, assigned}; apply → also assigns them.
+    /// {matches: [{party_id, party_name, address, route_id, route_name}], unmatched, assigned}: one match per customer and route it is
+    /// not on yet (a customer can be in several). apply → adds the routes: only `assignments` [{party_id, route_id}] when given,
+    /// else only `party_ids` when given, else all. (choices and unclear stay in the reply, empty, for apps that still read them.)
     func autoAssignRoutes(_ db: Database, _ b: Row) throws -> Any {
         let apply = JS.truthy(b["apply"] ?? nil)
         let only: Set<Double>? = (unwrap(b["party_ids"] ?? nil) as? [Any]).map { ids in Set(ids.map { JS.number($0) }) }
-        let routes: [(id: Any?, name: String, words: [String], keys: [String])] = try db.prepare("SELECT id, name FROM routes").all().compactMap { r in
+        let routes: [(id: Int, name: String, keys: [String])] = try db.prepare("SELECT id, name FROM routes ORDER BY name, id").all().compactMap { r in
             let name = JS.string(r.v("name"))
-            let w = Router.routePlaceWords(name)
-            return w.isEmpty ? nil : (id: r.v("id"), name: name, words: w, keys: Router.routeKeys(name))
+            let keys = Router.routeKeys(name)
+            return keys.isEmpty ? nil : (id: r.i("id"), name: name, keys: keys)
         }
-        let parties = try db.prepare("SELECT id, name, address FROM parties WHERE active=1 AND route_id IS NULL AND type <> 'SUPPLIER' ORDER BY name").all()
-        var matches: [Row] = [], choices: [Row] = []
-        var unclear = 0, unmatched = 0
+        let parties = try db.prepare("SELECT id, name, address, route_id FROM parties WHERE active=1 AND type <> 'SUPPLIER' ORDER BY name, id").all()
+        var on: [Int: Set<Int>] = [:]   // party → routes it is on
+        for x in try db.prepare("SELECT party_id, route_id FROM party_routes").all() { on[x.i("party_id"), default: []].insert(x.i("route_id")) }
+        var matches: [Row] = []
+        var unmatched = 0
         for p in parties {
             if let only, !only.contains(JS.number(p.v("id"))) { continue }
+            var has = on[p.i("id")] ?? []
+            if p.has("route_id") { has.insert(p.i("route_id")) }
             let addr = p.v("address") == nil ? "" : JS.string(p.v("address"))
-            let nameList = Router.routeWords(JS.string(p.v("name"))), addrList = Router.routeWords(addr)
-            let nameW = Set(nameList), addrW = Set(addrList)
-            let text = " " + nameList.joined(separator: " ") + " | " + addrList.joined(separator: " ") + " "
-            var scored: [(i: Int, s: [Int])] = []
-            for (i, r) in routes.enumerated() {
-                let inName = r.words.filter { nameW.contains($0) }.count
-                let inAddr = r.words.filter { !nameW.contains($0) && addrW.contains($0) }.count
-                if inName + inAddr == 0 { continue }
-                let phrase = r.keys.filter { text.contains($0) }.map { $0.count }.max() ?? 0
-                scored.append((i: i, s: [inName, inAddr, phrase]))
+            let text = " " + Router.routeWords(JS.string(p.v("name"))).joined(separator: " ") + " | " + Router.routeWords(addr).joined(separator: " ") + " "
+            var n = 0
+            for r in routes {
+                if has.contains(r.id) || !r.keys.contains(where: { text.contains($0) }) { continue }
+                matches.append(["party_id": p.v("id") as Any, "party_name": p.v("name") as Any, "address": addr, "route_id": r.id, "route_name": r.name] as Row)
+                n += 1
             }
-            if scored.isEmpty { unmatched += 1; continue }
-            scored.sort { $1.s.lexicographicallyPrecedes($0.s) }   // best first
-            if scored.count > 1 && scored[0].s == scored[1].s {
-                unclear += 1
-                let level = scored.filter { $0.s == scored[0].s }.sorted { $0.i < $1.i }.map {   // in route order, like the Mac
-                     ["route_id": routes[$0.i].id, "route_name": routes[$0.i].name] as Row }
-                choices.append(["party_id": p.v("id"), "party_name": p.v("name"), "address": addr, "routes": level] as Row)
-                continue
-            }
-            let best = routes[scored[0].i]
-            matches.append(["party_id": p.v("id"), "party_name": p.v("name"), "address": addr, "route_id": best.id, "route_name": best.name] as Row)
+            if n == 0 && has.isEmpty { unmatched += 1 }
         }
         var assigned = 0
         if apply {
-            var pairs: [(Any?, Any?)] = matches.map { ($0.v("route_id"), $0.v("party_id")) }
-            for a in (unwrap(b["assignments"] ?? nil) as? [Any]) ?? [] {
-                guard let o = a as? Row else { continue }
-                let pid = JS.number(o["party_id"] ?? nil), rid = JS.number(o["route_id"] ?? nil)
-                if pid > 0 && rid > 0 { pairs.append((rid, pid)) }
+            let ok = Set(try db.prepare("SELECT id FROM routes").all().map { $0.i("id") })
+            var pairs: [(pid: Any?, rid: Int)] = []
+            if let list = unwrap(b["assignments"] ?? nil) as? [Any] {
+                for a in list {
+                    guard let o = a as? Row else { continue }
+                    let pid = JS.number(o["party_id"] ?? nil), rid = JS.number(o["route_id"] ?? nil)
+                    if pid > 0 && rid > 0 && rid < 9e15 && rid == rid.rounded() && ok.contains(Int(rid)) { pairs.append((pid: pid, rid: Int(rid))) }
+                }
+            } else {
+                pairs = matches.map { (pid: $0.v("party_id"), rid: $0.i("route_id")) }
             }
             try db.transaction {
-                let up = try db.prepare("UPDATE parties SET route_id=? WHERE id=? AND route_id IS NULL AND active=1 AND EXISTS (SELECT 1 FROM routes WHERE id=?)")
-                for (rid, pid) in pairs { assigned += try up.run(rid, pid, rid).changes }
+                let live = db.prepare("SELECT 1 x FROM parties WHERE id=? AND active=1 AND type <> 'SUPPLIER'")
+                for m in pairs {
+                    let there = try live.get(m.pid)
+                    if there != nil, try Router.addPartyRoute(db, m.pid, m.rid) { assigned += 1 }
+                }
             }
         }
-        return ["matches": matches, "choices": choices, "unclear": unclear, "unmatched": unmatched, "assigned": assigned] as Row
+        return ["matches": matches, "choices": [Row](), "unclear": 0, "unmatched": unmatched, "assigned": assigned] as Row
     }
 
     func listRoutes(_ db: Database) throws -> Any {
         try db.prepare("""
-        SELECT r.*, s.name salesman_name, (SELECT COUNT(*) FROM parties p WHERE p.route_id=r.id AND p.active=1) outlets
+        SELECT r.*, s.name salesman_name, (SELECT COUNT(*) FROM parties p WHERE p.active=1 AND \(Router.ON_ROUTE)) outlets
              FROM routes r LEFT JOIN salesmen s ON s.id=r.salesman_id ORDER BY r.days, r.name
         """).all()
     }
@@ -310,7 +399,10 @@ extension Router {
 
     func deleteRoute(_ db: Database, _ id: String) throws -> Any {
         try db.transaction {
-            try db.prepare("UPDATE parties SET route_id=NULL WHERE route_id=?").run(id)   // outlets stay, just unassigned
+            // outlets stay: one that is on other routes too keeps those (the next becomes its first), the rest are just unassigned
+            try db.prepare("DELETE FROM party_routes WHERE route_id=?").run(id)
+            try db.prepare("UPDATE parties SET route_id=(SELECT x.route_id FROM party_routes x WHERE x.party_id=parties.id ORDER BY x.id LIMIT 1) WHERE route_id=?").run(id)
+            try db.prepare("DELETE FROM party_routes WHERE route_id=(SELECT p.route_id FROM parties p WHERE p.id=party_routes.party_id)").run()
             try db.prepare("DELETE FROM routes WHERE id=?").run(id)
         }
         return ["ok": true] as Row
@@ -324,12 +416,15 @@ extension Router {
             cal.timeZone = TimeZone.current
             day = Double(cal.component(.weekday, from: Clock.now) - 1)
         }
+        // the salesman's routes of that day; an outlet on two of them shows once, with both names
+        let due = "r.salesman_id=@sm AND (',' || COALESCE(r.days, CAST(r.day_of_week AS TEXT), '') || ',') LIKE '%,' || @day || ',%' AND \(Router.ON_ROUTE)"
         let rows = try db.prepare("""
-        SELECT p.id, p.name, p.phone, p.address, p.credit_limit, r.name route_name,
+        SELECT p.id, p.name, p.phone, p.address, p.credit_limit,
+               (SELECT group_concat(name, '; ') FROM (SELECT r.name FROM routes r WHERE \(due) ORDER BY r.name, r.id)) route_name,
                COALESCE((SELECT SUM(debit)-SUM(credit) FROM ledger l WHERE l.party_id=p.id AND l.date <= @to),0) outstanding,
                (SELECT MAX(date) FROM invoices i WHERE i.party_id=p.id AND i.date <= @to) last_order
-             FROM parties p JOIN routes r ON r.id=p.route_id
-             WHERE r.salesman_id=@sm AND (',' || COALESCE(r.days, CAST(r.day_of_week AS TEXT), '') || ',') LIKE '%,' || @day || ',%' AND p.active=1 ORDER BY r.name, p.name
+             FROM parties p
+             WHERE p.active=1 AND EXISTS (SELECT 1 FROM routes r WHERE \(due)) ORDER BY route_name, p.name
         """).all(["sm": id, "day": day.isNaN ? NSNull() as Any : JS.numberString(day) as Any, "to": try FY.range(q["fy"]).to] as Row)
         return ["day": day.isNaN ? NSNull() as Any : day, "outlets": rows, "total_outstanding": r2(rows.reduce(0.0) { $0 + $1.n("outstanding") })] as Row
     }

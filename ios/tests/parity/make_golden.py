@@ -46,7 +46,9 @@ save('scenario', scen, node(concrete(scen, work=TMP, engine='mac'), 'scenario'))
 # (the parser and page-text goldens come from real supplier bills: they go to Golden/private, which is kept off GitHub)
 os.makedirs(PRIV_OUT, exist_ok=True)
 for name in ('parser', 'fuzz'):
-    subprocess.run([sys.executable, os.path.join(HERE, f'gen_{name}.py'), TMP], check=True, capture_output=True)
+    rc = subprocess.run([sys.executable, os.path.join(HERE, f'gen_{name}.py'), TMP], capture_output=True).returncode
+    if rc == 3: print(f'{name}: skipped (private test files not present)'); continue
+    if rc: sys.exit(f'gen_{name}.py failed ({rc})')
     steps = json.load(open(os.path.join(TMP, name + '.json')))
     save(('private/' if name == 'parser' else '') + name, steps, node(steps, name))
 if os.path.exists(os.path.join(FIX, 'pdf_text_runs.json')):

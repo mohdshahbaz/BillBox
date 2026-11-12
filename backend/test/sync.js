@@ -57,6 +57,24 @@ function device(name, port) {
     assert.ok(a[0].id > 10000000 && a[0].id < 20000000);
     assert.deepStrictEqual(await q(B, 'SELECT id,name FROM categories ORDER BY id'), await q(A, 'SELECT id,name FROM categories ORDER BY id'));
   });
+  await ok('a party on several routes: its routes reach the other device, both ways', async () => {
+    const co = (dev) => (dev === A ? 'db.firstCompanyId()' : 'Object.keys(JSON.parse(db.registry.prepare("SELECT value FROM app_settings WHERE key=\'sync_map\'").get().value))[0]*1');
+    const PR = "require('../src/utils/partyroutes')";
+    const ids = await A.run(`return db.withCompany(${co(A)}, () => {
+      const r = ['Sync North', 'Sync South', 'Sync East'].map((n) => Number(db.prepare('INSERT INTO routes(name) VALUES(?)').run(n).lastInsertRowid));
+      const p = Number(db.prepare("INSERT INTO parties(name) VALUES('Sync Multi Store')").run().lastInsertRowid);
+      ${PR}.setPartyRoutes(db, p, [r[0], r[1]]);
+      return { r, p };
+    })`);
+    await both();
+    const routes = (dev) => dev.run(`return db.withCompany(${co(dev)}, () => ${PR}.partyRoutes(db, ${ids.p}))`);
+    assert.deepStrictEqual(await routes(B), [ids.r[0], ids.r[1]]);
+    await B.run(`return db.withCompany(${co(B)}, () => ${PR}.setPartyRoutes(db, ${ids.p}, [${ids.r[1]}, ${ids.r[2]}]))`);
+    await both();
+    assert.deepStrictEqual(await routes(A), [ids.r[1], ids.r[2]]);
+    assert.deepStrictEqual(await q(A, 'SELECT * FROM party_routes ORDER BY id'), await q(B, 'SELECT * FROM party_routes ORDER BY id'));
+    assert.strictEqual((await q(A, 'SELECT COUNT(*) n FROM party_routes WHERE party_id=?', ids.p))[0].n, 1);
+  });
   await ok('both devices sell from the same batch: stock counts both sales', async () => {
     const [batch] = await q(A, 'SELECT id,item_id,qty FROM batches WHERE qty > 20 ORDER BY id LIMIT 1');
     const sell = (dev, n) => dev.run(`const c = ${dev === A ? 'db.firstCompanyId()' : 'Object.keys(JSON.parse(db.registry.prepare("SELECT value FROM app_settings WHERE key=\'sync_map\'").get().value))[0]*1'};

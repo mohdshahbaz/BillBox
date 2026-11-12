@@ -2,6 +2,7 @@ const router = require('express').Router();
 const db = require('../db');
 const { h, today } = require('../utils/misc');
 const { r2 } = require('../utils/gst');
+const { ROUTE_NAMES } = require('../utils/partyroutes');
 const R = require('../services/reports');
 const { buildXlsx } = require('../utils/xlsx');
 const { fyRange, fyList } = require('../utils/fy');
@@ -49,8 +50,8 @@ router.get('/reports/low-stock', h((req, res) => res.json(R.lowStock().rows)));
 
 router.get('/reports/outstanding', h((req, res) => {
   res.json(db.prepare(
-    `SELECT p.id, p.name, p.phone, p.type, p.credit_limit, r.name route_name, SUM(l.debit)-SUM(l.credit) balance
-     FROM parties p JOIN ledger l ON l.party_id=p.id AND l.date <= ? LEFT JOIN routes r ON r.id=p.route_id
+    `SELECT p.id, p.name, p.phone, p.type, p.credit_limit, ${ROUTE_NAMES} route_name, SUM(l.debit)-SUM(l.credit) balance
+     FROM parties p JOIN ledger l ON l.party_id=p.id AND l.date <= ?
      GROUP BY p.id HAVING ABS(balance) > 0.5 ORDER BY balance DESC`).all(fyRange(req.query.fy).to));
 }));
 

@@ -57,18 +57,18 @@ class _PartiesState extends State<PartiesScreen> {
     });
   }
 
-  /// Customers without a route get the route sharing a word with their name or address (POST /routes/auto-assign): preview, untick, apply.
+  /// Customers go on every route that lists a place (comma separated in the route's name) found in their name or address
+  /// (POST /routes/auto-assign): preview, untick, apply. A customer can get several routes.
   Future<void> _autoRoutes() => guard(context, () async {
         final pre = await Api.post('/routes/auto-assign', {'apply': false}) as Json;
         if (!mounted) return;
         final matches = (pre['matches'] as List).cast<Json>();
-        final choices = ((pre['choices'] as List?) ?? const []).cast<Json>();
-        final skip = <int>{};
-        final picks = <int, int>{};   // a customer matching two beats equally → the beat picked (0 = leave without a route)
+        String key(Json m) => '${m['party_id']}-${m['route_id']}';
+        final skip = <String>{};   // unticked "party-route" pairs
         final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) {
-            final n = matches.where((m) => !skip.contains(m['party_id'])).length + picks.values.where((v) => v > 0).length;
+            final n = matches.where((m) => !skip.contains(key(m))).length;
             final unmatched = num_(pre['unmatched']).toInt();
             return AlertDialog(
               title: const Text('Assign routes from name and address'),
@@ -76,12 +76,12 @@ class _PartiesState extends State<PartiesScreen> {
                 width: math.min(620.0, MediaQuery.sizeOf(ctx).width - 80),
                 child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(matches.isEmpty
-                      ? 'No customer without a route shares a word with a route name.'
-                      : '${matches.length} customers without a route share a word with a route name. Untick any that are wrong.'),
+                      ? 'No customer has a place of a route in its name or address (that it is not on already).'
+                      : '${matches.length} routes to add. A customer goes on every route whose name lists a place (comma separated) found in the customer\'s name or address. Untick any that are wrong.'),
                   if (unmatched > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text('Left as they are: $unmatched sharing no word with a route.',
+                      child: Text('Left without a route: $unmatched customers matching no route.',
                           style: Theme.of(ctx).textTheme.bodySmall),
                     ),
                   const SizedBox(height: 8),
@@ -91,30 +91,16 @@ class _PartiesState extends State<PartiesScreen> {
                         CheckboxListTile(
                           dense: true,
                           controlAffinity: ListTileControlAffinity.leading,
-                          value: !skip.contains(m['party_id']),
-                          onChanged: (v) => setSt(() => v == true ? skip.remove(m['party_id']) : skip.add(m['party_id'] as int)),
+                          value: !skip.contains(key(m)),
+                          onChanged: (v) => setSt(() {
+                            if (v == true) {
+                              skip.remove(key(m));
+                            } else {
+                              skip.add(key(m));
+                            }
+                          }),
                           title: Text('${m['party_name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: '${m['address'] ?? ''}'.isEmpty ? null : Text('${m['address']}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                          secondary: Text('→ ${m['route_name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                        ),
-                      if (choices.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12, bottom: 4),
-                          child: Text('Pick a beat (${choices.length} match more than one equally)', style: const TextStyle(fontWeight: FontWeight.w700)),
-                        ),
-                      for (final c in choices)
-                        ListTile(
-                          dense: true,
-                          title: Text('${c['party_name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: '${c['address'] ?? ''}'.isEmpty ? null : Text('${c['address']}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                          trailing: DropdownButton<int>(
-                            value: picks[c['party_id']] ?? 0,
-                            items: [
-                              const DropdownMenuItem(value: 0, child: Text('Leave without a route')),
-                              for (final r in (c['routes'] as List).cast<Json>()) DropdownMenuItem(value: r['route_id'] as int, child: Text('${r['route_name']}')),
-                            ],
-                            onChanged: (v) => setSt(() => picks[c['party_id'] as int] = v ?? 0),
-                          ),
+                          subtitle: Text('${'${m['address'] ?? ''}'.isEmpty ? '' : '${m['address']}\n'}→ ${m['route_name']}', maxLines: 2, overflow: TextOverflow.ellipsis),
                         ),
                     ]),
                   ),
@@ -128,10 +114,9 @@ class _PartiesState extends State<PartiesScreen> {
           }),
         );
         if (ok != true || !mounted) return;
-        final ids = [for (final m in matches) if (!skip.contains(m['party_id'])) m['party_id']];
-        final picked = [for (final e in picks.entries) if (e.value > 0) {'party_id': e.key, 'route_id': e.value}];
-        final r = await Api.post('/routes/auto-assign', {'apply': true, 'party_ids': ids, 'assignments': picked}) as Json;
-        if (mounted) toast(context, '${r['assigned']} outlets assigned to routes.');
+        final picked = [for (final m in matches) if (!skip.contains(key(m))) {'party_id': m['party_id'], 'route_id': m['route_id']}];
+        final r = await Api.post('/routes/auto-assign', {'apply': true, 'assignments': picked}) as Json;
+        if (mounted) toast(context, '${r['assigned']} routes assigned.');
         await _load();
       });
 
@@ -335,7 +320,9 @@ class _PartyForm extends StatefulWidget {
 
 class _PartyFormState extends State<_PartyForm> {
   late final Map<String, TextEditingController> c;
-  late String type, tier, route; // route: '' | route id | '__new__'
+  late String type, tier;
+  final routeSet = <int>{}; // ids of the routes this party is on (a party can be on several)
+  bool addNew = false;
   String newSalesman = '', newDay = '1';
   String? err;
 
@@ -352,7 +339,8 @@ class _PartyFormState extends State<_PartyForm> {
     };
     type = p == null ? widget.defaultType : v('type', 'RETAILER');
     tier = v('price_tier', 'RETAIL');
-    route = v('route_id');
+    routeSet.addAll(v('route_ids').split(',').map((x) => int.tryParse(x.trim())).whereType<int>());
+    if (routeSet.isEmpty && p != null && p['route_id'] != null) routeSet.add(num_(p['route_id']).toInt());
     // Typing a GSTIN fills the state code and PAN boxes (the first 2 digits are the state, characters 3 to 12 the PAN).
     c['gstin']!.addListener(() {
       final g = c['gstin']!.text.trim().toUpperCase();
@@ -376,15 +364,17 @@ class _PartyFormState extends State<_PartyForm> {
 
   void _submit() {
     if (c['name']!.text.trim().isEmpty) return setState(() => err = 'Party name is required');
-    if (route == '__new__' && c['new_route']!.text.trim().isEmpty) return setState(() => err = 'Enter a name for the new route');
+    final supplier = type == 'SUPPLIER';
+    final makeRoute = addNew && !supplier;
+    if (makeRoute && c['new_route']!.text.trim().isEmpty) return setState(() => err = 'Enter a name for the new route');
     final out = <String, dynamic>{
       for (final k in ['name', 'gstin', 'state_code', 'phone', 'address', 'credit_limit', 'credit_days', 'tel', 'mobiles', 'email', 'fssai', 'pan']) k: c[k]!.text.trim(),
       'type': type,
       'price_tier': tier,
-      'route_id': route == '__new__' ? '' : route,
+      'route_ids': supplier ? <int>[] : [for (final r in widget.routes) if (routeSet.contains(num_(r['id']).toInt())) num_(r['id']).toInt()],
     };
     if (widget.party == null) out['opening_balance'] = c['opening_balance']!.text.trim();
-    if (route == '__new__') out['new_route'] = {'name': c['new_route']!.text.trim(), 'salesman_id': newSalesman, 'day_of_week': newDay};
+    if (makeRoute) out['new_route'] = {'name': c['new_route']!.text.trim(), 'salesman_id': newSalesman, 'day_of_week': newDay};
     Navigator.pop(context, out);
   }
 
@@ -431,18 +421,30 @@ class _PartyFormState extends State<_PartyForm> {
                 ),
                 _tf('credit_limit', 'Credit limit (0 = no limit)', half, number: true),
                 _tf('credit_days', 'Credit days', half, number: true),
-                AppDropdown<String>(
-                  width: half,
-                  label: 'Delivery / sales route',
-                  value: route,
-                  options: {
-                    '': 'No route',
-                    for (final r in widget.routes) '${r['id']}': '${r['name']}${r['day_of_week'] != null ? ' · ${_dayNames[r['day_of_week']]}' : ''}',
-                    '__new__': '+ New route…',
-                  },
-                  onChanged: (v) => setState(() => route = v ?? route),
+                SizedBox(
+                  width: full,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Delivery / sales routes (tick every route this party is on)', style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (final r in widget.routes)
+                        FilterChip(
+                          label: Text('${r['name']}${r['day_of_week'] != null ? ' · ${_dayNames[r['day_of_week']]}' : ''}'),
+                          selected: routeSet.contains(num_(r['id']).toInt()),
+                          onSelected: (on) => setState(() {
+                            final id = num_(r['id']).toInt();
+                            if (on) {
+                              routeSet.add(id);
+                            } else {
+                              routeSet.remove(id);
+                            }
+                          }),
+                        ),
+                      FilterChip(label: const Text('+ New route…'), selected: addNew, onSelected: (on) => setState(() => addNew = on)),
+                    ]),
+                  ]),
                 ),
-                if (route == '__new__')
+                if (addNew)
                   Container(
                     width: full,
                     padding: const EdgeInsets.all(12),

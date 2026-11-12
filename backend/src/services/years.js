@@ -13,7 +13,7 @@ const { fyRange } = require('../utils/fy');
  */
 const reg = db.registry;
 const norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
-const MASTERS = ['categories', 'salesmen', 'routes', 'parties', 'items', 'schemes'];
+const MASTERS = ['categories', 'salesmen', 'routes', 'parties', 'party_routes', 'items', 'schemes'];
 
 /** Rows of `table` from one raw database into another, same ids, columns matched by name. */
 function copyRows(src, dst, table, where = '') {

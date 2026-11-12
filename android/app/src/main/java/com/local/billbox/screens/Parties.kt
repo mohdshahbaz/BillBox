@@ -41,7 +41,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -204,48 +203,38 @@ fun PartiesScreen() {
     }, { confirmBulk = false }, destructive = true)
 }
 
-/** Customers without a route get the route sharing a word with their name or address (POST /routes/auto-assign): preview, untick, apply. */
+/**
+ * Customers go on every route that lists a place (comma separated in the route's name) found in their name or address
+ * (POST /routes/auto-assign): preview, untick, apply. A customer can get several routes.
+ */
 @Composable
 fun AutoRouteForm(onDismiss: () -> Unit, done: suspend () -> Unit) {
     val app = LocalApp.current
     var preview by remember { mutableStateOf<J?>(null) }
-    val skip = remember { mutableStateListOf<Int>() }
-    // a customer matching two beats equally → the beat the owner picked (0 = leave without a route)
-    val picks = remember { mutableStateMapOf<Int, Int>() }
+    val skip = remember { mutableStateListOf<String>() }   // unticked "party-route" pairs
     LaunchedEffect(Unit) { app.guarded { preview = Api.obj("POST", "/routes/auto-assign", body = mapOf("apply" to false)) } }
     val matches = preview?.list("matches") ?: emptyList()
-    val choices = preview?.list("choices") ?: emptyList()
-    val chosen = matches.map { it.int("party_id") }.filter { it !in skip }
-    val picked = picks.filter { it.value > 0 }.map { mapOf("party_id" to it.key, "route_id" to it.value) }
-    FormDialog("Assign routes", onDismiss, "Assign ${chosen.size + picked.size}", canSave = chosen.size + picked.size > 0, onSave = {
-        val r = Api.obj("POST", "/routes/auto-assign", body = mapOf("apply" to true, "party_ids" to chosen, "assignments" to picked))
-        app.notify("${r.int("assigned")} outlets assigned to routes.")
+    fun key(m: J) = "${m.int("party_id")}-${m.int("route_id")}"
+    val chosen = matches.filter { key(it) !in skip }.map { mapOf("party_id" to it.int("party_id"), "route_id" to it.int("route_id")) }
+    FormDialog("Assign routes", onDismiss, "Assign ${chosen.size}", canSave = chosen.isNotEmpty(), onSave = {
+        val r = Api.obj("POST", "/routes/auto-assign", body = mapOf("apply" to true, "assignments" to chosen))
+        app.notify("${r.int("assigned")} routes assigned.")
         done()
     }) {
         val p = preview
         if (p == null) { Loading(); return@FormDialog }
-        Hint(if (matches.isEmpty()) "No customer without a route shares a word with a route name."
-             else "${matches.size} customers without a route share a word with a route name. Untick any that are wrong.")
-        if (p.int("unmatched") > 0) Hint("Left as they are: ${p.int("unmatched")} sharing no word with a route.")
+        Hint(if (matches.isEmpty()) "No customer has a place of a route in its name or address (that it is not on already)."
+             else "${matches.size} routes to add. A customer goes on every route whose name lists a place (comma separated) found in the customer's name or address. Untick any that are wrong.")
+        if (p.int("unmatched") > 0) Hint("Left without a route: ${p.int("unmatched")} customers matching no route.")
         matches.forEach { m ->
-            val id = m.int("party_id")
-            Row(Modifier.fillMaxWidth().clickable { if (id in skip) skip.remove(id) else skip.add(id) }, verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(id !in skip, { on -> if (on) skip.remove(id) else skip.add(id) })
+            val k = key(m)
+            Row(Modifier.fillMaxWidth().clickable { if (k in skip) skip.remove(k) else skip.add(k) }, verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(k !in skip, { on -> skip.remove(k); if (!on) skip.add(k) })
                 Column(Modifier.weight(1f)) {
                     Text(m.str("party_name"), fontWeight = FontWeight.Medium)
                     if (m.str("address").isNotEmpty()) Hint(m.str("address"))
+                    Text("→ " + m.str("route_name"), fontWeight = FontWeight.SemiBold)
                 }
-                Text("→ " + m.str("route_name"), fontWeight = FontWeight.SemiBold)
-            }
-        }
-        if (choices.isNotEmpty()) {
-            SectionHeader("Pick a beat (${choices.size} match more than one equally)")
-            choices.forEach { c ->
-                val id = c.int("party_id")
-                Text(c.str("party_name"), fontWeight = FontWeight.Medium)
-                if (c.str("address").isNotEmpty()) Hint(c.str("address"))
-                Choice("Beat", listOf("0" to "Leave without a route") + c.list("routes").map { it.str("route_id") to it.str("route_name") },
-                    (picks[id] ?: 0).toString(), { picks[id] = it.toIntOrNull() ?: 0 })
             }
         }
     }
@@ -274,7 +263,15 @@ fun PartyForm(party: J?, defaultType: String, routes: List<J>, salesmen: List<J>
     var type by remember { mutableStateOf(if (party == null) defaultType else party.str("type").ifEmpty { "RETAILER" }) }
     val defTier = app.setting("party_default_tier").takeIf { it in listOf("RETAIL", "WHOLESALE", "MRP") } ?: "RETAIL"
     var tier by remember { mutableStateOf(party?.str("price_tier")?.ifEmpty { null } ?: defTier) }
-    var route by remember { mutableStateOf(if (party?.has("route_id") == true) party.str("route_id") else "") }
+    // ids of the routes this party is on (a party can be on several)
+    val routeSet = remember {
+        mutableStateListOf<Int>().apply {
+            addAll((party?.str("route_ids") ?: "").split(",").mapNotNull { it.trim().toIntOrNull() }.distinct())
+            if (isEmpty() && party?.has("route_id") == true) add(party.int("route_id"))
+        }
+    }
+    var addNew by remember { mutableStateOf(false) }
+    var routesOpen by remember { mutableStateOf(routeSet.isEmpty()) }
     var newRoute by remember { mutableStateOf("") }
     var newSalesman by remember { mutableStateOf("") }
     var newDays by remember { mutableStateOf("1") }
@@ -291,9 +288,10 @@ fun PartyForm(party: J?, defaultType: String, routes: List<J>, salesmen: List<J>
         val body = mutableMapOf<String, Any?>()
         for (k in listOf("name", "gstin", "state_code", "phone", "address", "credit_limit", "credit_days", "tel", "mobiles", "email", "fssai", "pan"))
             body[k] = v(k, if (k == "state_code") "09" else if (k == "credit_limit" || k == "credit_days") "0" else "").trim()
-        body["type"] = type; body["price_tier"] = tier; body["route_id"] = if (route == "__new__") "" else route
+        body["type"] = type; body["price_tier"] = tier
+        body["route_ids"] = if (isSupplier) emptyList<Int>() else routes.map { it.id }.filter { it in routeSet }
         if (party == null) body["opening_balance"] = v("opening_balance", "0")
-        if (route == "__new__") {
+        if (addNew && !isSupplier) {
             if (newRoute.isBlank()) throw Exception("Enter a name for the new route")
             var sid = newSalesman
             if (newSalesman == "__new__") {
@@ -327,11 +325,27 @@ fun PartyForm(party: J?, defaultType: String, routes: List<J>, salesmen: List<J>
             Choice("Price tier", listOf("RETAIL" to "Retail price", "WHOLESALE" to "Wholesale price", "MRP" to "MRP"), tier, { tier = it })
             Field("Credit limit (0 = no limit)", v("credit_limit", "0"), { set("credit_limit", it) }, kb = Kb.Decimal)
             Field("Credit days", v("credit_days", "0"), { set("credit_days", it) }, kb = Kb.Number)
-            Choice("Delivery / sales route", listOf("" to "No route") + routes.map { r ->
-                val days = dayList(r.str("days"))
-                r.id.toString() to (r.str("name") + if (days.isNotEmpty()) " · $days" else if (r.has("day_of_week")) " · ${dayNames[r.int("day_of_week").coerceIn(0, 6)].take(3)}" else "")
-            } + listOf("__new__" to "+ New route…"), route, { route = it })
-            if (route == "__new__") {
+            val on = routes.filter { it.id in routeSet }.map { it.str("name") } + (if (addNew) listOf("new route") else emptyList())
+            Row(Modifier.fillMaxWidth().clickable { routesOpen = !routesOpen }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (on.isEmpty()) "Delivery / sales routes: none" else "Routes (${on.size}): " + on.joinToString("; "), Modifier.weight(1f), fontWeight = FontWeight.Medium)
+                Text(if (routesOpen) "Hide" else "Change", color = MaterialTheme.colorScheme.primary)
+            }
+            if (routesOpen) {
+                routes.forEach { r ->
+                    val rid = r.id
+                    val days = dayList(r.str("days"))
+                    val label = r.str("name") + if (days.isNotEmpty()) " · $days" else if (r.has("day_of_week")) " · ${dayNames[r.int("day_of_week").coerceIn(0, 6)].take(3)}" else ""
+                    Row(Modifier.fillMaxWidth().clickable { if (rid in routeSet) routeSet.remove(rid) else routeSet.add(rid) }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(rid in routeSet, { c -> routeSet.remove(rid); if (c) routeSet.add(rid) })
+                        Text(label, Modifier.weight(1f))
+                    }
+                }
+                Row(Modifier.fillMaxWidth().clickable { addNew = !addNew }, verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(addNew, { addNew = it })
+                    Text("+ New route…", Modifier.weight(1f))
+                }
+            }
+            if (addNew) {
                 Field("New route name", newRoute, { newRoute = it })
                 Choice("Salesman for this route", listOf("" to "Not assigned yet") + salesmen.map { it.id.toString() to it.str("name") } + listOf("__new__" to "+ New salesman…"), newSalesman, { newSalesman = it })
                 if (newSalesman == "__new__") {

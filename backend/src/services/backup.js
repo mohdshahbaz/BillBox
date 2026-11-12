@@ -261,6 +261,11 @@ function mergeInto(row, file) {
         if (id) skip('parties'); else { id = insert('parties', { ...r, route_id: m('routes', r.route_id) }); haveP.set(k, id); newParties.add(id); add('parties'); }
         maps.parties.set(r.id, id);
       }
+      // the other routes of the parties just added (older backups have no party_routes table)
+      for (const r of all('party_routes')) {
+        const pid = m('parties', r.party_id), rid = m('routes', r.route_id);
+        if (pid && rid && newParties.has(pid)) insert('party_routes', { party_id: pid, route_id: rid });
+      }
       const haveI = idx('items', 'name');
       for (const r of all('items')) {
         let id = haveI.get(key(r.name));

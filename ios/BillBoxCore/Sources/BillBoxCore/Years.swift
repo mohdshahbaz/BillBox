@@ -6,7 +6,7 @@ import Foundation
 //                   balance, and the stock on hand becomes the opening stock.
 //   carry: false -> empty books with the company's settings (e.g. for that year's Marg data).
 enum Years {
-    static let MASTERS = ["categories", "salesmen", "routes", "parties", "items", "schemes"]
+    static let MASTERS = ["categories", "salesmen", "routes", "parties", "party_routes", "items", "schemes"]
 
     /// Rows of `table` from one database into another, same ids, columns matched by name.
     static func copyRows(_ src: Database, _ dst: Database, _ table: String, _ whereSQL: String = "") throws -> Int {

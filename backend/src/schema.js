@@ -240,6 +240,14 @@ function applySchema(db, settings = {}) {
   // v9: e-way bill (number from the portal, its date and validity, and the transport details used for it)
   for (const c of ['ewb_no', 'ewb_date', 'ewb_valid', 'ewb_transport']) addColumn(db, 'invoices', c, 'TEXT');
   db.exec(V7);
+  // v16.3: a party can be on several routes. parties.route_id stays the first one; party_routes holds the others.
+  db.exec(`CREATE TABLE IF NOT EXISTS party_routes (
+  id INTEGER PRIMARY KEY,
+  party_id INTEGER NOT NULL REFERENCES parties(id),
+  route_id INTEGER NOT NULL REFERENCES routes(id)
+);
+CREATE INDEX IF NOT EXISTS idx_party_routes_party ON party_routes(party_id);
+CREATE INDEX IF NOT EXISTS idx_party_routes_route ON party_routes(route_id);`);
   const ins = db.prepare('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)');
   const up = db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
   for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) ins.run(k, v);

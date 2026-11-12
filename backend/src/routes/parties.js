@@ -6,6 +6,7 @@ const { recordVoucher, getVoucher, deleteLedgerEntry } = require('../services/vo
 const Sheet = require('../services/paymentSheet');
 
 const { fyRange } = require('../utils/fy');
+const { ROUTE_NAMES, ROUTE_IDS, idList, setPartyRoutes, partyRoutes } = require('../utils/partyroutes');
 const BAL = `COALESCE((SELECT SUM(debit)-SUM(credit) FROM ledger l WHERE l.party_id=p.id),0)`;
 // balance as it stood at the end of the selected financial year
 const BAL_AT = `COALESCE((SELECT SUM(debit)-SUM(credit) FROM ledger l WHERE l.party_id=p.id AND l.date <= @to),0)`;
@@ -15,7 +16,7 @@ router.get('/parties', h((req, res) => {
   const q = `%${(req.query.q || '').trim()}%`;
   const kind = req.query.kind === 'SUPPLIER' ? `AND p.type = 'SUPPLIER'` : req.query.kind === 'CUSTOMER' ? `AND p.type <> 'SUPPLIER'` : '';
   res.json(db.prepare(
-    `SELECT p.*, ${BAL_AT} balance, r.name route_name FROM parties p LEFT JOIN routes r ON r.id=p.route_id
+    `SELECT p.*, ${BAL_AT} balance, ${ROUTE_NAMES} route_name, ${ROUTE_IDS} route_ids FROM parties p
      WHERE p.active=1 ${kind} AND (p.name LIKE @q OR p.phone LIKE @q OR p.gstin LIKE @q OR COALESCE(p.mobiles,'') LIKE @q OR COALESCE(p.tel,'') LIKE @q) ORDER BY p.name`
   ).all({ q, to: fyRange(req.query.fy).to }));
 }));
@@ -30,6 +31,19 @@ function resolveRoute(b) {
     return Number(info.lastInsertRowid);
   }
   return blank(b.route_id);
+}
+
+/** The routes a save asks for: route_ids (all of them), or the older route_id (changes the first, keeps the others; blank = none); a new_route is added. */
+function wantedRoutes(b, pid) {
+  const made = b.new_route && blank(b.new_route.name) ? resolveRoute({ new_route: b.new_route }) : null;
+  let ids;
+  if (b.route_ids !== undefined) ids = idList(b.route_ids);
+  else {
+    const now = pid ? partyRoutes(db, pid) : [];
+    if (!('route_id' in b) || made) ids = now;
+    else { const one = idList(b.route_id); ids = one.length ? [...one, ...now.slice(1)] : []; }   // "No route" from an older app clears them all
+  }
+  return made ? [...ids, made] : ids;
 }
 
 const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -68,12 +82,13 @@ router.post('/parties', h((req, res) => {
   const b = req.body || {};
   const o = cleanParty(b, null);
   const id = db.transaction(() => {
-    o.route_id = resolveRoute(b);
+    const routes = wantedRoutes(b, null);
     const info = db.prepare(
-      `INSERT INTO parties(name,gstin,state_code,phone,tel,mobiles,address,fssai,pan,email,type,price_tier,credit_limit,credit_days,route_id)
-       VALUES(@name,@gstin,@state_code,@phone,@tel,@mobiles,@address,@fssai,@pan,@email,@type,@price_tier,@credit_limit,@credit_days,@route_id)`
+      `INSERT INTO parties(name,gstin,state_code,phone,tel,mobiles,address,fssai,pan,email,type,price_tier,credit_limit,credit_days)
+       VALUES(@name,@gstin,@state_code,@phone,@tel,@mobiles,@address,@fssai,@pan,@email,@type,@price_tier,@credit_limit,@credit_days)`
     ).run(o);
     const pid = Number(info.lastInsertRowid);
+    setPartyRoutes(db, pid, routes);
     const opening = Number(b.opening_balance) || 0;   // positive = they owe us, negative = we owe them
     if (opening !== 0) {
       db.prepare('INSERT INTO ledger(party_id,date,type,ref_no,debit,credit,narration) VALUES(?,?,?,?,?,?,?)')
@@ -90,11 +105,12 @@ router.put('/parties/:id', h((req, res) => {
   const b = req.body || {};
   const o = cleanParty(b, cur);
   db.transaction(() => {
-    o.route_id = resolveRoute({ ...b, route_id: 'route_id' in b ? b.route_id : cur.route_id });
+    const routes = wantedRoutes(b, cur.id);
     db.prepare(
       `UPDATE parties SET name=@name,gstin=@gstin,state_code=@state_code,phone=@phone,tel=@tel,mobiles=@mobiles,address=@address,
-         fssai=@fssai,pan=@pan,email=@email,type=@type,price_tier=@price_tier,credit_limit=@credit_limit,credit_days=@credit_days,route_id=@route_id WHERE id=@id`
+         fssai=@fssai,pan=@pan,email=@email,type=@type,price_tier=@price_tier,credit_limit=@credit_limit,credit_days=@credit_days WHERE id=@id`
     ).run({ ...o, id: cur.id });
+    setPartyRoutes(db, cur.id, routes);
   })();
   res.json({ ok: true });
 }));
@@ -107,7 +123,10 @@ router.delete('/parties/:id', h((req, res) => {
     `SELECT (SELECT COUNT(*) FROM ledger WHERE party_id=@i) + (SELECT COUNT(*) FROM invoices WHERE party_id=@i) + (SELECT COUNT(*) FROM purchases WHERE party_id=@i) + (SELECT COUNT(*) FROM debit_notes WHERE party_id=@i) n`
   ).get({ i: p.id }).n;
   if (used) { db.prepare('UPDATE parties SET active=0 WHERE id=?').run(p.id); return res.json({ result: 'archived' }); }
-  db.prepare('DELETE FROM parties WHERE id=?').run(p.id);
+  db.transaction(() => {
+    db.prepare('DELETE FROM party_routes WHERE party_id=?').run(p.id);
+    db.prepare('DELETE FROM parties WHERE id=?').run(p.id);
+  })();
   res.json({ result: 'deleted' });
 }));
 

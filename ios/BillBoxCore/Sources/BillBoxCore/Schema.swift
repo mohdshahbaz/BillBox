@@ -277,6 +277,16 @@ enum Schema {
         // v9: e-way bill (number from the portal, its date and validity, and the transport details used for it)
         for c in ["ewb_no", "ewb_date", "ewb_valid", "ewb_transport"] { try addColumn(db, "invoices", c, "TEXT") }
         try db.exec(v7)
+        // v16.3: a party can be on several routes. parties.route_id stays the first one; party_routes holds the others.
+        try db.exec("""
+        CREATE TABLE IF NOT EXISTS party_routes (
+          id INTEGER PRIMARY KEY,
+          party_id INTEGER NOT NULL REFERENCES parties(id),
+          route_id INTEGER NOT NULL REFERENCES routes(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_party_routes_party ON party_routes(party_id);
+        CREATE INDEX IF NOT EXISTS idx_party_routes_route ON party_routes(route_id);
+        """)
         let ins = db.prepare("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)")
         let up = db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
         for (k, v) in defaultSettings { try ins.run(k, v) }

@@ -369,6 +369,24 @@ post('/routes/auto-assign', {}, company=1); post('/routes/auto-assign', {'apply'
 post('/routes/auto-assign', {'apply': True, 'party_ids': [0]}, company=1); post('/routes/auto-assign', {'apply': True}, company=1)
 post('/routes/auto-assign', {'apply': True, 'party_ids': [], 'assignments': [{'party_id': 9999, 'route_id': 2}, {'party_id': 'x'}, 'bad']}, company=1)
 get('/parties', {'kind': 'CUSTOMER'}, company=1); get('/routes', company=1)
+# a party on several routes: route_ids sets them all, not sent = kept, the older route_id changes the first ('' = none), new_route is added
+post('/parties', {'name': 'Two Beat Store', 'address': 'Haridwar', 'route_ids': [2, '1', 2, 9999, 0, 'x']}, company=1)
+put('/parties/17', {'phone': '9000000017'}, company=1); get('/parties', {'q': 'Two Beat'}, company=1)
+put('/parties/17', {'route_ids': '6, 2,4'}, company=1); get('/parties', {'q': 'Two Beat'}, company=1)
+put('/parties/17', {'route_id': 1}, company=1); get('/parties', {'q': 'Two Beat'}, company=1)
+put('/parties/17', {'route_ids': [4], 'new_route': {'name': 'Haridwar Road', 'salesman_id': 1, 'days': '4'}}, company=1); get('/parties', {'q': 'Two Beat'}, company=1)
+put('/parties/17', {'route_id': ''}, company=1); get('/parties', {'q': 'Two Beat'}, company=1)
+put('/parties/17', {'route_ids': None}, company=1); put('/parties/17', {'route_ids': 7}, company=1); get('/parties', {'q': 'Two Beat'}, company=1)
+# only the ticked pairs; a pair it has already, a route that is not there and half a route are left out
+post('/routes/auto-assign', {'apply': False, 'party_ids': [17, 9]}, company=1)
+post('/routes/auto-assign', {'apply': True, 'assignments': [{'party_id': 17, 'route_id': 9}, {'party_id': 17, 'route_id': 7}, {'party_id': 9, 'route_id': '2'},
+                                                            {'party_id': 9, 'route_id': 99}, {'party_id': 16, 'route_id': 2.5}, {'party_id': 6, 'route_id': 2}]}, company=1)
+post('/routes/auto-assign', {'apply': True, 'assignments': []}, company=1)
+get('/parties', {'kind': 'CUSTOMER'}, company=1); get('/routes', company=1); get('/reports/outstanding', company=1)
+for d in ('1', '3', '4'): get('/salesmen/1/beat', {'day': d}, company=1)
+# a route deleted: its outlets stay, those on other routes too keep them
+delete('/routes/7', company=1); delete('/routes/1', company=1); get('/parties', {'kind': 'CUSTOMER'}, company=1); get('/routes', company=1)
+delete('/parties/17', company=1); get('/parties', {'q': 'Two Beat'}, company=1)
 
 # ---------------- deleting a company (a throwaway one, so the books above stay for the backup tests)
 post('/companies', {'name': 'Temp Traders'}); get('/companies')

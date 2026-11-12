@@ -350,6 +350,11 @@ public final class Backup {
                 }
                 maps["parties"]![r.i("id")] = id!
             }
+            // the other routes of the parties just added (older backups have no party_routes table)
+            for r in all("party_routes") {
+                guard let pid = m("parties", r["party_id"] ?? nil) as? Int, let rid = m("routes", r["route_id"] ?? nil) as? Int, newParties.contains(pid) else { continue }
+                _ = try insert("party_routes", ["party_id": pid, "route_id": rid] as Row)
+            }
             var haveI = try idx("items", "name")
             for r in all("items") {
                 var id = haveI[key(r["name"] ?? nil)]
