@@ -149,8 +149,7 @@ enum Reports {
         let out: [Row] = rates.map { rate in
             let r = byRate[rate] ?? ["taxable": 0, "cgst": 0, "sgst": 0, "igst": 0, "invoices": 0]
             let tax = r2(r.n("cgst") + r.n("sgst") + r.n("igst"))
-            // the IGST column of this report carries the whole tax of the slab: CGST + SGST (+ any true IGST)
-            return ["rate": rate, "taxable": r2(r.n("taxable")), "cgst": r2(r.n("cgst")), "sgst": r2(r.n("sgst")), "igst": tax, "tax": tax,
+            return ["rate": rate, "taxable": r2(r.n("taxable")), "cgst": r2(r.n("cgst")), "sgst": r2(r.n("sgst")), "igst": r2(r.n("igst")), "tax": tax,
                     "value": r2(r.n("taxable") + tax), "invoices": r["invoices"]!]
         }
         func tot(_ k: String) -> Double { r2(out.reduce(0.0) { $0 + $1.n(k) }) }
@@ -196,7 +195,6 @@ enum Reports {
             x["rates"] = (rm[b.i("id")] ?? "").components(separatedBy: ",").filter { !$0.isEmpty }.map { $0 + "%" }.joined(separator: ", ")
             let tax = r2(b.n("cgst") + b.n("sgst") + b.n("igst"))
             x["tax"] = tax
-            x["igst"] = tax    // IGST column = CGST + SGST (+ IGST)
             return x
         }
         base["b2b_bills"] = rows.filter { !$0.str("gstin").isEmpty }

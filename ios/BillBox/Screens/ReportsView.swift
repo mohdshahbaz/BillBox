@@ -120,7 +120,7 @@ import SwiftUI
                         GridColumn("Taxable value", id: "taxable", min: 100, ideal: 120, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "taxable")).mono() }
                         GridColumn("CGST", id: "cgst", min: 90, ideal: 100, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "cgst")).mono() }
                         GridColumn("SGST", id: "sgst", min: 90, ideal: 100, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "sgst")).mono() }
-                        GridColumn("IGST (CGST+SGST)", id: "igst", min: 120, ideal: 130, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "igst")).mono() }
+                        GridColumn("IGST", id: "igst", min: 80, ideal: 100, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "igst")).mono() }
                         GridColumn("Total tax", id: "tax", min: 90, ideal: 100, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "tax")).mono() }
                         GridColumn("Invoice value", id: "value", min: 100, ideal: 120, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "value")).mono().fw(.semibold) }
                     }

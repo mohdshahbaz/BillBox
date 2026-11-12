@@ -136,7 +136,7 @@ import SwiftUI
                         GridColumn("Taxable value", align: .trailing) { (r: JSON) in Text(Fmt.money(r, "taxable")).mono() }
                         GridColumn("CGST", align: .trailing) { (r: JSON) in Text(Fmt.money(r, "cgst")).mono() }
                         GridColumn("SGST", align: .trailing) { (r: JSON) in Text(Fmt.money(r, "sgst")).mono() }
-                        GridColumn("IGST (CGST+SGST)", align: .trailing) { (r: JSON) in Text(Fmt.money(r, "igst")).mono() }
+                        GridColumn("IGST", align: .trailing) { (r: JSON) in Text(Fmt.money(r, "igst")).mono() }
                         GridColumn("Total tax", align: .trailing) { (r: JSON) in Text(Fmt.money(r, "tax")).mono() }
                         GridColumn("Invoice value", align: .trailing) { (r: JSON) in Text(Fmt.money(r, "value")).mono().fw(.semibold) }
                     }

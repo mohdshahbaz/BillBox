@@ -88,13 +88,13 @@ struct Spec {
         if inv.num("paid") > 0 && inv.num("paid") < inv.num("total") - 0.005 { n += 1 }
         let right = CGFloat(n) * 9 * f + 6 + 17 * f
         let left = leftOther(co, inv, f)
-        let sig: CGFloat = signatureInBand(co) ? 26 * f : 0
+        let sig: CGFloat = signatureInBand(co) || receiverInBand(co) ? 26 * f : 0
         let need = (max(right, left, sig) + 2).rounded(.up)
         let banded = Spec(w: w, h: h, m: m, rowH: rowH, tableHead: tableHead, foot: foot, totals: min(totals, need),
                           strip: strip, sellerBand: sellerBand, buyerBand: buyerBand, headNext: headNext, fs: fs, cw: cw)
         // the footer then holds one line of terms; kept full height when the bank lines still have to print there
         guard signatureInBand(co), bankLines(co).isEmpty || bankTabFits(co, inv, banded) else { return banded }
-        return Spec(w: w, h: h, m: m, rowH: rowH, tableHead: tableHead, foot: (foot * 0.6).rounded(), totals: banded.totals,
+        return Spec(w: w, h: h, m: m, rowH: rowH, tableHead: tableHead, foot: footerEmpty(co) ? 0 : (foot * 0.6).rounded(), totals: banded.totals,
                     strip: strip, sellerBand: sellerBand, buyerBand: buyerBand, headNext: headNext, fs: fs, cw: cw)
     }
 
@@ -124,7 +124,15 @@ func compactPrint(_ co: JSON) -> Bool { co.str("print_compact") != "0" }
 /// behind a ruled line, and the footer keeps one line of terms: the room saved goes to item rows.
 func signatureInBand(_ co: JSON) -> Bool { compactPrint(co) && co.str("print_signature") != "0" }
 /// Width of that signature block in the totals band.
-func signatureBandWidth(_ g: Spec) -> CGFloat { 96 * g.cw }
+func signatureBandWidth(_ g: Spec) -> CGFloat { 86 * g.cw }
+/// Settings › Printing › Receiver's signature box: an empty box for the buyer's signature, between the bank details and yours.
+func receiverInBand(_ co: JSON) -> Bool { compactPrint(co) && co.str("print_receiver") != "0" }
+func receiverBandWidth(_ g: Spec) -> CGFloat { 70 * g.cw }
+/// Nothing left for the footer row (terms off or empty, no payment line, no note): the row is left out and its room goes to items.
+func footerEmpty(_ co: JSON) -> Bool {
+    (co.str("print_terms") == "0" || co.str("invoice_terms").trimmingCharacters(in: .whitespaces).isEmpty)
+        && co.str("print_bank").isEmpty && co.str("print_note").isEmpty
+}
 
 /// The bank details printed above the amount in words, one per line, in this order; empty ones are left out.
 let bankFields: [(key: String, label: String, title: String)] = [
@@ -377,8 +385,10 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             .frame(width: W, height: tableHeight, alignment: .top)
             .overlay(gridLines(rowCount: rows.count))
             if last { hRule(frameLine); totalsBlock.frame(width: W).clipped() }
-            hRule(frameLine)
-            footer
+            if g.foot > 0 {
+                hRule(frameLine)
+                footer
+            }
         }
         .frame(width: W, height: g.inner + 3.6, alignment: .top)
         .clipped()
@@ -454,16 +464,26 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
 
     /// One shaded line: title, number, date, salesman, payment (or a debit note's reference), and which copy it is.
     private var infoRow: some View {
-        HStack(spacing: 10) {
-            t(docTitle, 8.5, bold: true)
-            ForEach(Array(details.enumerated()), id: \.offset) { _, kv in
-                HStack(spacing: 3) {
-                    t(kv.0 + ":", 6.5).foregroundStyle(muted)
-                    t(kv.1, 7.5, bold: kv.2).lineLimit(1).minimumScaleFactor(0.6)
-                }
+        let d = details
+        let left = Array(d.prefix(2)), right = Array(d.dropFirst(2))
+        func item(_ kv: (String, String, Bool)) -> some View {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                t(kv.0 + ":", 6.5).foregroundStyle(muted)
+                t(kv.1, 7.5, bold: kv.2).lineLimit(1).minimumScaleFactor(0.6)
             }
-            Spacer(minLength: 4)
-            t(copy, 6, bold: true).lineLimit(1)
+        }
+        // three parts on one baseline: the outer two take equal widths, so the title stays in the centre of the row
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                ForEach(Array(left.enumerated()), id: \.offset) { _, kv in item(kv) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            t(docTitle, 8.5, bold: true).lineLimit(1).fixedSize()
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                ForEach(Array(right.enumerated()), id: \.offset) { _, kv in item(kv) }
+                if !copy.isEmpty { t(copy, 6, bold: true).lineLimit(1).minimumScaleFactor(0.7) }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 5)
         .frame(height: g.strip)
@@ -549,12 +569,12 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 }
                 if on("print_words") || bankTab {
                     // the bank details sit beside "Amount in words" (the words take the left 42%), so they need no extra height
-                    let leftW = g.contentW - 186 * g.cw - 12 - (sigHere ? signatureBandWidth(g) : 0)   // inside the margins and the 6 pt padding each side
+                    let leftW = g.contentW - 186 * g.cw - 12 - (sigHere ? signatureBandWidth(g) : 0) - (recvHere ? receiverBandWidth(g) : 0)   // inside the margins and the 6 pt padding each side
                     HStack(alignment: .bottom, spacing: 0) {
                         if on("print_words") {
                             VStack(alignment: .leading, spacing: 1.5) {
                                 t("Amount in words", 5.5, bold: true).foregroundStyle(muted)
-                                t(inv.str("amount_words"), 7, weight: .semibold).lineLimit(2).minimumScaleFactor(0.65).fixedSize(horizontal: false, vertical: true)
+                                t(inv.str("amount_words"), recvHere ? 6.5 : 7, weight: .semibold).lineLimit(recvHere ? 3 : 2).minimumScaleFactor(0.65).fixedSize(horizontal: false, vertical: true)
                             }
                             .frame(width: bankTab ? leftW * (1 - bankShare - 0.02) : nil, alignment: .topLeading)
                         }
@@ -565,6 +585,17 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             }
             .padding(.horizontal, 6).padding(.vertical, 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            if recvHere {
+                // an empty box for the buyer to sign, between the bank details and the company's signature
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    t("Receiver's Signature", 6.5).foregroundStyle(muted).lineLimit(1).minimumScaleFactor(0.7)
+                }
+                .padding(.horizontal, 4).padding(.vertical, 4)
+                .frame(width: receiverBandWidth(g))
+                .frame(maxHeight: .infinity)
+                .overlay(alignment: .leading) { vRule(0.5, color: muted).padding(.vertical, 4) }
+            }
             if sigHere {
                 // the company's signature, beside the bank details behind a ruled line: the footer keeps only the terms
                 VStack(spacing: 0) {
@@ -575,7 +606,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 .padding(.horizontal, 5).padding(.vertical, 4)
                 .frame(width: signatureBandWidth(g))
                 .frame(maxHeight: .infinity)
-                .overlay(alignment: .leading) { vRule() }
+                .overlay(alignment: .leading) { vRule(0.5, color: muted).padding(.vertical, 4) }
             }
             sumColumn
                 .frame(maxHeight: .infinity)
@@ -589,8 +620,9 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
     private var bankTab: Bool { page == pages - 1 && bankTabFits(co, inv, g) }
     /// The signature prints in the totals band (last page) instead of the footer.
     private var sigHere: Bool { page == pages - 1 && signatureInBand(co) }
-    /// The bank block's share of the band's left side; with the signature beside it the words wrap narrower so the bank keeps its width.
-    private var bankShare: CGFloat { sigHere ? min(0.8, bankSize(co).width + 0.12) : bankSize(co).width }
+    private var recvHere: Bool { page == pages - 1 && receiverInBand(co) }
+    /// The bank block's share of the band's left side; with the signature boxes beside it the words wrap narrower so the bank keeps its width.
+    private var bankShare: CGFloat { recvHere ? 0.66 : sigHere ? min(0.8, bankSize(co).width + 0.12) : bankSize(co).width }
 
     /// The bank details as a small table: one column when every row fits the free height of the band (above and beside "Amount in
     /// words"), else two; labels, a tab, then the values, lined up, behind a fine divider.

@@ -217,7 +217,7 @@ db.withCompany(id1, () => {
     const month = new Date().toLocaleDateString('en-CA').slice(0, 7);
     const g = R.gstOutward(month), d = R.gstOutwardDetail(month);
     for (const r of g.rows) assert.ok(Math.abs(r.igst - (r.cgst + r.sgst)) < 0.02 || r.igst === r.tax, 'rate ' + r.rate);
-    assert.ok(g.rows.some((r) => r.cgst > 0 && r.igst >= r.cgst + r.sgst - 0.02), 'an intra-state slab shows its CGST+SGST in IGST');
+    assert.ok(g.rows.every((r) => Math.abs(r.tax - (r.cgst + r.sgst + r.igst)) < 0.02), 'IGST is only the integrated tax; the slab tax is CGST + SGST + IGST');
     assert.ok(Math.abs(g.totals.igst - g.totals.tax) < 0.02);
     for (const b of [...d.b2b_bills, ...d.b2c_bills]) assert.ok(Math.abs(b.igst - b.tax) < 0.02);
   });

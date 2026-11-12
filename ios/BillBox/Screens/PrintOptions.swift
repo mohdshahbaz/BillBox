@@ -71,7 +71,8 @@ import SwiftUI
             Toggle("Salesman", isOn: flag("print_salesman", true))
             Toggle("Payment mode and sale type", isOn: flag("print_payment", true))
             Toggle("GST rate-wise table", isOn: flag("print_gst_table", true))
-            Toggle("Terms", isOn: flag("print_terms", true))
+            Toggle("Terms row at the bottom", isOn: flag("print_terms", true))
+            Toggle("Receiver's signature box (beside the bank details)", isOn: flag("print_receiver", true))
             Toggle("Party's previous balance and total due", isOn: flag("print_balance", false))
             Toggle("Item names in CAPITALS", isOn: flag("print_caps", false))
             Toggle("Company and Bill to in CAPITALS", isOn: flag("print_caps_head", false))
@@ -79,7 +80,7 @@ import SwiftUI
                 Text("Boxes and pieces (6 box 6 pcs)").tag("boxpcs"); Text("Pieces only (150 pcs)").tag("pcs")
             }
         } header: { Text("More on the bill") } footer: {
-            Text("Previous balance prints “Previous balance · This bill · Now due” above the amount in words, from the party's ledger.")
+            Text("Previous balance prints “Previous balance · This bill · Now due” above the amount in words, from the party's ledger. Terms row off (with no payment line or note below): the bottom row is left out and the room goes to item rows; page numbers then do not print.")
         }
         Section {
             Picker("Text size", selection: choice("print_font", "normal")) {

@@ -122,8 +122,8 @@ function gstOutward(month, fyLabel) {
   const out = rates.map((rate) => {
     const r = byRate.get(rate) || { taxable: 0, cgst: 0, sgst: 0, igst: 0, invoices: 0 };
     const tax = r2(r.cgst + r.sgst + r.igst);
-    // the IGST column of this report carries the whole tax of the slab: CGST + SGST (+ any true IGST)
-    return { rate, taxable: r2(r.taxable), cgst: r2(r.cgst), sgst: r2(r.sgst), igst: tax, tax, value: r2(r.taxable + tax), invoices: r.invoices };
+    // IGST is only the integrated tax of inter-state bills; the whole tax of the slab is in "tax"
+    return { rate, taxable: r2(r.taxable), cgst: r2(r.cgst), sgst: r2(r.sgst), igst: r2(r.igst), tax, value: r2(r.taxable + tax), invoices: r.invoices };
   });
   const tot = (k) => r2(out.reduce((a, r) => a + r[k], 0));
   const split = (cond) => one(
@@ -156,7 +156,7 @@ function gstOutwardDetail(month, fyLabel) {
     `SELECT l.invoice_id, GROUP_CONCAT(DISTINCT l.gst_rate) rates FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id
      WHERE substr(i.date,1,7)=? GROUP BY l.invoice_id`).all(base.month);
   const rm = new Map(rates.map((r) => [r.invoice_id, r.rates]));
-  const rows = bills.map((b) => ({ ...b, rates: (rm.get(b.id) || '').split(',').filter(Boolean).map((x) => x + '%').join(', '), tax: r2(b.cgst + b.sgst + b.igst), igst: r2(b.cgst + b.sgst + b.igst) }));   // IGST column = CGST + SGST (+ IGST)
+  const rows = bills.map((b) => ({ ...b, rates: (rm.get(b.id) || '').split(',').filter(Boolean).map((x) => x + '%').join(', '), tax: r2(b.cgst + b.sgst + b.igst) }));
   return { ...base, b2b_bills: rows.filter((b) => b.gstin), b2c_bills: rows.filter((b) => !b.gstin) };
 }
 

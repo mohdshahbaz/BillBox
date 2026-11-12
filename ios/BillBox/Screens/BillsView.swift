@@ -47,7 +47,8 @@ import SwiftUI
         .onChange(of: app.dataVersion) { _ in Task { await load() } }
         .task {
             if from.isEmpty {
-                from = app.isCurrentFY ? app.monthStartInFY : app.fyFrom
+                // Settings › Billing & Dashboard › All Bills opens on: today's bills, or this month's (the default)
+                from = app.isCurrentFY ? (app.settings.str("bills_open") == "today" ? app.dateInFY : app.monthStartInFY) : app.fyFrom
                 to = app.isCurrentFY ? app.dateInFY : app.fyTo
             }
             if app.openUnprinted { app.openUnprinted = false; from = app.fyFrom; to = app.dateInFY; unprinted = true }

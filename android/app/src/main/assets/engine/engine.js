@@ -11373,7 +11373,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         const out = rates.map((rate) => {
           const r = byRate.get(rate) || { taxable: 0, cgst: 0, sgst: 0, igst: 0, invoices: 0 };
           const tax = r2(r.cgst + r.sgst + r.igst);
-          return { rate, taxable: r2(r.taxable), cgst: r2(r.cgst), sgst: r2(r.sgst), igst: tax, tax, value: r2(r.taxable + tax), invoices: r.invoices };
+          return { rate, taxable: r2(r.taxable), cgst: r2(r.cgst), sgst: r2(r.sgst), igst: r2(r.igst), tax, value: r2(r.taxable + tax), invoices: r.invoices };
         });
         const tot = (k) => r2(out.reduce((a, r) => a + r[k], 0));
         const split = (cond) => one(
@@ -11410,7 +11410,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
      WHERE substr(i.date,1,7)=? GROUP BY l.invoice_id`
         ).all(base.month);
         const rm = new Map(rates.map((r) => [r.invoice_id, r.rates]));
-        const rows = bills2.map((b) => ({ ...b, rates: (rm.get(b.id) || "").split(",").filter(Boolean).map((x) => x + "%").join(", "), tax: r2(b.cgst + b.sgst + b.igst), igst: r2(b.cgst + b.sgst + b.igst) }));
+        const rows = bills2.map((b) => ({ ...b, rates: (rm.get(b.id) || "").split(",").filter(Boolean).map((x) => x + "%").join(", "), tax: r2(b.cgst + b.sgst + b.igst) }));
         return { ...base, b2b_bills: rows.filter((b) => b.gstin), b2c_bills: rows.filter((b) => !b.gstin) };
       }
       function book(type, from, to, fyLabel) {
@@ -11621,7 +11621,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
           c("Taxable Value", "taxable", 15, "num"),
           c("CGST", "cgst", 12, "num"),
           c("SGST", "sgst", 12, "num"),
-          c("IGST (CGST+SGST)", "igst", 18, "num"),
+          c("IGST", "igst", 12, "num"),
           c("Round Off", "round_off", 10, "num"),
           c("Invoice Value", "total", 15, "num")
         ];
@@ -11644,7 +11644,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
           {
             name: "Rate-wise Summary",
             title: `Tax-rate-wise summary - ${d.month}`,
-            cols: [c("GST Rate %", "rate", 12, "num"), c("Invoices", "invoices", 10, "int"), c("Taxable Value", "taxable", 16, "num"), c("CGST", "cgst", 14, "num"), c("SGST", "sgst", 14, "num"), c("IGST (CGST+SGST)", "igst", 18, "num"), c("Total Tax", "tax", 14, "num"), c("Total Value", "value", 16, "num")],
+            cols: [c("GST Rate %", "rate", 12, "num"), c("Invoices", "invoices", 10, "int"), c("Taxable Value", "taxable", 16, "num"), c("CGST", "cgst", 14, "num"), c("SGST", "sgst", 14, "num"), c("IGST", "igst", 12, "num"), c("Total Tax", "tax", 14, "num"), c("Total Value", "value", 16, "num")],
             rows: d.rows,
             total: { rate: "Total", ...d.totals }
           }

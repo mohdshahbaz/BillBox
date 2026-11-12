@@ -520,7 +520,7 @@ The "Server is not running" screen, Start server, Choose backend folder, `server
 - [x] ✅ **GST Outward**:
   - Month title MM-YYYY with ‹ › arrows that stay inside the open FY. Default = dateInFY's month.
   - **Export month to Excel** (shows "Preparing…" while working) → save `GST-Outward-YYYY-MM.xlsx` (iOS: Files exporter / share).
-  - Rate table (layout key `gst-rates`, no S.No column): GST rate · Taxable value · CGST · SGST · IGST (CGST+SGST) · Total tax · Invoice value, plus a bold **Total** row.
+  - Rate table (layout key `gst-rates`, no S.No column): GST rate · Taxable value · CGST · SGST · IGST · Total tax · Invoice value, plus a bold **Total** row.
   - Rates shown: always 0, 5, 12, 18, 28, plus any other rate used.
   - Stat cards:
     - Invoices in YYYY-MM
@@ -536,11 +536,11 @@ The "Server is not running" screen, Start server, Choose backend folder, `server
     - Rows: B2B (registered parties) · B2C (unregistered / cash) · Total outward supplies · Less: input tax credit (purchases) · Net GST payable
   - **B2B Bills**:
     - Title "B2B bills - YYYY-MM"
-    - Columns: Invoice No, Date, Party Name, GSTIN, State, GST Rates, Taxable Value, CGST, SGST, IGST (CGST+SGST), Round Off, Invoice Value
+    - Columns: Invoice No, Date, Party Name, GSTIN, State, GST Rates, Taxable Value, CGST, SGST, IGST, Round Off, Invoice Value
     - Total row
   - **B2C Bills**: same columns without GSTIN, plus a Total row. A walk-in party is "Cash customer".
   - **Rate-wise Summary**:
-    - Columns: GST Rate %, Invoices, Taxable Value, CGST, SGST, IGST (CGST+SGST), Total Tax, Total Value
+    - Columns: GST Rate %, Invoices, Taxable Value, CGST, SGST, IGST, Total Tax, Total Value
     - Total row
   - Note: the date column holds YYYY-MM-DD text, exactly as the Mac export writes it.
 

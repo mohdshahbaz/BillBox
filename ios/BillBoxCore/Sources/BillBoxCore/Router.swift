@@ -373,7 +373,7 @@ public final class Router {
         func c(_ h: String, _ k: String, _ w: Double, _ t: String = "") -> XLSX.Col { XLSX.Col(h: h, k: k, w: w, t: t) }
         func cols(_ gst: Bool) -> [XLSX.Col] {
             [c("Invoice No", "invoice_no", 16), c("Date", "date", 12), c("Party Name", "party", 32)] + (gst ? [c("GSTIN", "gstin", 20)] : []) + [c("State", "state_code", 8),
-             c("GST Rates", "rates", 12), c("Taxable Value", "taxable", 15, "num"), c("CGST", "cgst", 12, "num"), c("SGST", "sgst", 12, "num"), c("IGST (CGST+SGST)", "igst", 18, "num"),
+             c("GST Rates", "rates", 12), c("Taxable Value", "taxable", 15, "num"), c("CGST", "cgst", 12, "num"), c("SGST", "sgst", 12, "num"), c("IGST", "igst", 12, "num"),
              c("Round Off", "round_off", 10, "num"), c("Invoice Value", "total", 15, "num")]
         }
         let coName = co?.s("value")
@@ -392,7 +392,7 @@ public final class Router {
             XLSX.Sheet(name: "B2B Bills", cols: cols(true), rows: b2b, title: "B2B bills - \(month)", total: bill(b2b)),
             XLSX.Sheet(name: "B2C Bills", cols: cols(false), rows: b2c, title: "B2C bills - \(month)", total: bill(b2c)),
             XLSX.Sheet(name: "Rate-wise Summary", cols: [c("GST Rate %", "rate", 12, "num"), c("Invoices", "invoices", 10, "int"), c("Taxable Value", "taxable", 16, "num"), c("CGST", "cgst", 14, "num"),
-                                                         c("SGST", "sgst", 14, "num"), c("IGST (CGST+SGST)", "igst", 18, "num"), c("Total Tax", "tax", 14, "num"), c("Total Value", "value", 16, "num")],
+                                                         c("SGST", "sgst", 14, "num"), c("IGST", "igst", 12, "num"), c("Total Tax", "tax", 14, "num"), c("Total Value", "value", 16, "num")],
                        rows: (d["rows"] as? [Row]) ?? [], title: "Tax-rate-wise summary - \(month)", total: { var t: Row = ["rate": "Total"]; for (k, v) in tot { t[k] = v }; return t }()),
         ]
         return (XLSX.build(sheets), month)

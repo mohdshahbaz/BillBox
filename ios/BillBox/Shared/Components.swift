@@ -318,7 +318,7 @@ enum BulkOutcome { case deleted, archived, failed(label: String, reason: String)
 
     var body: some View {
         if text.isEmpty {
-            EmptyView()
+            Text(" ").font(.caption)
         } else {
             Text(text).font(.caption.weight(.semibold)).foregroundStyle(tint).lineLimit(1)
                 .padding(.horizontal, 8).padding(.vertical, 3)

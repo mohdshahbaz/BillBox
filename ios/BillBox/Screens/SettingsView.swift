@@ -624,6 +624,7 @@ func fyLabelFor(_ start: Int) -> String { "\(start)-" + String(String(start + 1)
                 Picker("A new line starts as", selection: setting("bill_new_unit", "box")) { Text("One box").tag("box"); Text("One piece").tag("piece") }
                 Toggle("Keep the party for the next bill", isOn: flag("bill_keep_party", false))
                 Toggle("Ask before billing over a credit limit", isOn: flag("bill_credit_check", true))
+                Picker("All Bills opens on", selection: setting("bills_open", "month")) { Text("Today's bills").tag("today"); Text("This month").tag("month") }
             } header: { Text("Billing") } footer: { Text("Each bill can still be changed before saving. What happens after saving (print now or later) is under Printing.") }
             Section {
                 Picker("Dashboard opens on", selection: setting("dash_period", "month")) {
