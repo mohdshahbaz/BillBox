@@ -63,6 +63,10 @@ struct BillLine: Identifiable {
     @State private var detailsOpen = false
     @State private var creditAlert: String?
     @State private var askPrint: JSON?
+    /// Counters that start the saved / added / refused effects (Effects.swift).
+    @State private var savedTick = 0
+    @State private var addedTick = 0
+    @State private var errorTick = 0
     @FocusState private var searchFocus: Bool
     /// The Box (or Pcs) field the cursor goes to when an item is added, so its quantity can be typed straight away.
     @FocusState private var qtyFocus: QtyField?
@@ -350,6 +354,7 @@ struct BillLine: Identifiable {
             id = l.id
         }
         query = ""
+        addedTick += 1
         // the cursor goes to the line's Box (Pcs for loose items): the quantity is typed next, replacing the 1
         guard let l = lines.first(where: { $0.id == id }) else { searchFocus = true; return }
         let target: QtyField = l.ppb > 1 ? .box(id) : .pcs(id)
@@ -608,6 +613,8 @@ struct BillLine: Identifiable {
                 Text(t.map { Fmt.money($0.total) } ?? "₹0.00")
                     .font(.system(.title, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(Theme.accent)
                     .lineLimit(1).minimumScaleFactor(0.5)
+                    .numberRoll(t?.total ?? 0)
+                    .addedEffect(addedTick)
                 Text("\(lines.count) item\(lines.count == 1 ? "" : "s") · \(lines.reduce(0) { $0 + $1.totalPcs }) pcs").font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     saveButton(ready: ready)
@@ -624,6 +631,8 @@ struct BillLine: Identifiable {
         .buttonStyle(.borderedProminent)
         .keyboardShortcut("s", modifiers: .command)
         .disabled(busy || lines.isEmpty || (!ready && errorText != nil))
+        .savedEffect(savedTick)
+        .errorEffect(errorTick)
     }
 
     private func row(_ a: String, _ b: String) -> some View {
@@ -761,6 +770,7 @@ struct BillLine: Identifiable {
                 r = try await API.objRaw("POST", "/invoices", body: payload(override: override || app.settings.str("bill_credit_check") == "0"))
             }
             app.notify("\(wasEdit != nil ? "Updated" : "Saved") \(r.str("invoice_no")) · \(Fmt.money(r, "total"))")
+            savedTick += 1
             let keptParty = partyId
             clear()
             if app.settings.str("bill_keep_party") == "1" && wasEdit == nil { partyId = keptParty }   // Settings › Billing › next bill for the same party
@@ -774,7 +784,9 @@ struct BillLine: Identifiable {
             }
         } catch let e as APIError where e.code == "CREDIT_LIMIT" && !override {
             creditAlert = e.message
+            errorTick += 1
         } catch {
+            errorTick += 1
             app.notify(error.localizedDescription, error: true)
         }
     }

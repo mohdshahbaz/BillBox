@@ -899,7 +899,7 @@ How each part is verified:
 | Backups Mac ⇄ iPhone | `tests/parity/test_backup.py`: Mac backup restored on iOS, iOS backup restored on the Mac, Merge, single company file, refusals | 20/20 checks (year files included) |
 | Unit tests in Xcode (`BillBoxTests`, also `swift test`) | Golden answers recorded from the Mac engine, replayed on the iOS engine | 16/16 tests pass (`swift test`) |
 | Live bill arithmetic on the billing screen (BillMath, the Mac file unchanged) | 3,000 random bills vs the Mac's BillMath | identical to the paisa |
-| iOS screens | Type-checked against the iOS 16 SDK surface (builders limited to 10 children as in Xcode 14), 0 errors, 0 warnings (`tests/typecheck/stubs/build.sh`) | Not yet run on a device: there is no Xcode here. First build on your Mac is the remaining check. |
+| iOS screens | Type-checked against the iOS 16 SDK surface (builders limited to 10 children as in Xcode 14), 0 errors, 0 warnings (`tests/typecheck/stubs/build.sh`). The app now targets iOS 18 (Xcode 16+); Swift Charts and Pow code is behind `#if canImport` and is checked only by Xcode | Not yet run on a device: there is no Xcode here. First build on your Mac is the remaining check. |
 
 Mac bugs found while porting (fixed in the Mac app too, so both behave the same):
 - **Beat plan showed no outlets**: the weekday was bound as `'1.0'` instead of `'1'` (`backend/src/routes/salesmen.js`).

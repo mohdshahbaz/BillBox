@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes BillBox.xcodeproj (Xcode 14.2 or newer, iOS 16+) from the files on disk.  Run again after adding or removing a source file:
+"""Writes BillBox.xcodeproj (Xcode 16 or newer, iOS 18+) from the files on disk.  Run again after adding or removing a source file:
     python3 tools/make_xcodeproj.py
 Targets:
   BillBox       the iPhone app: BillBox/**.swift + the engine (BillBoxCore/Sources/BillBoxCore)
@@ -75,13 +75,18 @@ def phase(kind, target, files):
 
 app_src = phase('Sources', 'app', build_files('app', app_sources + core_sources))
 app_res = phase('Resources', 'app', build_files('app', [assets, pdfreader]))
-app_fw = phase('Frameworks', 'app', [])
+# ---- Swift packages: Pow (EmergeTools, MIT) for the dashboard and billing effects
+pow_pkg, pow_dep, pow_build = uid('package', 'Pow'), uid('packagedep', 'app', 'Pow'), uid('build', 'app', 'Pow')
+add(pow_pkg, f'{pow_pkg} /* XCRemoteSwiftPackageReference "Pow" */ = {{isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/EmergeTools/Pow"; requirement = {{kind = upToNextMajorVersion; minimumVersion = 1.0.0; }}; }};')
+add(pow_dep, f'{pow_dep} /* Pow */ = {{isa = XCSwiftPackageProductDependency; package = {pow_pkg} /* XCRemoteSwiftPackageReference "Pow" */; productName = Pow; }};')
+add(pow_build, f'{pow_build} /* Pow in Frameworks */ = {{isa = PBXBuildFile; productRef = {pow_dep} /* Pow */; }};')
+app_fw = phase('Frameworks', 'app', [pow_build])
 test_src = phase('Sources', 'tests', build_files('tests', core_sources + test_sources + ['BillBox/Shared/BillMath.swift']))
 test_res = phase('Resources', 'tests', build_files('tests', [golden]))
 test_fw = phase('Frameworks', 'tests', [])
 
 common = {
-    'IPHONEOS_DEPLOYMENT_TARGET': '16.0', 'SDKROOT': 'iphoneos', 'SWIFT_VERSION': '5.0', 'TARGETED_DEVICE_FAMILY': '1',
+    'IPHONEOS_DEPLOYMENT_TARGET': '18.0', 'SDKROOT': 'iphoneos', 'SWIFT_VERSION': '5.0', 'TARGETED_DEVICE_FAMILY': '1',
     'CLANG_ENABLE_MODULES': 'YES', 'ALWAYS_SEARCH_USER_PATHS': 'NO', 'ENABLE_STRICT_OBJC_MSGSEND': 'YES',
     'GCC_C_LANGUAGE_STANDARD': 'gnu11', 'MTL_FAST_MATH': 'YES', 'CODE_SIGN_STYLE': 'Automatic',
 }
@@ -118,7 +123,9 @@ add(app_target, f'''{app_target} /* BillBox */ = {{isa = PBXNativeTarget; buildC
 				{app_src} /* Sources */,
 				{app_fw} /* Frameworks */,
 				{app_res} /* Resources */,
-			); buildRules = (); dependencies = (); name = BillBox; productName = BillBox; productReference = {app_product} /* BillBox.app */; productType = "com.apple.product-type.application"; }};''')
+			); buildRules = (); dependencies = (); name = BillBox; packageProductDependencies = (
+				{pow_dep} /* Pow */,
+			); productName = BillBox; productReference = {app_product} /* BillBox.app */; productType = "com.apple.product-type.application"; }};''')
 add(test_target, f'''{test_target} /* BillBoxTests */ = {{isa = PBXNativeTarget; buildConfigurationList = {test_list}; buildPhases = (
 				{test_src} /* Sources */,
 				{test_fw} /* Frameworks */,
@@ -129,7 +136,9 @@ project = uid('project')
 root_group = group_for('')[0]
 add(project, f'''{project} /* Project object */ = {{isa = PBXProject; attributes = {{BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1420; LastUpgradeCheck = 1420; TargetAttributes = {{ {app_target} = {{CreatedOnToolsVersion = 14.2;}}; {test_target} = {{CreatedOnToolsVersion = 14.2;}}; }}; }};
 			buildConfigurationList = {proj_list}; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, );
-			mainGroup = {root_group}; productRefGroup = {products_group} /* Products */; projectDirPath = ""; projectRoot = ""; targets = (
+			mainGroup = {root_group}; packageReferences = (
+				{pow_pkg} /* XCRemoteSwiftPackageReference "Pow" */,
+			); productRefGroup = {products_group} /* Products */; projectDirPath = ""; projectRoot = ""; targets = (
 				{app_target} /* BillBox */,
 				{test_target} /* BillBoxTests */,
 			); }};''')

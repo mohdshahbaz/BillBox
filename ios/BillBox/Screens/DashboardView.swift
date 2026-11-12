@@ -151,7 +151,7 @@ struct DashSnap {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(x.bool("is_current") ? "Sales today" : "Sales on the last day").font(.caption).opacity(0.85)
-                    Text(Fmt.money(x.num("today_sales"))).font(.system(.title2, design: .rounded).weight(.bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.5)
+                    Text(Fmt.money(x.num("today_sales"))).font(.system(.title2, design: .rounded).weight(.bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.5).numberRoll(x.num("today_sales"))
                     Text("\(x.int("today_bills")) bills · collected \(Fmt.money(x.num("today_collections")))").font(.caption).opacity(0.85).lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
@@ -329,7 +329,7 @@ extension DashboardView {
                     Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                 }
                 Text(title).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                Text(value).font(.system(.title2, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.5)
+                Text(value).font(.system(.title2, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.5).numberRoll(value)
                 // two lines kept for every note, so all cards are the same height and line up row by row
                 Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(2, reservesSpace: true)
             }
@@ -338,7 +338,7 @@ extension DashboardView {
             .card(14)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .pressCard()
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens \(title)")
     }
@@ -424,7 +424,8 @@ extension DashboardView {
             GeometryReader { g in
                 Rectangle().fill(Color.clear).contentShape(Rectangle())
                     .onTapGesture { p in
-                        let x = p.x - g[proxy.plotAreaFrame].origin.x
+                        guard let plot = proxy.plotFrame else { return }
+                        let x = p.x - g[plot].origin.x
                         if let label = proxy.value(atX: x, as: String.self), let v = values.first(where: { $0.label == label }) { pick(v.id) }
                     }
             }

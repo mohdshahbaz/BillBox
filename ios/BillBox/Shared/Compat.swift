@@ -124,7 +124,8 @@ struct BarChartView: View {
                 GeometryReader { g in
                     Rectangle().fill(Color.clear).contentShape(Rectangle())
                         .onTapGesture { p in
-                            let x = p.x - g[proxy.plotAreaFrame].origin.x
+                            guard let plot = proxy.plotFrame else { return }
+                            let x = p.x - g[plot].origin.x
                             if let label = proxy.value(atX: x, as: String.self), let d = data.first(where: { $0.label == label }) {
                                 picked = picked == d.id ? nil : d.id
                             }
