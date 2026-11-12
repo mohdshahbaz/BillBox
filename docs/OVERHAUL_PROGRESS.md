@@ -5,8 +5,8 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 ## Stages
 - [x] 1. Design research and `docs/DESIGN_SYSTEM.md`
 - [x] 2. iPhone: shared components to the design system
-- [ ] 3. iPhone: screen by screen, self-test screenshots reviewed (in progress)
-- [ ] 4. Android: theme and components (Material 3), then screens; Android self-test
+- [x] 3. iPhone: screen by screen, self-test screenshots reviewed
+- [ ] 4. Android: theme and components (Material 3), then screens; Android self-test (in progress)
 - [ ] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow
 - [ ] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
 - [ ] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
@@ -14,6 +14,15 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [ ] 9. Docs updated, one pull request into `main` (not merged)
 
 ## Log
+- 2026-11-12 (run 2, later): stage 3 done. iPhone self-test 43314544985 (b293417, unit tests on): 17 tests passed,
+  543/543 steps match, no crash reports, screenshots reviewed (no banner, chips wrap, summary cards, nothing cut).
+  Stage 4 started: Android `DS` tokens; semantic colours `Good/Bad/Warn/Info/Money` now light/dark pairs with AA
+  contrast (old orange #E08A00 was ~2.4:1); Android 12 splash (windowSplashScreen*), predictive back
+  (enableOnBackInvokedCallback); tables are rounded cards with a tinted upper-case heading band; `SummaryCard`,
+  `StatusPill`, `SkeletonRows`, `ErrorState`; Bills / Debit Notes / Books footers as summary cards; dashboard chips wrap.
+  Fixed a real Android 12 bug found by the self-test: `crypto.randomUUID` missing in the WebView engine made every company
+  save fail (android/engine/shims/crypto.js falls back to getRandomValues). Parity compare ignores the device-local
+  `license_*` app settings. Android typecheck stubs fixed (PaddingValues(bottom=), PrintAttributes.Builder).
 - 2026-11-12 (run 2): stage 2 done — `DS` tokens (space, pad, radius, width, hit target, tint, motion), type tokens
   (`Font.dsMoney` …), semantic roles `Theme.positive/negative/warning/info`, `SkeletonRows`, `ErrorState`, `EmptyState`
   with action; StatCard, SummaryCard, StatusPill, Banner, toasts, FormSheet errors on tokens. Linux stubs: `repeatForever`,
@@ -29,11 +38,13 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
   GST outward (all engines), classic bill band with receiver/authorised signature boxes.
 
 ## Open problems
-- Local Swift toolchain download is blocked (403) in the cloud sandbox, so the Linux type-checks cannot run here; the
-  iPhone self-test build (Xcode) is the compile check.
-- Stocks / Bills tables run past the screen edge (scroll sideways by design); consider hiding low-value columns by
-  default on compact width.
+- Local Swift toolchain download is blocked (403) in the cloud sandbox, so the iOS/Mac Linux type-checks cannot run here;
+  the iPhone self-test build (Xcode) is the compile check.
+- The Android typecheck stubs do not know @Composable rules; the CI Android build is the real check (a composable
+  getter read inside a Canvas block broke e03c89e, fixed in f33071b).
+- iPhone/Android tables still run past the screen edge (sideways scroll by design).
 
 ## Next
-Stage 3: check the latest self-test (commit 5f4f197); then Billing keyboard/scan flow, Settings sub-pages, sheets;
-one run with unit tests on; then tick stage 3 and move to stage 4 (Android).
+Stage 4: check Android self-test for f33071b (API 31 and 34: parity 0 differences, screenshots light; add dark
+screenshots if the workflow lacks them), then screens: status pills in Bills/Parties, skeleton/error states on lists,
+NavigationRail on large screens (exists), billing bar. Then stage 5 (Flutter desktop).
