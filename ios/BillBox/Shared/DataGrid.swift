@@ -192,30 +192,32 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
         // sideways scroller it gets no inset for them, so the last rows hid behind the buttons. One point of padding keeps the
         // grid inside the visible area; the clip keeps rows from being drawn under the bars.
         .padding(.bottom, 1)
-        .background(Theme.page)
-        .overlay(Rectangle().stroke(Theme.line, lineWidth: 0.5))
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.line, lineWidth: 0.5))
+        .padding(.horizontal, 10).padding(.bottom, 6)
         .sheet(isPresented: $showColumns) { ColumnSheet(layout: layout, columns: columns) }
     }
 
     private func headerBlock(_ cols: [GridColumn<Row>], _ w: [CGFloat]) -> some View {
         VStack(spacing: 0) {
             header(cols, w)
-            Rectangle().fill(Theme.line).frame(height: 1)
+            Rectangle().fill(Theme.line).frame(height: 0.5)
         }
-        .background(Theme.page)
+        .background(Theme.card)
     }
 
     private func header(_ cols: [GridColumn<Row>], _ w: [CGFloat]) -> some View {
         HStack(spacing: 0) {
             ForEach(Array(cols.enumerated()), id: \.element.id) { i, c in
                 ZStack(alignment: .trailing) {
-                    Text(c.title).font(.caption.weight(.medium)).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.8)
-                        .padding(.horizontal, 8)
+                    Text(c.title).font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.8)
+                        .padding(.horizontal, 10)
                         .frame(width: w[i], alignment: c.align)
-                        .frame(minHeight: 32)
+                        .frame(minHeight: 34)
                         .accessibilityAddTraits(.isHeader)
                     // resize grip on the right edge
-                    Rectangle().fill(Theme.line).frame(width: 1, height: 22)
+                    Rectangle().fill(Theme.line.opacity(0.6)).frame(width: 1, height: 16)
                     Color.clear.frame(width: 14).contentShape(Rectangle())
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 2, coordinateSpace: .global)   // the handle moves with the edge: local space fed back into itself
@@ -235,7 +237,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
             }
             .accessibilityLabel("Columns")
         }
-        .background(Theme.card)
+        .background(Theme.accent.opacity(0.06))
         .contextMenu {
             ForEach(orderedColumns) { c in
                 Button { toggle(c) } label: {
@@ -264,7 +266,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                         } else { c.cell(row) }
                     }
                     .lineLimit(1)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 10)
                     .frame(width: w[i], alignment: c.align)
                     .frame(minHeight: rh)
                     .clipped()
@@ -272,7 +274,7 @@ struct DataGrid<Row: Identifiable>: View where Row.ID: Hashable {
                 }
                 Color.clear.frame(width: 36, height: 1)
             }
-            Rectangle().fill(Theme.line.opacity(0.7)).frame(height: 0.5)
+            Rectangle().fill(Theme.line.opacity(0.45)).frame(height: 0.5).padding(.leading, 12)
         }
         .background(selected ? Theme.accent.opacity(0.14) : (stripes && idx % 2 == 1 ? Theme.accent.opacity(0.05) : Color.clear))
         .background(Theme.card)

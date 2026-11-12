@@ -282,6 +282,22 @@ func bulkDelete<ID>(_ ids: [ID], notify: (String) -> Void, delete: (ID) async ->
 
 enum BulkOutcome { case deleted, archived, failed(label: String, reason: String) }
 
+/// A small coloured label for a status in a table or list: Sale, Purchase, Not yet, Retailer …
+@MainActor struct StatusPill: View {
+    let text: String
+    var tint: Color = Theme.accent
+
+    var body: some View {
+        if text.isEmpty {
+            EmptyView()
+        } else {
+            Text(text).font(.caption.weight(.semibold)).foregroundStyle(tint).lineLimit(1)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(tint.opacity(0.13), in: Capsule())
+        }
+    }
+}
+
 @MainActor struct Banner: View {
     let text: String
     var symbol = "info.circle.fill"

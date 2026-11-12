@@ -47,7 +47,9 @@ import SwiftUI
     private var grid: some View {
         DataGrid(parties, layoutKey: "parties", selection: $selection, selecting: $selecting, onOpen: { openLedger($0) }, menu: { AnyView(partyMenu($0)) }) {
             GridColumn("Party", id: "name", min: 150, ideal: 220) { (p: JSON) in Text(p.str("name")).fontWeight(.medium).lineLimit(2) }
-            GridColumn("Type", id: "type", min: 70, ideal: 90) { (p: JSON) in Text(p.str("type").capitalized) }
+            GridColumn("Type", id: "type", min: 80, ideal: 100) { (p: JSON) in
+                StatusPill(text: p.str("type").capitalized, tint: p.str("type").lowercased().hasPrefix("whole") ? Color.purple : Theme.accent)
+            }
             GridColumn("GSTIN", id: "gstin", min: 110, ideal: 150) { (p: JSON) in Text(p.str("gstin")).monospacedDigit() }
             GridColumn("Route", id: "route", min: 80, ideal: 140) { (p: JSON) in Text(p.str("route_name")) }
             GridColumn("Price tier", id: "tier", min: 70, ideal: 90) { (p: JSON) in Text(p.str("price_tier").capitalized) }

@@ -97,15 +97,15 @@ import SwiftUI
         }) }) {
             GridColumn("Date", id: "date", min: 86, ideal: 96) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
             GridColumn("Type", id: "type", min: 70, ideal: 80) { (r: JSON) in
-                Text(billTypeName(r)).fontWeight(.semibold).foregroundStyle(billTypeColor(r))
+                StatusPill(text: billTypeName(r), tint: billTypeColor(r))
             }
             GridColumn("Bill no", id: "no", min: 110, ideal: 130) { (r: JSON) in Text(r.str("no")).monospacedDigit() }
             GridColumn("Supplier bill", id: "ref", min: 80, ideal: 110) { (r: JSON) in Text(r.str("ref")) }
             GridColumn("Party", id: "party", min: 140, ideal: 200) { (r: JSON) in Text(r.str("party")).lineLimit(2) }
             GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).monospacedDigit() }
             GridColumn("Paid", id: "paid", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "paid")).monospacedDigit() }
-            GridColumn("Printed", id: "printed", min: 54, ideal: 64) { (r: JSON) in
-                Text(r.str("type") != "SALE" ? "" : r.int("printed") == 1 ? "Yes" : "Not yet").foregroundStyle(r.int("printed") == 1 ? Color.secondary : Color.orange)
+            GridColumn("Printed", id: "printed", min: 70, ideal: 84) { (r: JSON) in
+                StatusPill(text: r.str("type") != "SALE" ? "" : r.int("printed") == 1 ? "Yes" : "Not yet", tint: r.int("printed") == 1 ? Color.secondary : Color.orange)
             }
             GridColumn("Due", id: "due", min: 90, ideal: 110, align: .trailing) { (r: JSON) in
                 let due = r.num("total") - r.num("paid")
