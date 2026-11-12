@@ -584,7 +584,9 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 }
             }
             .padding(.horizontal, 6).padding(.vertical, 4)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(width: bandLeftW, alignment: .topLeading)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
+            .clipped()
             if recvHere {
                 // an empty box for the buyer to sign, between the bank details and the company's signature
                 VStack(spacing: 0) {
@@ -621,6 +623,8 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
     /// The signature prints in the totals band (last page) instead of the footer.
     private var sigHere: Bool { page == pages - 1 && signatureInBand(co) }
     private var recvHere: Bool { page == pages - 1 && receiverInBand(co) }
+    /// Width of the band's left side (GST table, words, bank): what the signature boxes and the totals column leave.
+    private var bandLeftW: CGFloat { g.contentW - 186 * g.cw - (sigHere ? signatureBandWidth(g) : 0) - (recvHere ? receiverBandWidth(g) : 0) }
     /// The bank block's share of the band's left side; with the signature boxes beside it the words wrap narrower so the bank keeps its width.
     private var bankShare: CGFloat { recvHere ? 0.66 : sigHere ? min(0.8, bankSize(co).width + 0.12) : bankSize(co).width }
 
@@ -671,7 +675,9 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             let inter = inv.str("supply") == "INTER" || (inv.num("igst") > 0 && inv.num("cgst") == 0)
             let heads = inter ? ["HSN", "GST %", "Taxable", "IGST"] : ["HSN", "GST %", "Taxable", "CGST", "SGST", "Total GST"]
             let rows = hsnGst(inv)
-            func w(_ h: String) -> CGFloat { (h == "HSN" ? 52 : h == "GST %" ? 32 : 50) * g.cw }
+            let natural = heads.reduce(CGFloat(0)) { $0 + ($1 == "HSN" ? 52 : $1 == "GST %" ? 32 : 50) * g.cw }
+            let fit = min(1, (bandLeftW - 12) / natural)   // beside the signature boxes the columns narrow (figures shrink to fit)
+            func w(_ h: String) -> CGFloat { (h == "HSN" ? 52 : h == "GST %" ? 32 : 50) * g.cw * fit }
             func vals(_ r: HsnGst) -> [String] {
                 inter ? [r.hsn, Fmt.qty(r.rate), Fmt.amount(r.taxable), Fmt.amount(r.igst)]
                       : [r.hsn, Fmt.qty(r.rate), Fmt.amount(r.taxable), Fmt.amount(r.cgst), Fmt.amount(r.sgst), Fmt.amount(r.gst)]
