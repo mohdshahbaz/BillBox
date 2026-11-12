@@ -10,7 +10,8 @@
   if (q.get('plan')) { const r = document.querySelector(`input[name=plan][value="${q.get('plan')}"]`); if (r) r.checked = true; }
   const plan = () => document.querySelector('input[name=plan]:checked').value;
   let config = null;
-  fetch(`${API}/config`).then((r) => r.json()).then((c) => { config = c; if (c.bank) $('bankBtn').hidden = false; }).catch(() => {});
+  const ready = fetch(`${API}/config`).then((r) => r.json()).then((c) => { config = c; }).catch(() => {});
+  const notSet = (what) => msg('msg', `${what} is not set up yet. Write to <a href="mailto:${window.BB_EMAIL}">${window.BB_EMAIL}</a> and we will send the payment details.`, 'warn');
 
   async function post(path, body) {
     const r = await fetch(API + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -28,8 +29,9 @@
 
   let method = 'upi';
   function direct(m) {
-    const p = config && config.plans[plan()];
-    if (!p) return null;
+    const p = config && config.plans && config.plans[plan()];
+    if (!p) { msg('msg', 'Could not load the payment details. Check the internet connection and try again.', 'err'); return null; }
+    msg('msg', '');
     if (p.currency !== 'INR') { msg('msg', 'UPI and bank transfer work in rupees only. Choose Yearly or Lifetime.', 'warn'); return null; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($('email').value.trim())) { msg('msg', 'Enter your e-mail address first: your licence key is kept for it.', 'err'); return null; }
     msg('msg', ''); method = m;
@@ -39,9 +41,10 @@
   }
   const rupees = (amt) => `₹${Number(amt).toLocaleString('en-IN')}`;
 
-  $('upiBtn').addEventListener('click', () => {
+  $('upiBtn').addEventListener('click', async () => {
+    await ready;
+    if (config && !config.upi_vpa) return notSet('UPI');
     const vpa = config && config.upi_vpa;
-    if (!vpa) return msg('msg', `Direct UPI is not set up yet. Write to <a href="mailto:${window.BB_EMAIL}">${window.BB_EMAIL}</a> and we will send the UPI details.`, 'warn');
     const amt = direct('upi'); if (!amt) return;
     const p = config.plans[plan()];
     const link = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent('AK Enterprises')}&am=${amt}&cu=INR&tn=${encodeURIComponent('BillBox ' + p.plan)}`;
@@ -52,11 +55,16 @@
     $('upi').scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 
-  $('bankBtn').addEventListener('click', () => {
-    const b = config && config.bank; if (!b) return;
+  $('bankBtn').addEventListener('click', async () => {
+    await ready;
+    if (config && !config.bank) return notSet('Bank transfer');
     const amt = direct('bank'); if (!amt) return;
-    $('bamt').textContent = rupees(amt);
-    $('bdetails').innerHTML = `Name: ${esc(b.name)}<br>Account: ${esc(b.account)}<br>IFSC: ${esc(b.ifsc)}${b.bank ? '<br>Bank: ' + esc(b.bank) : ''}`;
+    const b = config.bank;
+    const rows = [['Amount', rupees(amt), amt], ['Account name', b.name], ['Account number', b.account], ['IFSC', b.ifsc]].concat(b.bank ? [['Bank', b.bank]] : []);
+    $('bdetails').innerHTML = rows.map(([k, v, copy]) => `<div class="row"><div><span class="k">${esc(k)}</span><b>${esc(v)}</b></div><button type="button" data-copy="${esc(copy || v)}">Copy</button></div>`).join('');
+    $('bdetails').querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.dataset.copy).then(() => { btn.textContent = 'Copied ✓'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); });
+    }));
     $('bank').scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 

@@ -35,7 +35,7 @@
     </div>
     <label for="email">E-mail (your licence is kept for it)</label><input id="email" type="email" autocomplete="email" required placeholder="you@business.in">
     <label for="name">Business name (optional)</label><input id="name" autocomplete="organization" placeholder="Your business">
-    <div class="btns" style="justify-content:flex-start"><button class="btn" id="upiBtn" type="button">Pay by UPI</button><button class="btn ghost" id="bankBtn" type="button" hidden>Bank transfer</button></div>
+    <div class="btns" style="justify-content:flex-start"><button class="btn" id="upiBtn" type="button">Pay by UPI</button><button class="btn ghost" id="bankBtn" type="button">Bank transfer</button></div>
     <div id="msg"></div>
   </form>
   <div class="card" id="done" hidden style="margin-top:28px"><h3>Thank you! Here is your licence key</h3>
@@ -46,7 +46,7 @@
     <p style="color:var(--muted)">Scan with any UPI app (GPay, PhonePe, Paytm, BHIM) or pay to <b id="vpa"></b>.</p>
     <div class="center"><div id="qr"></div><p id="upiApp"></p></div></div>
   <div class="card" id="bank" hidden style="margin-top:28px"><h3>Bank transfer (IMPS / NEFT / RTGS)</h3>
-    <p style="color:var(--muted)">Send <b id="bamt"></b> to:</p><div class="keybox" id="bdetails"></div></div>
+    <p style="color:var(--muted)">Send the amount below from your bank app or branch, then send the UTR / reference.</p><div class="kv" id="bdetails"></div></div>
   <div class="card" id="claim" hidden style="margin-top:28px"><h3>Paid? Send the reference</h3>
     <label for="cref" id="creflabel">UPI reference / UTR (12 digits, in your UPI app's payment details)</label><input id="cref" inputmode="text" autocomplete="off">
     <div class="btns" style="justify-content:flex-start"><button class="btn" id="claimBtn" type="button">I have paid</button></div><div id="cmsg"></div></div>
