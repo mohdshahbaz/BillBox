@@ -14,7 +14,7 @@ def uid(*parts):
 
 app_sources = sorted(glob.glob('BillBox/*/*.swift'))
 core_sources = sorted(glob.glob('BillBoxCore/Sources/BillBoxCore/*.swift'))
-test_sources = sorted(f for f in glob.glob('BillBoxCore/Tests/BillBoxCoreTests/*.swift') if not os.path.islink(f)) + ['BillBoxCore/Sources/ParityKit/ParityRunner.swift']
+test_sources = sorted(f for f in glob.glob('BillBoxCore/Tests/BillBoxCoreTests/*.swift') if not os.path.islink(f) and os.path.basename(f) != 'BillMath.swift') + ['BillBoxCore/Sources/ParityKit/ParityRunner.swift']
 golden = 'BillBoxCore/Tests/BillBoxCoreTests/Golden'
 assets = 'BillBox/Resources/Assets.xcassets'
 pdfreader = 'BillBox/Resources/PDFReader'   # the Mac's PDF reader (pdf.js 1.10.100 + pdfExtract.js), a folder reference

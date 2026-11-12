@@ -90,9 +90,13 @@ jobs:
           D="$C/Library/Application Support/DistributorPro"
           rm -rf "$D/data"; mkdir -p "$D"; cp -R st/ios/data "$D/data"
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 || true
+          # each screen's run is ended by force (simctl terminate). BillBox would show "Last close" on the next screen,
+          # as if iOS had killed it, so clear its running marker first
+          CC="$C/Library/Caches/CrashCatcher"
           n=0
           for p in dashboard billing bills purchases stock parties salesmen debitNotes reports settings; do
             n=$((n+1))
+            rm -f "$CC/running" "$CC/last-crash.txt"
             xcrun simctl launch "$UDID" $BID -startPage $p > /dev/null
             sleep 7
             xcrun simctl io "$UDID" screenshot "$O/shots/$(printf %02d $n)_$p.png" >/dev/null 2>&1 || true
@@ -100,10 +104,12 @@ jobs:
           done
           # dark mode, one screen
           xcrun simctl ui "$UDID" appearance dark || true
+          rm -f "$CC/running" "$CC/last-crash.txt"
           xcrun simctl launch "$UDID" $BID -startPage dashboard > /dev/null; sleep 7
           xcrun simctl io "$UDID" screenshot "$O/shots/99_dashboard_dark.png" >/dev/null 2>&1 || true
           xcrun simctl terminate "$UDID" $BID || true
           xcrun simctl ui "$UDID" appearance light || true
+          rm -f "$CC/running" "$CC/last-crash.txt"
           # the bills, drawn as they print
           xcrun simctl launch "$UDID" $BID -BillBoxPrintTest 1 -startPage bills > /dev/null
           for i in $(seq 1 40); do [ -f "$C/Documents/selftest/done.txt" ] && break; sleep 2; done

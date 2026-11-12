@@ -39,7 +39,6 @@
 				5318549362AC91972CE3F7B5,
 				09A533E4A1E6CF1F22AEC845,
 				37537249C258B5AA1820FBA7,
-				B6295DE7694906E664959D91,
 				B513C334B31C652BECFE76BD,
 				BA9A3511567078969B98637F,
 				D2A68E412BBF176EB3B537F5,
@@ -272,7 +271,6 @@
 		8FAFAB6DF7C239E6721B3FE7 /* FEATURE_PARITY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "FEATURE_PARITY.md"; sourceTree = "<group>"; };
 		8FD2B979AD66A10F5F9DC8BD /* LicenseView.swift in app */ = {isa = PBXBuildFile; fileRef = 4045E0CE18E0E8E8FDC69122 /* LicenseView.swift */; };
 		914472DDF481E5698D4A4E16 /* SyncView.swift in app */ = {isa = PBXBuildFile; fileRef = 7E6C3ADA5BBFFA136DB6C370 /* SyncView.swift */; };
-		920ACC902AD5438CA8ADA35D /* BillMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BillMath.swift"; sourceTree = "<group>"; };
 		92F8ADD9AAF730B1F57EBCD7 /* Utils.swift in tests */ = {isa = PBXBuildFile; fileRef = EFF01BFCF3EB383DC573CD66 /* Utils.swift */; };
 		936121B0569181F2CE00AF62 /* Themes.swift in app */ = {isa = PBXBuildFile; fileRef = 1AFB47A00CA0AF4E7D66CB6B /* Themes.swift */; };
 		953344B576AA0EF0C6B81E77 /* SQLite.swift in app */ = {isa = PBXBuildFile; fileRef = C18A6D877C8858E504196942 /* SQLite.swift */; };
@@ -420,7 +418,6 @@
 		B4D1F30AB52B5B7C1D57148D /* Billing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Billing.swift"; sourceTree = "<group>"; };
 		B513C334B31C652BECFE76BD /* BillMathTests.swift in tests */ = {isa = PBXBuildFile; fileRef = 57B527741BBCDA077B10D9B0 /* BillMathTests.swift */; };
 		B586A997BD27B810FB1A365A /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = 8BE8E923763221BF4DE7D2E2 /* Pow */; };
-		B6295DE7694906E664959D91 /* BillMath.swift in tests */ = {isa = PBXBuildFile; fileRef = 920ACC902AD5438CA8ADA35D /* BillMath.swift */; };
 		B712F250FCFD4C07ED7FCD46 = {isa = PBXGroup; children = (
 				F64A58194628179482BC0A1B,
 				1DA1EFEEA1444E9006A0821D,
@@ -480,7 +477,6 @@
 		C86033F40FE8ACBBD16A174C /* Golden */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Golden"; sourceTree = "<group>"; };
 		C9B444850B0BBD2786E10ED7 = {isa = PBXGroup; children = (
 				99FFF8838B45A6A41FA10350,
-				920ACC902AD5438CA8ADA35D,
 				57B527741BBCDA077B10D9B0,
 				DBD48449E2F697E94C0A1F71,
 				EDEF31E06B71EE8FAA55F680,
