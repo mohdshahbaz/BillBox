@@ -62,12 +62,14 @@ class _PartiesState extends State<PartiesScreen> {
         final pre = await Api.post('/routes/auto-assign', {'apply': false}) as Json;
         if (!mounted) return;
         final matches = (pre['matches'] as List).cast<Json>();
+        final choices = ((pre['choices'] as List?) ?? const []).cast<Json>();
         final skip = <int>{};
+        final picks = <int, int>{};   // a customer matching two beats equally → the beat picked (0 = leave without a route)
         final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) {
-            final n = matches.where((m) => !skip.contains(m['party_id'])).length;
-            final unclear = num_(pre['unclear']).toInt(), unmatched = num_(pre['unmatched']).toInt();
+            final n = matches.where((m) => !skip.contains(m['party_id'])).length + picks.values.where((v) => v > 0).length;
+            final unmatched = num_(pre['unmatched']).toInt();
             return AlertDialog(
               title: const Text('Assign routes from name and address'),
               content: SizedBox(
@@ -76,10 +78,10 @@ class _PartiesState extends State<PartiesScreen> {
                   Text(matches.isEmpty
                       ? 'No customer without a route shares a word with a route name.'
                       : '${matches.length} customers without a route share a word with a route name. Untick any that are wrong.'),
-                  if (unclear > 0 || unmatched > 0)
+                  if (unmatched > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text('Left as they are: $unmatched sharing no word with a route${unclear > 0 ? ', $unclear matching two routes equally' : ''}.',
+                      child: Text('Left as they are: $unmatched sharing no word with a route.',
                           style: Theme.of(ctx).textTheme.bodySmall),
                     ),
                   const SizedBox(height: 8),
@@ -95,6 +97,25 @@ class _PartiesState extends State<PartiesScreen> {
                           subtitle: '${m['address'] ?? ''}'.isEmpty ? null : Text('${m['address']}', maxLines: 1, overflow: TextOverflow.ellipsis),
                           secondary: Text('→ ${m['route_name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
                         ),
+                      if (choices.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12, bottom: 4),
+                          child: Text('Pick a beat (${choices.length} match more than one equally)', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      for (final c in choices)
+                        ListTile(
+                          dense: true,
+                          title: Text('${c['party_name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: '${c['address'] ?? ''}'.isEmpty ? null : Text('${c['address']}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                          trailing: DropdownButton<int>(
+                            value: picks[c['party_id']] ?? 0,
+                            items: [
+                              const DropdownMenuItem(value: 0, child: Text('Leave without a route')),
+                              for (final r in (c['routes'] as List).cast<Json>()) DropdownMenuItem(value: r['route_id'] as int, child: Text('${r['route_name']}')),
+                            ],
+                            onChanged: (v) => setSt(() => picks[c['party_id'] as int] = v ?? 0),
+                          ),
+                        ),
                     ]),
                   ),
                 ]),
@@ -108,7 +129,8 @@ class _PartiesState extends State<PartiesScreen> {
         );
         if (ok != true || !mounted) return;
         final ids = [for (final m in matches) if (!skip.contains(m['party_id'])) m['party_id']];
-        final r = await Api.post('/routes/auto-assign', {'apply': true, 'party_ids': ids}) as Json;
+        final picked = [for (final e in picks.entries) if (e.value > 0) {'party_id': e.key, 'route_id': e.value}];
+        final r = await Api.post('/routes/auto-assign', {'apply': true, 'party_ids': ids, 'assignments': picked}) as Json;
         if (mounted) toast(context, '${r['assigned']} outlets assigned to routes.');
         await _load();
       });

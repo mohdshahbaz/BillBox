@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -209,11 +210,15 @@ fun AutoRouteForm(onDismiss: () -> Unit, done: suspend () -> Unit) {
     val app = LocalApp.current
     var preview by remember { mutableStateOf<J?>(null) }
     val skip = remember { mutableStateListOf<Int>() }
+    // a customer matching two beats equally → the beat the owner picked (0 = leave without a route)
+    val picks = remember { mutableStateMapOf<Int, Int>() }
     LaunchedEffect(Unit) { app.guarded { preview = Api.obj("POST", "/routes/auto-assign", body = mapOf("apply" to false)) } }
     val matches = preview?.list("matches") ?: emptyList()
+    val choices = preview?.list("choices") ?: emptyList()
     val chosen = matches.map { it.int("party_id") }.filter { it !in skip }
-    FormDialog("Assign routes", onDismiss, "Assign ${chosen.size}", canSave = chosen.isNotEmpty(), onSave = {
-        val r = Api.obj("POST", "/routes/auto-assign", body = mapOf("apply" to true, "party_ids" to chosen))
+    val picked = picks.filter { it.value > 0 }.map { mapOf("party_id" to it.key, "route_id" to it.value) }
+    FormDialog("Assign routes", onDismiss, "Assign ${chosen.size + picked.size}", canSave = chosen.size + picked.size > 0, onSave = {
+        val r = Api.obj("POST", "/routes/auto-assign", body = mapOf("apply" to true, "party_ids" to chosen, "assignments" to picked))
         app.notify("${r.int("assigned")} outlets assigned to routes.")
         done()
     }) {
@@ -221,8 +226,7 @@ fun AutoRouteForm(onDismiss: () -> Unit, done: suspend () -> Unit) {
         if (p == null) { Loading(); return@FormDialog }
         Hint(if (matches.isEmpty()) "No customer without a route shares a word with a route name."
              else "${matches.size} customers without a route share a word with a route name. Untick any that are wrong.")
-        if (p.int("unclear") > 0 || p.int("unmatched") > 0)
-            Hint("Left as they are: ${p.int("unmatched")} sharing no word with a route" + (if (p.int("unclear") > 0) ", ${p.int("unclear")} matching two routes equally" else "") + ".")
+        if (p.int("unmatched") > 0) Hint("Left as they are: ${p.int("unmatched")} sharing no word with a route.")
         matches.forEach { m ->
             val id = m.int("party_id")
             Row(Modifier.fillMaxWidth().clickable { if (id in skip) skip.remove(id) else skip.add(id) }, verticalAlignment = Alignment.CenterVertically) {
@@ -232,6 +236,16 @@ fun AutoRouteForm(onDismiss: () -> Unit, done: suspend () -> Unit) {
                     if (m.str("address").isNotEmpty()) Hint(m.str("address"))
                 }
                 Text("→ " + m.str("route_name"), fontWeight = FontWeight.SemiBold)
+            }
+        }
+        if (choices.isNotEmpty()) {
+            SectionHeader("Pick a beat (${choices.size} match more than one equally)")
+            choices.forEach { c ->
+                val id = c.int("party_id")
+                Text(c.str("party_name"), fontWeight = FontWeight.Medium)
+                if (c.str("address").isNotEmpty()) Hint(c.str("address"))
+                Choice("Beat", listOf("0" to "Leave without a route") + c.list("routes").map { it.str("route_id") to it.str("route_name") },
+                    (picks[id] ?: 0).toString(), { picks[id] = it.toIntOrNull() ?: 0 })
             }
         }
     }

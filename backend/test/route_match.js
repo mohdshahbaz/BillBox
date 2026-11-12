@@ -57,10 +57,14 @@ ok('a beat listing several places, comma separated: each place counts', () => {
   autoAssignRoutes(db, { apply: true });
   assert.deepStrictEqual([p1, p2, p3, p4, p5].map(routeOf), [a, a, a, b, b]);
 });
-ok('two routes level on every rule: unclear, skipped', () => {
-  route('RAJWADA'); route('Rajwada');
-  const p = party('SONI STORE', 'Rajwada');
+ok('two beats level on every rule: listed as a choice, the owner picks', () => {
+  const r1 = route('Qazipara, Mandi, Mandawar Road'), r2 = route('Qazipara, Mandi, Bairaj Road, Mandawar Road');
+  const p = party('A-One Trader', 'Sabzi Mandi, BIJNOR');            // MANDI counts (it names beats)
   const r = autoAssignRoutes(db, { apply: true });
   assert.strictEqual(r.unclear, 1); assert.strictEqual(routeOf(p), null);
+  const c = r.choices.find((x) => x.party_id === p);
+  assert.deepStrictEqual(c.routes.map((x) => x.route_id).sort(), [r1, r2].sort());
+  const done = autoAssignRoutes(db, { apply: true, party_ids: [], assignments: [{ party_id: p, route_id: r2 }, { party_id: p, route_id: 9999 }] });
+  assert.strictEqual(done.assigned, 1); assert.strictEqual(routeOf(p), r2);
 });
 console.log(`${passed} route matching checks passed`);

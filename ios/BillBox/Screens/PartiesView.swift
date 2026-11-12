@@ -444,13 +444,17 @@ extension PartiesView {
     let done: () async -> Void
     @State private var preview: JSON?
     @State private var skip = Set<Int>()
+    /// A customer that matches two beats equally → the beat the owner picked (0 = leave without a route).
+    @State private var picks: [Int: Int] = [:]
 
     private var matches: [JSON] { preview?.list("matches") ?? [] }
+    private var choices: [JSON] { preview?.list("choices") ?? [] }
     private var chosen: [Int] { matches.map { $0.int("party_id") }.filter { !skip.contains($0) } }
+    private var picked: [[String: Any]] { picks.filter { $0.value > 0 }.map { ["party_id": $0.key, "route_id": $0.value] } }
 
     var body: some View {
-        FormSheet(title: "Assign routes from name and address", saveLabel: "Assign \(chosen.count)", width: 600, canSave: !chosen.isEmpty, onSave: {
-            let r = try await API.obj("POST", "/routes/auto-assign", body: ["apply": true, "party_ids": chosen])
+        FormSheet(title: "Assign routes from name and address", saveLabel: "Assign \(chosen.count + picked.count)", width: 600, canSave: chosen.count + picked.count > 0, onSave: {
+            let r = try await API.obj("POST", "/routes/auto-assign", body: ["apply": true, "party_ids": chosen, "assignments": picked])
             app.notify("\(r.int("assigned")) outlets assigned to routes.")
             await done()
         }) {
@@ -458,8 +462,8 @@ extension PartiesView {
                 Text(matches.isEmpty ? "No customer without a route shares a word with a route name."
                      : "\(matches.count) customers without a route share a word with a route name. Untick any that are wrong.")
                     .foregroundStyle(.secondary)
-                if p.int("unclear") > 0 || p.int("unmatched") > 0 {
-                    Text("Left as they are: \(p.int("unmatched")) sharing no word with a route\(p.int("unclear") > 0 ? ", \(p.int("unclear")) matching two routes equally" : "").")
+                if p.int("unmatched") > 0 {
+                    Text("Left as they are: \(p.int("unmatched")) sharing no word with a route.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 ForEach(matches) { m in
@@ -474,6 +478,22 @@ extension PartiesView {
                             Text("→ \(m.str("route_name"))").fw(.semibold)
                         }
                     }
+                }
+                if !choices.isEmpty {
+                    Section {
+                        ForEach(choices) { c in
+                            let id = c.int("party_id")
+                            Picker(selection: Binding(get: { picks[id] ?? 0 }, set: { picks[id] = $0 })) {
+                                Text("Leave without a route").tag(0)
+                                ForEach(c.list("routes")) { r in Text(r.str("route_name")).tag(r.int("route_id")) }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(c.str("party_name")).fw(.medium)
+                                    if !c.str("address").isEmpty { Text(c.str("address")).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                                }
+                            }
+                        }
+                    } header: { Text("Pick a beat (\(choices.count) match more than one equally)") }
                 }
             } else {
                 ProgressView()

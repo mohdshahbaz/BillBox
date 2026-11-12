@@ -360,12 +360,14 @@ post('/backup/drive/connect'); post('/backup/drive/upload'); post('/backup/drive
 
 # ---------------- Parties › Assign routes: customers without a route get the route named in their name or address
 post('/routes', {'name': 'Kotdwar, Najibabad / Dhampur & A1', 'salesman_id': 1, 'days': '4'}, company=1)
+post('/routes', {'name': 'Qazipara, Mandi, Mandawar Road', 'days': '1'}, company=1); post('/routes', {'name': 'Qazipara, Mandi, Bairaj Road', 'days': '4'}, company=1)
 for n, ad in [('Verma Store', 'Near railway station, Bijnor'), ('Civil Lines Medical', ''), ('Stationwala Kirana', 'Main bazaar'),
               ('Nagina Road Agency', 'Nagina Road, near Civil Lines'), ('Patel Medical', 'Opp. Civil Hospital'), ('Yadav Dairy', 'Station Road 12'),
-              ('Kotdwar Traders', 'Kotdwar'), ('Sharma Agency', 'Station Road, Dhampur'), ('No Match Traders', 'Haridwar')]:
+              ('Kotdwar Traders', 'Kotdwar'), ('Sharma Agency', 'Station Road, Dhampur'), ('A-One Trader', 'Sabzi Mandi, BIJNOR'), ('No Match Traders', 'Haridwar')]:
     post('/parties', {'name': n, 'address': ad}, company=1)
 post('/routes/auto-assign', {}, company=1); post('/routes/auto-assign', {'apply': False}, company=1)
 post('/routes/auto-assign', {'apply': True, 'party_ids': [0]}, company=1); post('/routes/auto-assign', {'apply': True}, company=1)
+post('/routes/auto-assign', {'apply': True, 'party_ids': [], 'assignments': [{'party_id': 9999, 'route_id': 2}, {'party_id': 'x'}, 'bad']}, company=1)
 get('/parties', {'kind': 'CUSTOMER'}, company=1); get('/routes', company=1)
 
 # ---------------- deleting a company (a throwaway one, so the books above stay for the backup tests)

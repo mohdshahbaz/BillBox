@@ -204,7 +204,7 @@ extension Router {
     // utils/routematch.js: outlets without a route get the route that shares a word with their name or address.
     static let ROUTE_FILLER: Set<String> = ["ROUTE", "ROUTES", "BEAT", "MON", "TUE", "TUES", "WED", "THU", "THUR", "THURS", "FRI", "SAT", "SUN",
         "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
-    static let ROUTE_GENERIC: Set<String> = ["ROAD", "NAGAR", "MARG", "CHOWK", "CHAURAHA", "BAZAR", "BAZAAR", "MARKET", "MANDI", "COLONY", "STREET",
+    static let ROUTE_GENERIC: Set<String> = ["ROAD", "NAGAR", "MARG", "CHOWK", "CHAURAHA", "BAZAR", "BAZAAR", "MARKET", "COLONY", "STREET",
         "NEAR", "MAIN", "GALI", "LANE", "SECTOR", "AREA", "SIDE", "THE", "AND", "OPP", "OPPOSITE", "BEHIND", "SHOP", "STORE", "STORES"]
     static func routeWords(_ s: String) -> [String] {
         let up = s.uppercased().unicodeScalars.map { ($0 >= "A" && $0 <= "Z") || ($0 >= "0" && $0 <= "9") ? Character($0) : " " }
@@ -238,7 +238,7 @@ extension Router {
             return w.isEmpty ? nil : (id: r.v("id"), name: name, words: w, keys: Router.routeKeys(name))
         }
         let parties = try db.prepare("SELECT id, name, address FROM parties WHERE active=1 AND route_id IS NULL AND type <> 'SUPPLIER' ORDER BY name").all()
-        var matches: [Row] = []
+        var matches: [Row] = [], choices: [Row] = []
         var unclear = 0, unmatched = 0
         for p in parties {
             if let only, !only.contains(JS.number(p.v("id"))) { continue }
@@ -256,17 +256,30 @@ extension Router {
             }
             if scored.isEmpty { unmatched += 1; continue }
             scored.sort { $1.s.lexicographicallyPrecedes($0.s) }   // best first
-            if scored.count > 1 && scored[0].s == scored[1].s { unclear += 1; continue }
+            if scored.count > 1 && scored[0].s == scored[1].s {
+                unclear += 1
+                let level = scored.filter { $0.s == scored[0].s }.sorted { $0.i < $1.i }.map {   // in route order, like the Mac
+                     ["route_id": routes[$0.i].id, "route_name": routes[$0.i].name] as Row }
+                choices.append(["party_id": p.v("id"), "party_name": p.v("name"), "address": addr, "routes": level] as Row)
+                continue
+            }
             let best = routes[scored[0].i]
             matches.append(["party_id": p.v("id"), "party_name": p.v("name"), "address": addr, "route_id": best.id, "route_name": best.name] as Row)
         }
-        if apply && !matches.isEmpty {
+        var assigned = 0
+        if apply {
+            var pairs: [(Any?, Any?)] = matches.map { ($0.v("route_id"), $0.v("party_id")) }
+            for a in (unwrap(b["assignments"] ?? nil) as? [Any]) ?? [] {
+                guard let o = a as? Row else { continue }
+                let pid = JS.number(o["party_id"] ?? nil), rid = JS.number(o["route_id"] ?? nil)
+                if pid > 0 && rid > 0 { pairs.append((rid, pid)) }
+            }
             try db.transaction {
-                let up = try db.prepare("UPDATE parties SET route_id=? WHERE id=? AND route_id IS NULL")
-                for m in matches { try up.run(m.v("route_id"), m.v("party_id")) }
+                let up = try db.prepare("UPDATE parties SET route_id=? WHERE id=? AND route_id IS NULL AND active=1 AND EXISTS (SELECT 1 FROM routes WHERE id=?)")
+                for (rid, pid) in pairs { assigned += try up.run(rid, pid, rid).changes }
             }
         }
-        return ["matches": matches, "unclear": unclear, "unmatched": unmatched, "assigned": apply ? matches.count : 0] as Row
+        return ["matches": matches, "choices": choices, "unclear": unclear, "unmatched": unmatched, "assigned": assigned] as Row
     }
 
     func listRoutes(_ db: Database) throws -> Any {
