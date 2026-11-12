@@ -3,7 +3,7 @@ tapped: Type an item name at 517 326
 tapped: Bikano at 395 470
 tapped: Save & print at 892 1545
 tapped: Parties at 760 2211
-tapped: City Mart at 288 1169
+tapped: City Mart at 288 1170
 tapped: Stock at 540 2211
 missing: New item
 tapped: More at 980 2211
