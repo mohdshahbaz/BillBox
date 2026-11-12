@@ -61,7 +61,8 @@ import SwiftUI
             }
         }
         .overlay {
-            if loading { ProgressView() }
+            if loading && parties.isEmpty { SkeletonRows() }
+            else if loading { ProgressView() }
             else if parties.isEmpty { EmptyState(title: supplier ? "No suppliers" : "No customers", symbol: "person.2", message: supplier ? "Suppliers are added automatically when you scan their bill." : "Add your first customer.") }
         }
     }

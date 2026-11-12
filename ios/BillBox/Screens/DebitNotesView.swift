@@ -74,7 +74,8 @@ struct DNLine: Identifiable, Equatable {
             GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).monospacedDigit().fontWeight(.semibold) }
         }
         .overlay {
-            if loading { ProgressView() }
+            if loading && rows.isEmpty { SkeletonRows() }
+            else if loading { ProgressView() }
             else if rows.isEmpty { EmptyState(title: "No debit notes in \(app.fy)", symbol: "arrow.uturn.backward.square") }
         }
     }

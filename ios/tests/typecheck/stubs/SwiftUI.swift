@@ -169,6 +169,7 @@ public struct EnvironmentValues {
     public var verticalSizeClass: UserInterfaceSizeClass? { get { nil } set {} }
     public var scenePhase: ScenePhase { get { .active } set {} }
     public var dynamicTypeSize: DynamicTypeSize { get { .large } set {} }
+    public var accessibilityReduceMotion: Bool { false }
     public var isEnabled: Bool { get { true } set {} }
     public var isSearching: Bool { false }
     public var layoutDirection: LayoutDirection { get { .leftToRight } set {} }
@@ -530,6 +531,7 @@ public struct Animation: Equatable {
     public static func easeOut(duration: Double) -> Animation { Animation() }
     public static func easeInOut(duration: Double) -> Animation { Animation() }
     public static func linear(duration: Double) -> Animation { Animation() }
+    public func repeatForever(autoreverses: Bool = true) -> Animation { self }
     public static func spring(response: Double = 0.5, dampingFraction: Double = 0.8, blendDuration: Double = 0) -> Animation { Animation() }
 }
 public func withAnimation<R>(_ a: Animation? = .default, _ body: () throws -> R) rethrows -> R { try body() }

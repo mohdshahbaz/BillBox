@@ -74,7 +74,8 @@ import SwiftUI
             GridColumn("Retailer margin", id: "rmargin", min: 80, ideal: 110, sort: { (it: JSON) -> Any? in it.num("retailer_margin_pct") }) { (it: JSON) in Text("\(it.str("retailer_margin_pct"))%").monospacedDigit() }
         }
         .overlay {
-            if loading { ProgressView() }
+            if loading && items.isEmpty { SkeletonRows() }
+            else if loading { ProgressView() }
             else if items.isEmpty { EmptyState(title: "No items", symbol: "archivebox", message: "Add an item, or scan a supplier bill in Purchases and items are created for you.") }
         }
     }

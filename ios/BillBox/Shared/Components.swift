@@ -28,7 +28,7 @@ import PDFKit
             Form {
                 content
                 if let errorText {
-                    Section { Text(errorText).font(.callout).foregroundStyle(.red) }
+                    Section { Label(errorText, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(Theme.negative) }
                 }
             }
             .groupedForm()
@@ -221,15 +221,15 @@ struct Choice: Identifiable, Hashable {
     var tint: Color = Theme.accent
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.subheadline).foregroundStyle(.secondary)
-            Text(value).font(.system(.title, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(tint)
+        VStack(alignment: .leading, spacing: DS.Space.xxs) {
+            Text(title).font(.dsCallout).foregroundStyle(Theme.textSecondary)
+            Text(value).font(.dsMoney).monospacedDigit().foregroundStyle(tint)
                 .lineLimit(1).minimumScaleFactor(0.5)
-            if !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+            if !note.isEmpty { Text(note).font(.dsCaption).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true) }
         }
-        .padding(14)
+        .padding(DS.Pad.card)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(10)
+        .card(DS.Radius.card)
         .accessibilityElement(children: .combine)
     }
 }
@@ -263,7 +263,8 @@ struct Choice: Identifiable, Hashable {
             }
         }
         .font(.callout)
-        .padding(.horizontal, 12).padding(.vertical, 6)
+        .padding(.horizontal, DS.Space.s).padding(.vertical, 6)
+        .frame(minHeight: DS.hitTarget)
         .background(Theme.card)
     }
 }
@@ -293,21 +294,21 @@ enum BulkOutcome { case deleted, archived, failed(label: String, reason: String)
     let items: [Item]
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 10, alignment: .leading)], alignment: .leading, spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: DS.Width.summaryCell), spacing: 10, alignment: .leading)], alignment: .leading, spacing: DS.Space.xs) {
             ForEach(items.indices, id: \.self) { i in
                 let it = items[i]
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(it.label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(it.label).font(.dsCaption).foregroundStyle(Theme.textSecondary).lineLimit(1)
                     Text(it.value).font(it.strong ? .callout.weight(.bold) : .callout.weight(.medium)).monospacedDigit()
                         .foregroundStyle(it.tint ?? Color.primary).lineLimit(1).minimumScaleFactor(0.7)
                 }
                 .accessibilityElement(children: .combine)
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
+        .padding(.horizontal, DS.Pad.card).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(14)
-        .padding(.horizontal, 10).padding(.bottom, 8)
+        .card(DS.Radius.card)
+        .padding(.horizontal, DS.Pad.tableSide).padding(.bottom, DS.Space.xs)
     }
 }
 
@@ -320,9 +321,9 @@ enum BulkOutcome { case deleted, archived, failed(label: String, reason: String)
         if text.isEmpty {
             Text(" ").font(.caption)
         } else {
-            Text(text).font(.caption.weight(.semibold)).foregroundStyle(tint).lineLimit(1)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(tint.opacity(0.13), in: Capsule())
+            Text(text).font(.dsCaption.weight(.semibold)).foregroundStyle(tint).lineLimit(1).fixedSize()
+                .padding(.horizontal, DS.Space.xs).padding(.vertical, 3)
+                .background(tint.opacity(DS.tint), in: Capsule())
         }
     }
 }
@@ -330,7 +331,7 @@ enum BulkOutcome { case deleted, archived, failed(label: String, reason: String)
 @MainActor struct Banner: View {
     let text: String
     var symbol = "info.circle.fill"
-    var tint: Color = .orange
+    var tint: Color = Theme.warning
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -340,9 +341,9 @@ enum BulkOutcome { case deleted, archived, failed(label: String, reason: String)
                 .padding(.top, 3)
         }
         .font(.callout)
-        .padding(12)
-        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(tint.opacity(0.22), lineWidth: 0.5))
+        .padding(DS.Space.s)
+        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous).stroke(tint.opacity(0.22), lineWidth: 0.5))
     }
 }
 
@@ -355,7 +356,7 @@ enum BulkOutcome { case deleted, archived, failed(label: String, reason: String)
             if let t = app.toast {
                 HStack(spacing: 8) {
                     Image(systemName: t.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                        .foregroundStyle(t.isError ? .red : .green)
+                        .foregroundStyle(t.isError ? Theme.negative : Theme.positive)
                     Text(t.text).font(.callout).lineLimit(4).textSelection(.enabled)
                     Button { app.toast = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain).accessibilityLabel("Dismiss")
                 }

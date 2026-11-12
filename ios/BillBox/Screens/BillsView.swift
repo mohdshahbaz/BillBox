@@ -114,7 +114,8 @@ import SwiftUI
             }
         }
         .overlay {
-            if loading { ProgressView() }
+            if loading && rows.isEmpty { SkeletonRows() }
+            else if loading { ProgressView() }
             else if rows.isEmpty { EmptyState(title: "No bills match these filters", symbol: "doc.text.magnifyingglass") }
         }
     }

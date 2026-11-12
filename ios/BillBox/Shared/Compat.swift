@@ -25,18 +25,25 @@ extension View {
     func card(_ radius: CGFloat = 10) -> some View { self.modifier(CardBackground(radius: radius)) }
 }
 
+/// Nothing to show: an icon, one line, an optional sentence and an optional action (docs/DESIGN_SYSTEM.md §5).
 struct EmptyState: View {
     let title: String
     var symbol = "tray"
     var message = ""
+    var actionTitle: String? = nil
+    var action: (() -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: symbol).font(.system(size: 34)).foregroundStyle(.secondary)
+        VStack(spacing: DS.Space.xs) {
+            Image(systemName: symbol).font(.system(size: 34)).foregroundStyle(Theme.textSecondary)
+                .accessibilityHidden(true)
             Text(title).font(.title3.weight(.semibold)).multilineTextAlignment(.center)
-            if !message.isEmpty { Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 420) }
+            if !message.isEmpty { Text(message).foregroundStyle(Theme.textSecondary).multilineTextAlignment(.center).frame(maxWidth: 420) }
+            if let actionTitle, let action {
+                Button(actionTitle, action: action).buttonStyle(.bordered).padding(.top, DS.Space.xxs)
+            }
         }
-        .padding(24)
+        .padding(DS.Space.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
