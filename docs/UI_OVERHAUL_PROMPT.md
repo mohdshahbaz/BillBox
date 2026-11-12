@@ -9,7 +9,7 @@ stock, parties and ledgers, salesmen and routes, Books & GST reports, backups an
 distributor (AK Enterprises) in India, often on a phone at the counter, so speed, clarity and correctness of money
 figures matter more than decoration.
 
-Your job: a **complete, modern UI/UX overhaul** of the iPhone, Mac and Windows/Linux apps, and an **optimisation of
+Your job: a **complete, modern UI/UX overhaul** of the iPhone, Mac, Android and Windows/Linux apps, and an **optimisation of
 the Node.js backend**, without changing any figure the app calculates or prints. Work autonomously, in stages, and
 keep going until every acceptance check at the end passes.
 
@@ -83,7 +83,7 @@ Then write **`docs/DESIGN_SYSTEM.md`**: one shared design language for all apps.
 - **Radii, elevation and shadows.**
 - **Component specs:** cards, tables, buttons, fields, chips, pills, toasts, sheets, empty states, charts.
 - **Motion:** durations and when to animate (never on money figures while typing).
-- **Per-platform mapping:** SwiftUI, AppKit/SwiftUI on Mac, Flutter.
+- **Per-platform mapping:** SwiftUI, AppKit/SwiftUI on Mac, Jetpack Compose (Android), Flutter.
 
 Every platform implements tokens from this one file.
 
@@ -143,7 +143,29 @@ What good looks like:
   title), and scale correctly at 100–200% DPI.
 - **Check:** `flutter analyze` is clean, and the `desktop.yml` workflow builds both Windows and Linux.
 
-## 7. Backend (Node.js 22): optimise and clean up
+## 7. Android app (Kotlin + Jetpack Compose, Android 12+): UI/UX overhaul
+
+- **Code:** `android/app/src/main/java/com/local/billbox/` (`ui/Theme.kt`, `ui/Components.kt`, `ui/DataTable.kt`,
+  `ui/MainScaffold.kt`, `ui/Cells.kt`, `screens/`). Same screens and the same design system, in Material 3.
+- **Material 3:**
+  - Colour roles from the selected theme's accent. Material You dynamic colour is an optional choice in
+    Settings › Appearance, never forced.
+  - Light and dark.
+  - The M3 type scale with tabular figures for money.
+- **Android 12+ fit:**
+  - Edge-to-edge with proper insets.
+  - The Android 12 splash screen API.
+  - Predictive back on Android 14.
+  - `NavigationBar` on phones, `NavigationRail` on tablets and foldables (window size classes).
+  - Large-screen layouts.
+- **Tables:** sticky header, sorting, right-aligned monospaced money, comfortable touch targets (48 dp).
+- **Billing:** same speed goals as the iPhone (search, scan, quantity, save; the keyboard never hides the field).
+- **Checks:**
+  - Keep `minSdk 31`.
+  - `./build.sh typecheck` (Kotlin type-check against stubs).
+  - The Android self-test screenshots on Android 12 and 14 look right.
+
+## 8. Backend (Node.js 22): optimise and clean up
 
 `backend/src` is also the engine inside Android, Windows, Linux and the Mac. Goals, in this order:
 1. **Correctness first.** Every existing test passes: `backend/test/smoke.js` and the parity checks in `ci.yml`.
@@ -166,7 +188,7 @@ What good looks like:
    one; keep them answering identically, and keep the Android bundle in step (`android/engine` builds from
    `backend/src`).
 
-## 8. Build, run and test loop (repeat until done)
+## 9. Build, run and test loop (repeat until done)
 
 There may be no Mac in your environment; use GitHub Actions for everything Apple. After each stage:
 
@@ -191,14 +213,15 @@ There may be no Mac in your environment; use GitHub Actions for everything Apple
 
 Stop a stage only when its checks are green **and** the screenshots look right.
 
-## 9. Acceptance checklist (the work is done when all are true)
+## 10. Acceptance checklist (the work is done when all are true)
 
 - [ ] `docs/DESIGN_SYSTEM.md` exists and every platform uses its tokens.
 - [ ] iPhone: all 11 self-test screens plus dark mode look consistent. Nothing is clipped (dates, amounts, titles),
       every table sorts, and empty/loading/error states exist. The unit tests pass, the engine matches the Mac
       (543/543 steps) and there are no crash reports.
 - [ ] Mac: builds in CI, type-check passes, and no API above macOS 12 is used without `#available`.
-- [ ] Android: builds, the self-test screenshots look right on Android 12 and 14, and `minSdk` is still 31.
+- [ ] Android: redesigned to the design system in Material 3. It builds, the Kotlin type-check passes, the
+      self-test screenshots look right on Android 12 and 14 (light and dark), and `minSdk` is still 31.
 - [ ] Windows/Linux: `flutter analyze` is clean and both builds succeed in the Desktop workflow.
 - [ ] Backend: all tests and parity checks pass. `docs/BACKEND_PERF.md` shows measured improvements on the slow
       paths, with no figure changed.
@@ -206,7 +229,7 @@ Stop a stage only when its checks are green **and** the screenshots look right.
 - [ ] `ios/FEATURE_PARITY.md`, the READMEs and `docs/CI_CD.md` are updated.
 - [ ] One pull request into `main` with before/after screenshots and a summary per platform. Not merged.
 
-## 10. Working across sessions and usage limits
+## 11. Working across sessions and usage limits
 
 You may hit a usage limit or the session may end. Make the work resumable:
 
@@ -219,7 +242,7 @@ You may hit a usage limit or the session may end. Make the work resumable:
 - If scheduled tasks are available, create one that runs this prompt again every few hours until the acceptance
   checklist is complete. It must stop itself (delete or disable the task) when everything is ticked.
 
-## 11. Permissions
+## 12. Permissions
 
 Before starting, list in one message every permission you will need, so the owner can approve them once. For
 example: running shell commands, editing files, `git push` to the branch, `gh workflow run`, reading Actions logs,
