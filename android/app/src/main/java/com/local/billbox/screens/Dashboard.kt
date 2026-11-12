@@ -257,6 +257,7 @@ private fun ListCard(title: String, icon: ImageVector, rows: List<Pair<String, S
 @Composable
 private fun MonthBars(values: List<Triple<String, String, Double>>, color: Color, selected: String, pick: (String) -> Unit) {
     val top = maxOf(1.0, values.maxOfOrNull { abs(it.third) } ?: 1.0)
+    val loss = Bad   // read here: the drawing block below is not composable
     Row(Modifier.fillMaxWidth().height(200.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
         values.forEach { (id, label, v) ->
             val on = id == selected
@@ -264,7 +265,7 @@ private fun MonthBars(values: List<Triple<String, String, Double>>, color: Color
                 if (on) Text(Fmt.money(v), fontSize = 8.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
                 Canvas(Modifier.weight(1f).fillMaxWidth()) {
                     val h = maxOf(if (v != 0.0) 3f else 0f, size.height * (abs(v) / top).toFloat())
-                    drawRoundRect((if (v < 0) Bad else color).copy(alpha = if (on) 1f else 0.45f), Offset(0f, size.height - h), Size(size.width, h), CornerRadius(8f, 8f))
+                    drawRoundRect((if (v < 0) loss else color).copy(alpha = if (on) 1f else 0.45f), Offset(0f, size.height - h), Size(size.width, h), CornerRadius(8f, 8f))
                 }
                 Text(label, fontSize = 10.sp, maxLines = 1, color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
             }
