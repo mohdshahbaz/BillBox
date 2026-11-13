@@ -34,6 +34,22 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+      # the Mac engine's libraries and the iPhone engine's build are kept between runs (npm install alone took 2 min)
+      - uses: actions/cache@v4
+        with:
+          path: backend/node_modules
+          key: selftest-npm-${{ runner.os }}-${{ hashFiles('backend/package.json') }}
+      - uses: actions/cache@v4
+        with:
+          path: ios/BillBoxCore/.build
+          key: selftest-swiftpm-${{ runner.os }}-${{ hashFiles('ios/BillBoxCore/Package.swift', 'ios/BillBoxCore/Sources/**') }}
+          restore-keys: selftest-swiftpm-${{ runner.os }}-
+      # Xcode's build folder: the next run compiles only what changed (a cold build takes 2-3 min)
+      - uses: actions/cache@v4
+        with:
+          path: build
+          key: selftest-xcode-${{ runner.os }}-${{ hashFiles('ios/**/*.swift', 'ios/BillBox.xcodeproj/project.pbxproj') }}
+          restore-keys: selftest-xcode-${{ runner.os }}-
 
       - name: Pick a simulator
         run: |
@@ -58,7 +74,7 @@ jobs:
       - name: The working session, on the Mac engine and the iPhone engine
         run: |
           W=$PWD/st; mkdir -p $W/out
-          (cd backend && npm install --no-audit --no-fund)
+          [ -d backend/node_modules/express ] || (cd backend && npm install --no-audit --no-fund)
           python3 ios/tests/parity/gen_scenario.py $W >/dev/null
           sed "s#{engine}#mac#g" $W/scenario.json > $W/scen-mac.json
           sed "s#{engine}#ios#g" $W/scenario.json > $W/scen-ios.json
