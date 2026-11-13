@@ -43,6 +43,19 @@ enum SimSelfTest {
                     }
                 }
                 if n == 0 {
+                    // every design in every paper layout (docs/UI_OVERHAUL_PROMPT.md §2.4): layout_<design>_<layout>.pdf
+                    for design in ["classic", "marg", "busy", "bizom"] {
+                        var c = app.settings.raw
+                        c["print_style"] = design
+                        for lay in PrintLayout.allCases {
+                            if let data = invoicePDF(inv, company: JSON(c), layout: lay)?.dataRepresentation() {
+                                try data.write(to: dir.appendingPathComponent("layout_\(design)_\(lay.rawValue).pdf"))
+                                log.append("layout_\(design)_\(lay.rawValue).pdf \(data.count) bytes")
+                            } else {
+                                log.append("layout_\(design)_\(lay.rawValue): no PDF")
+                            }
+                        }
+                    }
                     marg["print_marg_colour"] = "mono"; marg["print_marg_classes"] = "used"; marg["print_marg_font"] = "sans"
                     if let data = invoicePDF(inv, company: JSON(marg), layout: .a4FullOriginal)?.dataRepresentation() {
                         try data.write(to: dir.appendingPathComponent("marg_a4.pdf"))
