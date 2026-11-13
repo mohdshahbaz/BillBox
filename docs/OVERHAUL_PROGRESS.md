@@ -11,9 +11,12 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
 - [x] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
 - [x] 8. Bills: every style and layout checked from self-test PDFs
-- [ ] 9. Docs updated, one pull request into `main` (not merged) (in progress 2026-11-13 03:55 UTC)
+- [x] 9. Docs updated, one pull request into `main` (not merged)
 
 ## Log
+- 2026-11-13 (run 5, end): stage 9 done. Pull request #1 into `main` opened (not merged):
+  https://github.com/mohdshahbaz/BillBox/pull/1 . Every stage done; the scheduled task "BillBox UI overhaul – continue" is
+  deleted. Leftovers are listed in the pull request (Android engine bundle rebuild, Flutter sticky headings, more profiling).
 - 2026-11-13 (run 5): stage 8 done. The iPhone self-test now draws the first bill in every design × every paper layout
   (20 `layout_<design>_<layout>.pdf`, 39 PDFs in all). Found and fixed text cut off with "…": bank details in the totals
   band (values shrink to 60 %, else printed in full in the footer), GST % / Disc % headings on A4 (shrink instead), the
@@ -82,10 +85,7 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - iPhone/Android tables still run past the screen edge (sideways scroll by design).
 
 ## Next
-Stage 8 (bills): run the iPhone self-test (unit tests off is fine; engine Swift unchanged), render `bill_*.pdf` from the
-`selftest-results` branch with `pdftoppm -r 200`, check every style/layout prints every field. Then stage 9: update
-`ios/FEATURE_PARITY.md` (Flutter Appearance tab, sortable tables), READMEs, `docs/CI_CD.md` (bench.js), open ONE PR into
-`main` (not merged) with before/after screenshots per platform, then delete the scheduled task.
+Review and merge pull request #1. Then rebuild the Android engine bundle (`cd android && ./build.sh engine`).
 Backend leftovers: rebuild the Android engine bundle (`cd android && ./build.sh engine`, commit engine.js) — npm was
 unreachable from the sandbox; profile Excel export, backup/restore, PDF import; `{ code, message }` errors + route validation.
 Mac leftovers (nice to have): pills/summary cards on Stock, Parties, Debit Notes; skeletons on the other lists.
