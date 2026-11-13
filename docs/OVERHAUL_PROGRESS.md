@@ -14,6 +14,19 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 9. Docs updated, one pull request into `main` (not merged)
 
 ## Log
+- 2026-11-13 (after merge, branch `leftovers`): the leftovers listed in pull request #1.
+  - Backend: merge-restore of 20 000 bills 64.8 s → 1.9 s (lines grouped once instead of scanned per bill; same fix in
+    `Backup.swift`; merge checksum identical); Excel writer uses native `zlib.crc32`; `bench.js` now times Excel export,
+    PDF import, backup and merge restore (`docs/BACKEND_PERF.md`).
+  - Errors: every error reply in all three engines carries `message` and `code` beside `error` (`docs/API_ERRORS.md`);
+    iPhone golden files carry the two fields. Request checks on the main write routes, report-only (`utils/validate.js`).
+  - Android bundle rebuilt from `backend/src` (pinned esbuild 0.28.2); parity 543/543, fuzz 1647/1647.
+  - Windows/Linux: tables keep their heading while rows scroll, Total row pinned, columns resizable (drag the heading
+    edge, double-click resets), right-click / long-press row menus (All bills, Stock, Parties). Fixed: light mode
+    crashed (`Palette.card` returned itself); "Cash" wrapped; text on light accents now picked by contrast.
+  - Desktop workflow: Linux UI test opens all 9 screens in light and dark, fails on Flutter errors or if the screens
+    do not change, screenshots in `selftest-results/desktop-linux`.
+  - Mac: Stock, Parties, Debit Notes get status pills, summary cards, skeleton rows and an error state with Try again.
 - 2026-11-13 (run 5, end): stage 9 done. Pull request #1 into `main` opened (not merged):
   https://github.com/mohdshahbaz/BillBox/pull/1 . Every stage done. The scheduled task "BillBox UI overhaul – continue" could not be deleted from the run
   (permission denied): the owner deletes it in Scheduled tasks. Leftovers are listed in the pull request (Android engine bundle rebuild, Flutter sticky headings, more profiling).
@@ -85,9 +98,6 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - iPhone/Android tables still run past the screen edge (sideways scroll by design).
 
 ## Next
-Review and merge pull request #1. Then rebuild the Android engine bundle (`cd android && ./build.sh engine`).
-Backend leftovers: rebuild the Android engine bundle (`cd android && ./build.sh engine`, commit engine.js) — npm was
-unreachable from the sandbox; profile Excel export, backup/restore, PDF import; `{ code, message }` errors + route validation.
-Mac leftovers (nice to have): pills/summary cards on Stock, Parties, Debit Notes; skeletons on the other lists.
-Flutter leftovers (nice to have, not in the checklist): sticky table headings (header outside the vertical scroll),
-resizable columns, right-click menus on table rows, no desktop screenshots in CI yet.
+Nice to have: switch request checks to reject (`REJECT = true` in `backend/src/utils/validate.js`) once the
+`[validate]` log lines stay quiet across the app versions in use; Windows UI screenshots (the Linux test covers the
+shared Flutter code); keyboard shortcuts cannot be tested on the window-manager-less CI screen.
