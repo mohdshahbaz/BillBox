@@ -35,6 +35,26 @@ jobs:
         with:
           node-version: 22
 
+      - name: Pick a simulator
+        run: |
+          mkdir -p st/out
+          xcodebuild -version | tee st/out/xcode.txt
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)['devices']
+          ios=[(k,x) for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]
+          ios.sort(key=lambda kx: kx[0])
+          newest=[x for k,x in ios if k==ios[-1][0]] if ios else []
+          want=['iPhone 16 Pro','iPhone 16','iPhone 15 Pro','iPhone 15']
+          pick=next((x for w in want for x in newest if x['name']==w), None) or next((x for x in newest if 'SE' not in x['name']), None) or (newest[0] if newest else None)
+          print(pick['udid'] if pick else '')
+          ")
+          [ -n "$UDID" ] || { echo "no iPhone simulator"; exit 1; }
+          xcrun simctl list devices | grep "$UDID" | tee -a st/out/xcode.txt
+          echo "UDID=$UDID" >> $GITHUB_ENV
+          # started first: the simulator boots while the engines replay the session and the app compiles
+          xcrun simctl boot "$UDID" || true
+
       - name: The working session, on the Mac engine and the iPhone engine
         run: |
           W=$PWD/st; mkdir -p $W/out
@@ -51,25 +71,6 @@ jobs:
           echo "::notice title=iPhone engine on macOS::$(tail -1 $W/out/compare.txt)"
           # the app opens on the main company
           sqlite3 $W/ios/data/registry.db "INSERT INTO app_settings(key,value) VALUES('last_company','1') ON CONFLICT(key) DO UPDATE SET value='1'"
-
-      - name: Pick a simulator
-        run: |
-          xcodebuild -version | tee st/out/xcode.txt
-          UDID=$(xcrun simctl list devices available -j | python3 -c "
-          import json,sys
-          d=json.load(sys.stdin)['devices']
-          ios=[(k,x) for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]
-          ios.sort(key=lambda kx: kx[0])
-          newest=[x for k,x in ios if k==ios[-1][0]] if ios else []
-          want=['iPhone 16 Pro','iPhone 16','iPhone 15 Pro','iPhone 15']
-          pick=next((x for w in want for x in newest if x['name']==w), None) or next((x for x in newest if 'SE' not in x['name']), None) or (newest[0] if newest else None)
-          print(pick['udid'] if pick else '')
-          ")
-          [ -n "$UDID" ] || { echo "no iPhone simulator"; exit 1; }
-          xcrun simctl list devices | grep "$UDID" | tee -a st/out/xcode.txt
-          echo "UDID=$UDID" >> $GITHUB_ENV
-          # started here, waited for after the build: the simulator boots while the app compiles
-          xcrun simctl boot "$UDID" || true
 
       - name: Unit tests on the simulator
         if: github.event_name != 'workflow_dispatch' || inputs.unit_tests
@@ -90,9 +91,14 @@ jobs:
       - name: Open the app on the working session's books, photograph every screen, print the bills
         run: |
           O=$PWD/st/out; mkdir -p $O/shots
-          xcrun simctl bootstatus "$UDID" -b > /dev/null
-          xcrun simctl install "$UDID" "$APP"
-          xcrun simctl launch "$UDID" $BID; sleep 8; xcrun simctl terminate "$UDID" $BID || true
+          T0=$SECONDS; lap() { echo "⏱ $1: $((SECONDS - T0)) s"; T0=$SECONDS; }   # where the time goes, in the log
+          xcrun simctl bootstatus "$UDID" -b > /dev/null; lap "simulator ready"
+          xcrun simctl install "$UDID" "$APP"; lap "app installed"
+          # first launch creates the app's folders; wait for them instead of a fixed 8 s
+          xcrun simctl launch "$UDID" $BID > /dev/null
+          C0=$(xcrun simctl get_app_container "$UDID" $BID data)
+          for i in $(seq 1 40); do [ -d "$C0/Library/Application Support" ] && break; sleep 0.25; done; sleep 1
+          xcrun simctl terminate "$UDID" $BID || true; lap "first launch"
           C=$(xcrun simctl get_app_container "$UDID" $BID data)
           D="$C/Library/Application Support/DistributorPro"
           rm -rf "$D/data"; mkdir -p "$D"; cp -R st/ios/data "$D/data"
@@ -109,6 +115,7 @@ jobs:
             xcrun simctl io "$UDID" screenshot "$O/shots/$(printf %02d $n)_$p.png" >/dev/null 2>&1 || true
             xcrun simctl terminate "$UDID" $BID || true
           done
+          lap "screens"
           # dark mode, one screen
           xcrun simctl ui "$UDID" appearance dark || true
           rm -f "$CC/running" "$CC/last-crash.txt"
@@ -120,12 +127,14 @@ jobs:
           # the bills, drawn as they print
           xcrun simctl launch "$UDID" $BID -BillBoxPrintTest 1 -startPage bills > /dev/null
           for i in $(seq 1 90); do [ -f "$C/Documents/selftest/done.txt" ] && break; sleep 2; done
+          lap "bills drawn"
           cp -R "$C/Documents/selftest/." $O/ 2>/dev/null || true
           for f in $O/bill_*.pdf $O/marg_*.pdf $O/busy_*.pdf $O/layout_*.pdf; do [ -f "$f" ] && sips -s format png "$f" --out "${f%.pdf}.png" >/dev/null 2>&1 || true; done
           xcrun simctl terminate "$UDID" $BID || true
           cat $O/done.txt 2>/dev/null || echo "no bills were drawn"
           # anything the app reported as a crash
-          xcrun simctl spawn "$UDID" log show --last 15m --style compact --predicate 'process == "BillBox" AND (messageType == error OR messageType == fault)' 2>/dev/null | grep -v "com.apple.dt.xctest" | head -60 > $O/app-log.txt || true
+          xcrun simctl spawn "$UDID" log show --last 10m --style compact --predicate 'process == "BillBox" AND (messageType == error OR messageType == fault)' 2>/dev/null | grep -v "com.apple.dt.xctest" | head -60 > $O/app-log.txt || true
+          lap "logs"
           ls "$HOME/Library/Logs/DiagnosticReports" 2>/dev/null | grep -i billbox > $O/crash-reports.txt || true
           ls -la $O/shots $O | head -60
 

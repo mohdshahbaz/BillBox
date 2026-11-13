@@ -18,9 +18,12 @@ enum SimSelfTest {
         do {
             let r = try await API.obj("GET", "/bills", query: ["type": "SALE", "from": "2000-01-01", "to": "2100-12-31"])
             let layout = PrintLayout.parse(app.settings.str("print_layout"))
+            // the first bill's drawings by "design|layout", so the every-layout set below does not draw them twice
+            var drawn: [String: Data] = [:]
             for (n, row) in r.list("rows").prefix(4).enumerated() {
                 let inv = try await API.obj("GET", "/invoices/\(row.int("id"))")
                 if let data = invoicePDF(inv, company: app.settings, layout: layout)?.dataRepresentation() {
+                    if n == 0 { drawn["\(printStyle(app.settings))|\(layout.rawValue)"] = data }
                     try data.write(to: dir.appendingPathComponent("bill_\(n + 1).pdf"))
                     log.append("bill_\(n + 1).pdf \(inv.str("invoice_no")) \(inv.str("party_name")) \(data.count) bytes")
                 } else {
@@ -30,6 +33,7 @@ enum SimSelfTest {
                 var marg = app.settings.raw
                 marg["print_style"] = "marg"
                 if let data = invoicePDF(inv, company: JSON(marg), layout: .single)?.dataRepresentation() {
+                    if n == 0 { drawn["marg|single"] = data }
                     try data.write(to: dir.appendingPathComponent("marg_\(n + 1).pdf"))
                     log.append("marg_\(n + 1).pdf \(data.count) bytes")
                 }
@@ -38,6 +42,7 @@ enum SimSelfTest {
                     var c = app.settings.raw
                     c["print_style"] = design
                     if let data = invoicePDF(inv, company: JSON(c), layout: .single)?.dataRepresentation() {
+                        if n == 0 { drawn["\(design)|single"] = data }
                         try data.write(to: dir.appendingPathComponent("\(design)_\(n + 1).pdf"))
                         log.append("\(design)_\(n + 1).pdf \(data.count) bytes")
                     }
@@ -48,7 +53,7 @@ enum SimSelfTest {
                         var c = app.settings.raw
                         c["print_style"] = design
                         for lay in PrintLayout.allCases {
-                            if let data = invoicePDF(inv, company: JSON(c), layout: lay)?.dataRepresentation() {
+                            if let data = drawn["\(design)|\(lay.rawValue)"] ?? invoicePDF(inv, company: JSON(c), layout: lay)?.dataRepresentation() {
                                 try data.write(to: dir.appendingPathComponent("layout_\(design)_\(lay.rawValue).pdf"))
                                 log.append("layout_\(design)_\(lay.rawValue).pdf \(data.count) bytes")
                             } else {
