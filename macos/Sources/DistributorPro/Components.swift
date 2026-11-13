@@ -40,7 +40,7 @@ import UniformTypeIdentifiers
             if let errorText {
                 Text(errorText)
                     .font(.callout)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
             }
@@ -317,7 +317,7 @@ enum BulkOutcome { case deleted, archived, failed(label: String, reason: String)
             if let t = app.toast {
                 HStack(spacing: 8) {
                     Image(systemName: t.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                        .foregroundStyle(t.isError ? .red : .green)
+                        .foregroundStyle(t.isError ? Theme.negative : Theme.positive)
                     Text(t.text).lineLimit(4).textSelection(.enabled)
                     Button { app.toast = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
                 }

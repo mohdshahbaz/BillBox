@@ -174,7 +174,7 @@ class BillingScreenState extends State<BillingScreen> {
                         dense: true,
                         title: Text('${o['name']}', maxLines: 1, overflow: TextOverflow.ellipsis),
                         subtitle: Text('Stock ${num_(o['stock']).toInt()} pcs  ·  MRP ${money(o['mrp'])}  ·  GST ${o['gst_rate']}%', maxLines: 1, overflow: TextOverflow.ellipsis),
-                        trailing: num_(o['stock']) <= 0 ? const Text('Out of stock', style: TextStyle(color: Palette.brick, fontSize: 12)) : null,
+                        trailing: num_(o['stock']) <= 0 ? Text('Out of stock', style: TextStyle(color: Palette.brick, fontSize: 12)) : null,
                         onTap: () => onSelected(o),
                       ),
                   ],
@@ -319,7 +319,7 @@ class BillingScreenState extends State<BillingScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(color: Palette.turmeric.withValues(alpha: .15), borderRadius: BorderRadius.circular(kRadius), border: Border.all(color: Palette.turmeric)),
             child: Row(children: [
-              const Icon(Icons.edit_note, color: Palette.turmeric),
+              Icon(Icons.edit_note, color: Palette.turmeric),
               const SizedBox(width: 8),
               Expanded(child: Text('Editing $editingNo. Saving replaces the old bill; stock and ledger are corrected automatically.', maxLines: 2, overflow: TextOverflow.ellipsis)),
               TextButton(onPressed: _clear, child: const Text('Cancel edit')),
@@ -329,7 +329,7 @@ class BillingScreenState extends State<BillingScreen> {
         const SizedBox(height: 12),
         Expanded(
           child: lines.isEmpty
-              ? const Center(child: Text('Search an item above and pick it to start the bill.', style: TextStyle(color: Palette.muted, fontSize: 16)))
+              ? Center(child: Text('Search an item above and pick it to start the bill.', style: TextStyle(color: Palette.muted, fontSize: 16)))
               : Card(
                   child: LayoutBuilder(
                     builder: (context, box) {
@@ -355,13 +355,13 @@ class BillingScreenState extends State<BillingScreen> {
             margin: const EdgeInsets.only(top: 8),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: Palette.brick.withValues(alpha: .1), borderRadius: BorderRadius.circular(kRadius)),
-            child: Text(error!, style: const TextStyle(color: Palette.brick)),
+            child: Text(error!, style: TextStyle(color: Palette.brick)),
           ),
       ]),
     );
     final side = Container(
       width: narrow ? double.infinity : 380,
-      decoration: const BoxDecoration(color: Colors.white, border: Border(left: BorderSide(color: Palette.line))),
+      decoration: BoxDecoration(color: Palette.card, border: Border(left: BorderSide(color: Palette.line))),
       padding: const EdgeInsets.all(18),
       child: _side(narrow ? double.infinity : 344, narrow),
     );
@@ -399,14 +399,14 @@ class BillingScreenState extends State<BillingScreen> {
       );
 
   Widget _header() {
-    const st = TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Palette.muted);
+    final st = TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Palette.muted);
     Widget c(String t, double w, {bool right = false}) => SizedBox(width: w, child: Text(t, textAlign: right ? TextAlign.right : TextAlign.start, style: st));
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Palette.line))),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Palette.line))),
       child: Row(children: [
         c('S.No', 34),
-        const Expanded(child: Text('Item name', style: st)),
+        Expanded(child: Text('Item name', style: st)),
         c('Box', 78),
         c('Pcs', 72),
         c('Total', 56, right: true),
@@ -432,7 +432,7 @@ class BillingScreenState extends State<BillingScreen> {
         ].join('  ·  '),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Palette.muted, fontSize: 12),
+        style: TextStyle(color: Palette.muted, fontSize: 12),
       ),
     ]);
     final inputs = Row(mainAxisSize: MainAxisSize.min, children: [
@@ -458,7 +458,7 @@ class BillingScreenState extends State<BillingScreen> {
       SizedBox(
           width: 70,
           child: Text(p != null && num_(p['free_qty']) > 0 ? '+${p['free_qty']} free' : '',
-              textAlign: TextAlign.right, maxLines: 1, style: const TextStyle(color: Palette.leaf, fontWeight: FontWeight.w600))),
+              textAlign: TextAlign.right, maxLines: 1, style: TextStyle(color: Palette.leaf, fontWeight: FontWeight.w600))),
       SizedBox(width: 100, child: Text(p == null ? '' : money(p['amount']), textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: tabular.copyWith(fontWeight: FontWeight.w600))),
       IconButton(
         icon: const Icon(Icons.close, size: 18),

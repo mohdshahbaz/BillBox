@@ -96,7 +96,7 @@ import AppKit
                         Text([c.str("company_gstin"), c.str("company_address")].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if c.id == app.companyId { Label("Open", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption) }
+                    if c.id == app.companyId { Label("Open", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.positive).font(.caption) }
                     else { Button("Open") { Task { await app.switchCompany(c.id) } } }
                     Button("Edit…") { editing = c }
                     Button("Delete…", role: .destructive) { deleting = c }

@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(Charts)
+import Charts
+#endif
 
 /// Everything the dashboard shows, worked out once per load (not on every redraw): the figures for each period, the chart
 /// bars and the list rows with their amounts already formatted.
@@ -148,7 +151,7 @@ struct DashSnap {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(x.bool("is_current") ? "Sales today" : "Sales on the last day").font(.caption).opacity(0.85)
-                    Text(Fmt.money(x.num("today_sales"))).font(.system(.title2, design: .rounded).weight(.bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.5)
+                    Text(Fmt.money(x.num("today_sales"))).font(.system(.title2, design: .rounded).weight(.bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.5).numberRoll(x.num("today_sales"))
                     Text("\(x.int("today_bills")) bills · collected \(Fmt.money(x.num("today_collections")))").font(.caption).opacity(0.85).lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
@@ -164,15 +167,17 @@ struct DashSnap {
             }
         }
         .foregroundStyle(.white)
-        .padding(16)
-        .background(LinearGradient(colors: [Theme.accent, Theme.accent.opacity(0.72)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: 16))
+        .padding(18)
+        // the glow is drawn from the header's shape only (a shadow on the whole content redrew every text while scrolling)
+        .background(HeroBackground().clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: Theme.accent.opacity(0.28), radius: 18, y: 8))
     }
 
     private func quick(_ title: String, _ symbol: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Label(title, systemImage: symbol).font(.callout.weight(.medium)).padding(.horizontal, 12).padding(.vertical, 8)
-                .background(Color.white.opacity(0.2), in: Capsule())
+            Label(title, systemImage: symbol).font(.callout.weight(.medium)).padding(.horizontal, 13).padding(.vertical, 8)
+                .background(Color.white.opacity(0.18), in: Capsule())
+                .overlay(Capsule().stroke(Color.white.opacity(0.28), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
     }
@@ -181,25 +186,29 @@ struct DashSnap {
 
     private func alerts(_ x: JSON) -> some View {
         let chips: [(String, String, Color, () -> Void)] = [
-            x.int("unprinted_bills") > 0 ? ("\(x.int("unprinted_bills")) bills to print", "printer", Color.blue, { app.openUnprinted = true; go(.bills) }) : nil,
-            x.int("low_stock_count") > 0 ? ("\(x.int("low_stock_count")) items low on stock", "exclamationmark.triangle", Color.red, { go(.stock) }) : nil,
-            x.int("expiring_30d") > 0 ? ("\(x.int("expiring_30d")) batches expire within \(x.has("expiry_days") ? x.int("expiry_days") : 30) days", "clock.badge.exclamationmark", Color.orange, { go(.reports) }) : nil,
-            x.int("expired_stock") > 0 ? ("\(x.int("expired_stock")) expired batches in stock", "xmark.octagon", Color.red, { go(.reports) }) : nil,
+            x.int("unprinted_bills") > 0 ? ("\(x.int("unprinted_bills")) bills to print", "printer", Theme.info, { app.openUnprinted = true; go(.bills) }) : nil,
+            x.int("low_stock_count") > 0 ? ("\(x.int("low_stock_count")) items low on stock", "exclamationmark.triangle", Theme.negative, { go(.stock) }) : nil,
+            x.int("expiring_30d") > 0 ? ("\(x.int("expiring_30d")) \(x.int("expiring_30d") == 1 ? "batch expires" : "batches expire") within \(x.has("expiry_days") ? x.int("expiry_days") : 30) days", "clock.badge.exclamationmark", Theme.warning, { go(.reports) }) : nil,
+            x.int("expired_stock") > 0 ? ("\(x.int("expired_stock")) expired batch\(x.int("expired_stock") == 1 ? "" : "es") in stock", "xmark.octagon", Theme.negative, { go(.reports) }) : nil,
         ].compactMap { $0 }
+        // one line when they fit, otherwise one under another: a chip is never cut off at the screen edge
+        func chip(_ c: (String, String, Color, () -> Void)) -> some View {
+            Button(action: c.3) {
+                Label(c.0, systemImage: c.1).font(.callout.weight(.medium)).lineLimit(1)
+                    .padding(.horizontal, DS.Space.s).padding(.vertical, 7)
+                    .frame(minHeight: DS.hitTarget - 8)
+                    .foregroundStyle(c.2).background(c.2.opacity(DS.tint), in: Capsule())
+                    .overlay(Capsule().stroke(c.2.opacity(0.25), lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+        }
         return Group {
             if !chips.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(chips.indices, id: \.self) { i in
-                            let c = chips[i]
-                            Button(action: c.3) {
-                                Label(c.0, systemImage: c.1).font(.callout).padding(.horizontal, 12).padding(.vertical, 7)
-                                    .foregroundStyle(c.2).background(c.2.opacity(0.12), in: Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: DS.Space.xs) { ForEach(chips.indices, id: \.self) { chip(chips[$0]) } }
+                    VStack(alignment: .leading, spacing: DS.Space.xs) { ForEach(chips.indices, id: \.self) { chip(chips[$0]) } }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -220,7 +229,7 @@ struct DashSnap {
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
             Kpi(title: "Sales", symbol: "indianrupeesign.circle", value: Fmt.money(sales), note: "\(Int(bills)) bills \(periodWord)", tint: Theme.accent) { go(.bills) }
             Kpi(title: "Profit", symbol: "chart.line.uptrend.xyaxis", value: Fmt.money(profit),
-                note: period == "year" ? "Margin \(Fmt.qty(x.num("fy_margin_pct")))%" : "Before expenses, \(periodWord)", tint: profit >= 0 ? .green : .red) { go(.reports) }
+                note: period == "year" ? "Margin \(Fmt.qty(x.num("fy_margin_pct")))%" : "Before expenses, \(periodWord)", tint: profit >= 0 ? Theme.positive : Theme.negative) { go(.reports) }
             Kpi(title: "Collections", symbol: "banknote", value: Fmt.money(collected), note: "Payments received \(periodWord)", tint: Theme.accent) { go(.parties) }
             Kpi(title: "Purchases", symbol: "shippingbox", value: Fmt.money(purchases), note: "Supplier bills \(periodWord)", tint: Theme.accent) { go(.purchases) }
             Kpi(title: "To receive", symbol: "person.crop.circle.badge.exclamationmark", value: Fmt.money(x.num("receivable")),
@@ -251,7 +260,7 @@ struct DashSnap {
                 HStack(spacing: 14) {
                     Text(Self.monthName(c.str("month")) + " " + String(c.str("month").prefix(4))).fw(.semibold)
                     Text("Sales \(Fmt.money(c.num("sales")))").foregroundStyle(.teal)
-                    Text("Purchases \(Fmt.money(c.num("purchases")))").foregroundStyle(.orange)
+                    Text("Purchases \(Fmt.money(c.num("purchases")))").foregroundStyle(Theme.warning)
                     Text("Profit \(Fmt.money(c.num("profit")))").foregroundStyle(c.num("profit") >= 0 ? .green : .red)
                 }
                 .font(.caption).mono().lineLimit(1).minimumScaleFactor(0.6)
@@ -326,7 +335,7 @@ extension DashboardView {
                     Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                 }
                 Text(title).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                Text(value).font(.system(.title2, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.5)
+                Text(value).font(.system(.title2, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.5).numberRoll(value)
                 // two lines kept for every note, so all cards are the same height and line up row by row
                 Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(2, reservesSpace: true)
             }
@@ -335,7 +344,7 @@ extension DashboardView {
             .card(14)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .pressCard()
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens \(title)")
     }
@@ -379,6 +388,58 @@ extension DashboardView {
     let pick: (String) -> Void
 
     var body: some View {
+        #if canImport(Charts)
+        chart
+        #else
+        legacy
+        #endif
+    }
+
+    #if canImport(Charts)
+    /// Swift Charts (iOS 16): one bar per month, the chosen month full colour with its figure above; tap a bar to choose it.
+    private var chart: some View {
+        Chart {
+            ForEach(values.indices, id: \.self) { i in
+                let v = values[i]
+                let on = v.id == selected
+                BarMark(x: .value("Month", v.label), y: .value("Amount", v.value))
+                    .foregroundStyle(v.value < 0 ? Theme.negative : color)
+                    .cornerRadius(4)
+                    .opacity(on ? 1 : 0.45)
+                    .annotation(position: .top) {
+                        if on { Text(Fmt.money(v.value)).font(.system(size: 9).weight(.semibold)).lineLimit(1).fixedSize() }
+                    }
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading) { a in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let n = a.as(Double.self) { Text(Fmt.short(n)).font(.system(size: 9)) }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks { a in
+                AxisValueLabel {
+                    if let s = a.as(String.self) { Text(s).font(.system(size: 10)) }
+                }
+            }
+        }
+        .chartOverlay { proxy in
+            GeometryReader { g in
+                Rectangle().fill(Color.clear).contentShape(Rectangle())
+                    .onTapGesture { p in
+                        guard let plot = proxy.plotFrame else { return }
+                        let x = p.x - g[plot].origin.x
+                        if let label = proxy.value(atX: x, as: String.self), let v = values.first(where: { $0.label == label }) { pick(v.id) }
+                    }
+            }
+        }
+    }
+    #endif
+
+    @ViewBuilder private var legacy: some View {
         let top = max(1, values.map { abs($0.value) }.max() ?? 1)
         // one measurement for the whole chart (a GeometryReader in each bar made every redraw lay out twelve times)
         GeometryReader { g in
@@ -391,7 +452,7 @@ extension DashboardView {
                         Spacer(minLength: 0)
                         if on { Text(Fmt.money(v.value)).font(.system(size: 9).weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5).fixedSize() }
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(v.value < 0 ? Color.red : color)
+                            .fill(v.value < 0 ? Theme.negative : color)
                             .opacity(on ? 1 : 0.45)
                             .frame(height: max(v.value != 0 ? 3 : 0, barArea * CGFloat(abs(v.value) / top)))
                         Text(v.label).font(.system(size: 10)).foregroundStyle(on ? .primary : .secondary).lineLimit(1).minimumScaleFactor(0.6)

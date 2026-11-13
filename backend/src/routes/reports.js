@@ -20,7 +20,7 @@ router.get('/reports/gst-outward.xlsx', h((req, res) => {
   const bill = (rows) => ({ total: { invoice_no: 'Total', taxable: r2(rows.reduce((a, r) => a + r.taxable, 0)), cgst: r2(rows.reduce((a, r) => a + r.cgst, 0)), sgst: r2(rows.reduce((a, r) => a + r.sgst, 0)), igst: r2(rows.reduce((a, r) => a + r.igst, 0)), round_off: r2(rows.reduce((a, r) => a + r.round_off, 0)), total: r2(rows.reduce((a, r) => a + r.total, 0)) } });
   const c = (h2, k, w, t) => ({ h: h2, k, w, t });
   const cols = (gst) => [c('Invoice No', 'invoice_no', 16), c('Date', 'date', 12), c('Party Name', 'party', 32), ...(gst ? [c('GSTIN', 'gstin', 20)] : []), c('State', 'state_code', 8),
-    c('GST Rates', 'rates', 12), c('Taxable Value', 'taxable', 15, 'num'), c('CGST', 'cgst', 12, 'num'), c('SGST', 'sgst', 12, 'num'), c('IGST (CGST+SGST)', 'igst', 18, 'num'), c('Round Off', 'round_off', 10, 'num'), c('Invoice Value', 'total', 15, 'num')];
+    c('GST Rates', 'rates', 12), c('Taxable Value', 'taxable', 15, 'num'), c('CGST', 'cgst', 12, 'num'), c('SGST', 'sgst', 12, 'num'), c('IGST', 'igst', 12, 'num'), c('Round Off', 'round_off', 10, 'num'), c('Invoice Value', 'total', 15, 'num')];
   const name = (co && co.value) || 'Company';
   const sheets = [
     { name: 'Summary', title: `GST Outward Supply - ${d.month} - ${name}`, cols: [c('Particulars', 'k', 34), c('Taxable Value', 'taxable', 16, 'num'), c('Tax', 'tax', 16, 'num')],
@@ -28,7 +28,7 @@ router.get('/reports/gst-outward.xlsx', h((req, res) => {
         { k: 'Less: input tax credit (purchases less debit notes)', taxable: null, tax: d.input_credit.total }, { k: 'Net GST payable', taxable: null, tax: d.net_payable }] },
     { name: 'B2B Bills', title: `B2B bills - ${d.month}`, cols: cols(true), rows: d.b2b_bills, ...bill(d.b2b_bills) },
     { name: 'B2C Bills', title: `B2C bills - ${d.month}`, cols: cols(false), rows: d.b2c_bills, ...bill(d.b2c_bills) },
-    { name: 'Rate-wise Summary', title: `Tax-rate-wise summary - ${d.month}`, cols: [c('GST Rate %', 'rate', 12, 'num'), c('Invoices', 'invoices', 10, 'int'), c('Taxable Value', 'taxable', 16, 'num'), c('CGST', 'cgst', 14, 'num'), c('SGST', 'sgst', 14, 'num'), c('IGST (CGST+SGST)', 'igst', 18, 'num'), c('Total Tax', 'tax', 14, 'num'), c('Total Value', 'value', 16, 'num')],
+    { name: 'Rate-wise Summary', title: `Tax-rate-wise summary - ${d.month}`, cols: [c('GST Rate %', 'rate', 12, 'num'), c('Invoices', 'invoices', 10, 'int'), c('Taxable Value', 'taxable', 16, 'num'), c('CGST', 'cgst', 14, 'num'), c('SGST', 'sgst', 14, 'num'), c('IGST', 'igst', 12, 'num'), c('Total Tax', 'tax', 14, 'num'), c('Total Value', 'value', 16, 'num')],
       rows: d.rows, total: { rate: 'Total', ...d.totals } },
   ];
   res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="GST-Outward-${d.month}.xlsx"` });

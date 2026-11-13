@@ -162,13 +162,13 @@ class _BillsState extends State<BillsScreen> {
         child: loading
             ? const Center(child: CircularProgressIndicator())
             : rows.isEmpty
-                ? const Center(child: Text('No bills match these filters.', style: TextStyle(color: Palette.muted)))
+                ? Center(child: Text('No bills match these filters.', style: TextStyle(color: Palette.muted)))
                 : SingleChildScrollView(
                     child: table(['Date', 'Type', 'Bill no', 'Supplier bill', 'Party', 'Total', 'Paid', 'Due', ''], [
                       for (final r in rows)
                         [
                           t(dmy(r['date'])),
-                          Text(r['type'] == 'SALE' ? 'Sale' : 'Purchase', style: TextStyle(color: r['type'] == 'SALE' ? Palette.teal : Palette.turmeric, fontWeight: FontWeight.w600)),
+                          StatusPill(r['type'] == 'SALE' ? 'Sale' : 'Purchase', tint: r['type'] == 'SALE' ? Palette.teal : Palette.turmeric),
                           t('${r['no']}'),
                           t('${r['ref'] ?? ''}'),
                           t('${r['party']}'),
@@ -183,18 +183,12 @@ class _BillsState extends State<BillsScreen> {
                     ], numeric: {5, 6, 7}),
                   ),
       ),
-      Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(children: [
-          Text('${rows.length} bills', style: TextStyle(color: Palette.muted)),
-          const Spacer(),
-          Text('Sales ${money(totals['sales'])}', style: tabular),
-          const SizedBox(width: 24),
-          Text('Purchases ${money(totals['purchases'])}', style: tabular),
-          const SizedBox(width: 24),
-          Text('Due ${money(totals['due'])}', style: tabular.copyWith(fontWeight: FontWeight.w700)),
-        ]),
-      ),
+      SummaryCard([
+        SumItem('Bills', '${rows.length}'),
+        SumItem('Sales', money(totals['sales'])),
+        SumItem('Purchases', money(totals['purchases'])),
+        SumItem('Due', money(totals['due']), strong: true, tint: num_(totals['due']) > 0.5 ? Palette.brick : null),
+      ]),
     ]);
   }
 }

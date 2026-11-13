@@ -1,5 +1,8 @@
 package com.local.billbox.screens
 
+import com.local.billbox.ui.DS
+import com.local.billbox.ui.Info
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -138,14 +141,15 @@ fun DashboardScreen() {
             if (!x.bool("is_current")) Banner("You are looking at a past financial year. Figures show that year only; \"today\" means its last day, ${Fmt.dmy(x.str("as_of"))}. Switch year from the company menu at the top.", Icons.Default.History)
             if ("alerts" !in hidden) {
                 val chips = listOfNotNull(
-                    if (x.int("unprinted_bills") > 0) Triple("${x.int("unprinted_bills")} bills to print", Icons.Default.Print, Color(0xFF1E88E5)) to { app.openUnprinted = true; go(Page.Bills) } else null,
+                    if (x.int("unprinted_bills") > 0) Triple("${x.int("unprinted_bills")} bill${if (x.int("unprinted_bills") == 1) "" else "s"} to print", Icons.Default.Print, Info) to { app.openUnprinted = true; go(Page.Bills) } else null,
                     if (x.int("low_stock_count") > 0) Triple("${x.int("low_stock_count")} items low on stock", Icons.Default.Warning, Bad) to { go(Page.Stock) } else null,
-                    if (x.int("expiring_30d") > 0) Triple("${x.int("expiring_30d")} batches expire within ${if (x.has("expiry_days")) x.int("expiry_days") else 30} days", Icons.Default.EventBusy, Warn) to { go(Page.Reports) } else null,
-                    if (x.int("expired_stock") > 0) Triple("${x.int("expired_stock")} expired batches in stock", Icons.Default.Cancel, Bad) to { go(Page.Reports) } else null,
+                    if (x.int("expiring_30d") > 0) Triple("${x.int("expiring_30d")} ${if (x.int("expiring_30d") == 1) "batch expires" else "batches expire"} within ${if (x.has("expiry_days")) x.int("expiry_days") else 30} days", Icons.Default.EventBusy, Warn) to { go(Page.Reports) } else null,
+                    if (x.int("expired_stock") > 0) Triple("${x.int("expired_stock")} expired batch${if (x.int("expired_stock") == 1) "" else "es"} in stock", Icons.Default.Cancel, Bad) to { go(Page.Reports) } else null,
                 )
-                if (chips.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // chips wrap onto a new line instead of running off the screen edge (docs/DESIGN_SYSTEM.md)
+                if (chips.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(DS.space8), verticalArrangement = Arrangement.spacedBy(DS.space8)) {
                     chips.forEach { (c, run) ->
-                        Row(Modifier.clip(CircleShape).background(c.third.copy(alpha = 0.12f)).clickable { run() }.padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.clip(CircleShape).background(c.third.copy(alpha = DS.tint)).clickable { run() }.heightIn(min = 40.dp).padding(horizontal = DS.space12, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(c.second, null, Modifier.size(16.dp), tint = c.third); Text("  ${c.first}", color = c.third, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
@@ -253,6 +257,7 @@ private fun ListCard(title: String, icon: ImageVector, rows: List<Pair<String, S
 @Composable
 private fun MonthBars(values: List<Triple<String, String, Double>>, color: Color, selected: String, pick: (String) -> Unit) {
     val top = maxOf(1.0, values.maxOfOrNull { abs(it.third) } ?: 1.0)
+    val loss = Bad   // read here: the drawing block below is not composable
     Row(Modifier.fillMaxWidth().height(200.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
         values.forEach { (id, label, v) ->
             val on = id == selected
@@ -260,7 +265,7 @@ private fun MonthBars(values: List<Triple<String, String, Double>>, color: Color
                 if (on) Text(Fmt.money(v), fontSize = 8.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
                 Canvas(Modifier.weight(1f).fillMaxWidth()) {
                     val h = maxOf(if (v != 0.0) 3f else 0f, size.height * (abs(v) / top).toFloat())
-                    drawRoundRect((if (v < 0) Bad else color).copy(alpha = if (on) 1f else 0.45f), Offset(0f, size.height - h), Size(size.width, h), CornerRadius(8f, 8f))
+                    drawRoundRect((if (v < 0) loss else color).copy(alpha = if (on) 1f else 0.45f), Offset(0f, size.height - h), Size(size.width, h), CornerRadius(8f, 8f))
                 }
                 Text(label, fontSize = 10.sp, maxLines = 1, color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
             }

@@ -471,9 +471,9 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
         }
     }
 
-    private func cell(_ s: String, _ c: MargColumn, bold: Bool = false, size: CGFloat = 7.5) -> some View {
+    private func cell(_ s: String, _ c: MargColumn, bold: Bool = false, size: CGFloat = 7.5, minScale: CGFloat = 0.7) -> some View {
         let w = c.width.map { $0 * g.cw }
-        return t(s, size, bold: bold).lineLimit(1).minimumScaleFactor(0.7)
+        return t(s, size, bold: bold).lineLimit(1).minimumScaleFactor(minScale)
             .padding(.horizontal, 2.5)
             .frame(width: w, alignment: c.align)
             .frame(maxWidth: w == nil ? .infinity : nil, alignment: c.align)
@@ -482,7 +482,7 @@ func margSpec(_ base: Spec, _ inv: JSON, _ co: JSON) -> Spec {
     private var table: some View {
         let lines = inv.list("lines")
         return VStack(spacing: 0) {
-            HStack(spacing: 0) { ForEach(cols, id: \.key) { c in cell(c.head, c, bold: true, size: 8) } }
+            HStack(spacing: 0) { ForEach(cols, id: \.key) { c in cell(c.head, c, bold: true, size: 8, minScale: 0.5) } }   // short headings shrink rather than end in "…"
                 .frame(height: g.tableHead)
                 .background(band)
             ForEach(Array(rows), id: \.self) { i in

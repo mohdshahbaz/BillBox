@@ -173,7 +173,7 @@ import SwiftUI
                 Image(systemName: "calendar")
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Financial year \(app.fyLabel)").fw(.medium).lineLimit(1)
-                    Text(app.isCurrentFY ? "Current year" : "Past year · view and edit").font(.caption2).foregroundStyle(app.isCurrentFY ? Color.secondary : Color.orange)
+                    Text(app.isCurrentFY ? "Current year" : "Past year · view and edit").font(.caption2).foregroundStyle(app.isCurrentFY ? Color.secondary : Theme.warning)
                 }
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)

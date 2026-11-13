@@ -1,6 +1,6 @@
 # BillBox for iPhone
 
-The iPhone version of BillBox, with the same functions as BillBox for macOS v14.11. It is native Swift and SwiftUI, needs iOS 16 or later and runs on iPhone XR and newer.
+The iPhone version of BillBox, with the same functions as BillBox for macOS v14.11. It is native Swift and SwiftUI, needs iOS 18 or later and runs on iPhone XR and newer. It uses Swift Charts for the dashboard [Pow](https://github.com/EmergeTools/Pow) for its effects and [PopupView](https://github.com/exyte/PopupView) for its message banners (both MIT, added by Swift Package Manager). Code for the real iOS SDK sits behind `#if XCODE_BUILD`, a flag only the Xcode project sets.
 
 Everything runs on the phone. There is no server and no Node. The app keeps the same SQLite files as the Mac (one per company plus `registry.db`), so backups move between Mac and iPhone in both directions.
 
@@ -25,15 +25,13 @@ chmod +x build.sh
 
 - **Signing team**: the script finds your team by itself once you have signed in to Xcode › Settings › Accounts with your Apple ID.
 - **Free Apple ID**: you may need your own app identifier, for example `BUNDLE_ID=com.yourname.billbox ./build.sh`.
-- **Xcode 14.2 on Monterey** can install only on iPhones running iOS 16 or older:
-  - Installing from Terminal also needs `brew install ios-deploy`.
-  - For an iPhone on iOS 17 or newer, run `./build.sh ipa` and install `BillBox.ipa` with Sideloadly or AltStore. The script tells you when this applies.
+- **Xcode 16 or newer is needed** (macOS Sonoma 14.5 or later). Xcode 14.2 on Monterey can no longer build BillBox.
 - Logs of every step go to `ios/build/*.log`.
 - If BillBox ever closes by itself, it shows the reason the next time it opens ("Last close", with Share). `./build.sh crashlog` reads the phone's own crash reports (Xcode 15+, or `brew install libimobiledevice` with Xcode 14).
 
 ## Build in Xcode
 
-You need a Mac with **Xcode 14.2 or newer**. The code is Swift 5.7 and iOS 16 compatible, so Xcode 14.2 on macOS Monterey is enough.
+You need a Mac with **Xcode 16 or newer** (macOS Sonoma 14.5 or later). The app targets iOS 18. The first build downloads the Pow package, so be online.
 
 1. Open `ios/BillBox.xcodeproj`.
 2. Select the **BillBox** target, then **Signing & Capabilities**:
@@ -85,7 +83,7 @@ In Marg: Reports › Management Report › Data Transfer Utility › Export All 
   - `run_more.sh`: the parser, random bills and PDF page text
   - `test_backup.py WORK BBCHECK`: backups in both directions
   - `make_golden.py`: re-records the Mac answers used by the unit tests. Run it after any change to `backend/src`.
-- `tests/typecheck/stubs/build.sh`: type-checks all app code on Linux against an iOS 16 SDK surface (no Xcode needed).
+- `tests/typecheck/stubs/build.sh`: type-checks all app code on Linux against an iOS 16 SDK surface (no Xcode needed). Code that uses Swift Charts, Pow or iOS 17/18 APIs sits behind `#if canImport(...)`, so only Xcode checks it.
 - `../macos/tests/typecheck/build.sh`: the same for the Mac app (AppKit surface stubbed), so Mac edits are checked without a Mac.
 - `tools/make_pdfreader.py`: rebuilds `BillBox/Resources/PDFReader/reader.js` from the Mac's `backend/src/services/pdfExtract.js`. `tests/pdfreader/browser_check.py a.pdf …` checks the iPhone reader against the Mac's on real PDFs.
 - `tools/make_xcodeproj.py`: regenerates `BillBox.xcodeproj` after adding or removing files. `tools/check_pbxproj.py` validates it.

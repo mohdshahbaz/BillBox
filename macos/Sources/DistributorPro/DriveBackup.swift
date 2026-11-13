@@ -30,7 +30,7 @@ import SwiftUI
     var body: some View {
         Section {
             HStack(spacing: 8) {
-                Image(systemName: connected ? "checkmark.icloud.fill" : "icloud.slash").foregroundColor(connected ? .green : .secondary)
+                Image(systemName: connected ? "checkmark.icloud.fill" : "icloud.slash").foregroundColor(connected ? Theme.positive : .secondary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(connected ? "Connected: backups also go to Google Drive › BillBox Backups" : code.isEmpty ? "Not connected" : "Waiting for Google…")
                         .font(.callout.weight(.medium))
@@ -38,7 +38,7 @@ import SwiftUI
                         Text("Last upload: \(status.str("last_upload")) · \(status.str("last_status") == "ok" ? "done" : status.str("last_status"))")
                             .font(.caption).foregroundStyle(.secondary)
                     } else if connected && status.str("last_status").hasPrefix("failed") {
-                        Text(status.str("last_status")).font(.caption).foregroundStyle(.red)
+                        Text(status.str("last_status")).font(.caption).foregroundStyle(Theme.negative)
                     }
                 }
             }

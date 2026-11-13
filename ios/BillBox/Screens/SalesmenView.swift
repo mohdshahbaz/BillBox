@@ -75,7 +75,7 @@ import SwiftUI
             let ach: Double? = p.has("achievement_pct") ? p.num("achievement_pct") : nil
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
                 StatCard(title: "Target for \(p.str("month"))", value: Fmt.money(p, "target"))
-                StatCard(title: "Sales (\(p.int("invoices")) bills)", value: Fmt.money(p, "sales"), tint: .teal)
+                StatCard(title: "Sales (\(p.int("invoices")) bill\(p.int("invoices") == 1 ? "" : "s"))", value: Fmt.money(p, "sales"), tint: .teal)
                 StatCard(title: "Achievement", value: ach.map { "\(Fmt.qty($0))%" } ?? "No target set", tint: (ach ?? 0) >= 100 ? .green : .orange)
                 StatCard(title: "Collections this month", value: Fmt.money(p, "collections"), tint: .green)
             }
@@ -98,12 +98,12 @@ import SwiftUI
                 Text("No outlets on \(dayNames[day]). Create a route for this day and assign parties to it.").foregroundStyle(.secondary)
             } else {
                 DataGrid(outlets, layoutKey: "beat") {
-                    GridColumn("Outlet", id: "outlet", min: 150, ideal: 220) { (o: JSON) in Text(o.str("name")).lineLimit(2) }
-                    GridColumn("Route", id: "route", min: 100, ideal: 150) { (o: JSON) in Text(o.str("route_name")) }
-                    GridColumn("Last order", id: "last", min: 90, ideal: 110) { (o: JSON) in Text(o.has("last_order") ? Fmt.dmy(o.str("last_order")) : "Never") }
+                    GridColumn("Outlet", id: "outlet", min: 150, ideal: 220, sort: { (o: JSON) -> Any? in o.str("name") }) { (o: JSON) in Text(o.str("name")).lineLimit(2) }
+                    GridColumn("Route", id: "route", min: 100, ideal: 150, sort: { (o: JSON) -> Any? in o.str("route_name") }) { (o: JSON) in Text(o.str("route_name")) }
+                    GridColumn("Last order", id: "last", min: 90, ideal: 110, sort: { (o: JSON) -> Any? in o.str("last_order") }) { (o: JSON) in Text(o.has("last_order") ? Fmt.dmy(o.str("last_order")) : "Never") }
                     GridColumn("Outstanding to collect", id: "outstanding", min: 140, ideal: 170, align: .trailing) { (o: JSON) in
                         Text(Fmt.money(o, "outstanding")).monospacedDigit().fontWeight(.semibold)
-                            .foregroundStyle(o.num("outstanding") > 0 ? Color.orange : Color.primary)
+                            .foregroundStyle(o.num("outstanding") > 0 ? Theme.warning : Color.primary)
                     }
                 }
                 .frame(height: min(CGFloat(outlets.count) * 40 + 44, 440))

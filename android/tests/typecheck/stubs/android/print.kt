@@ -3,7 +3,10 @@ package android.print
 import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
-class PrintAttributes
+class PrintAttributes {
+    class MediaSize { companion object { val ISO_A4 = MediaSize(); val ISO_A5 = MediaSize() } }
+    class Builder { fun setMediaSize(m: MediaSize): Builder = this; fun build(): PrintAttributes = PrintAttributes() }
+}
 class PageRange { companion object { val ALL_PAGES = PageRange() } }
 class PrintDocumentInfo { class Builder(name: String) { fun setContentType(t: Int): Builder = this; fun build(): PrintDocumentInfo = PrintDocumentInfo() }
     companion object { const val CONTENT_TYPE_DOCUMENT = 0 } }

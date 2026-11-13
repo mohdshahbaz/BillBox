@@ -63,6 +63,10 @@ struct BillLine: Identifiable {
     @State private var detailsOpen = false
     @State private var creditAlert: String?
     @State private var askPrint: JSON?
+    /// Counters that start the saved / added / refused effects (Effects.swift).
+    @State private var savedTick = 0
+    @State private var addedTick = 0
+    @State private var errorTick = 0
     @FocusState private var searchFocus: Bool
     /// The Box (or Pcs) field the cursor goes to when an item is added, so its quantity can be typed straight away.
     @FocusState private var qtyFocus: QtyField?
@@ -312,7 +316,7 @@ struct BillLine: Identifiable {
                                 .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer()
-                        if it.num("stock") <= 0 { Text("Out of stock").font(.caption).foregroundStyle(.red) }
+                        if it.num("stock") <= 0 { Text("Out of stock").font(.caption).foregroundStyle(Theme.negative) }
                     }
                     .padding(.horizontal, 10).padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -350,6 +354,7 @@ struct BillLine: Identifiable {
             id = l.id
         }
         query = ""
+        addedTick += 1
         // the cursor goes to the line's Box (Pcs for loose items): the quantity is typed next, replacing the 1
         guard let l = lines.first(where: { $0.id == id }) else { searchFocus = true; return }
         let target: QtyField = l.ppb > 1 ? .box(id) : .pcs(id)
@@ -408,7 +413,7 @@ struct BillLine: Identifiable {
 
     private var linesTable: some View {
         let calc = lineCalcs()   // worked out once per redraw, not once per cell
-        return DataGrid(lines, layoutKey: "billing", rowHeight: 44, lazy: false) {
+        return DataGrid(lines, layoutKey: "billing", rowHeight: 44, lazy: false, sortable: false) {
             GridColumn("S.No", id: "sno", min: 36, ideal: 44) { (l: BillLine) in
                 Text("\((lines.firstIndex(where: { $0.id == l.id }) ?? 0) + 1)").monospacedDigit().foregroundStyle(.secondary)
             }
@@ -436,7 +441,7 @@ struct BillLine: Identifiable {
             GridColumn("Rate / pc (ex-GST)", id: "rate", min: 100, ideal: 116, align: .trailing) { (l: BillLine) in
                 TextField("", text: pieceRateBinding(l), prompt: Text(calc[l.id].map { Fmt.rate($0.rate) } ?? "rate"))
                     .multilineTextAlignment(.trailing).keyboardType(.decimalPad)
-                    .foregroundStyle(l.rate.isEmpty ? Color.primary : Color.orange)
+                    .foregroundStyle(l.rate.isEmpty ? Color.primary : Theme.warning)
                     .accessibilityLabel("Rate per piece for \(l.name). Type a different rate to override the price list; clear it to go back.")
             }
             GridColumn("Rate / box", id: "boxrate", min: 90, ideal: 104, align: .trailing) { (l: BillLine) in
@@ -444,7 +449,7 @@ struct BillLine: Identifiable {
                     let shown = Double(l.rate) ?? (calc[l.id]?.rate ?? 0)
                     TextField("", text: boxRateBinding(l), prompt: Text(Fmt.amount(shown * Double(l.ppb))))
                         .multilineTextAlignment(.trailing).keyboardType(.decimalPad)
-                        .foregroundStyle(l.rate.isEmpty ? Color.primary : Color.orange)
+                        .foregroundStyle(l.rate.isEmpty ? Color.primary : Theme.warning)
                         .accessibilityLabel("Rate per box for \(l.name)")
                 } else {
                     Text("–").foregroundStyle(.secondary)
@@ -452,7 +457,7 @@ struct BillLine: Identifiable {
             }
             GridColumn("Free", id: "free", min: 50, ideal: 76) { (l: BillLine) in
                 let f = calc[l.id]?.free ?? 0
-                Text(f > 0 ? "+\(Fmt.qty(f)) pcs free" : "").foregroundStyle(.green).fontWeight(.semibold)
+                Text(f > 0 ? "+\(Fmt.qty(f)) pcs free" : "").foregroundStyle(Theme.positive).fontWeight(.semibold)
             }
             GridColumn("Amount", id: "amount", min: 90, ideal: 104, align: .trailing) { (l: BillLine) in
                 Text(calc[l.id].map { Fmt.money($0.amount) } ?? "").monospacedDigit().fontWeight(.semibold)
@@ -499,15 +504,18 @@ struct BillLine: Identifiable {
                     .buttonStyle(.plain)
                     .accessibilityLabel(detailsOpen ? "Hide party, payment and totals" : "Show party, payment and totals")
                     Spacer(minLength: 4)
-                    VStack(alignment: .trailing, spacing: 0) {
-                        ProgressView().controlSize(.mini).opacity(calculating ? 1 : 0)
-                        Text(t.map { Fmt.money($0.total) } ?? "₹0.00").font(.title3.weight(.bold)).monospacedDigit().foregroundStyle(Theme.accent)
-                            .lineLimit(1).minimumScaleFactor(0.5)
-                    }
-                    saveButton(ready: ready)
+                    // the total stays on one baseline; the "working" spinner sits beside it instead of pushing it down
+                    Text(t.map { Fmt.money($0.total) } ?? "₹0.00").font(.dsMoney.weight(.bold)).monospacedDigit().foregroundStyle(Theme.accent)
+                        .lineLimit(1).minimumScaleFactor(0.5)
+                        .layoutPriority(1)
+                        .overlay(alignment: .topTrailing) {
+                            ProgressView().controlSize(.mini).opacity(calculating ? 1 : 0).offset(x: 6, y: -10)
+                        }
+                        .accessibilityLabel("Bill total \(t.map { Fmt.money($0.total) } ?? "₹0.00")")
+                    saveButton(ready: ready, compact: true)
                 }
             }
-            .padding(10)
+            .padding(.horizontal, DS.Space.s).padding(.vertical, 10)
             .background(Theme.card)
         }
     }
@@ -555,10 +563,10 @@ struct BillLine: Identifiable {
                     .multilineTextAlignment(.trailing).keyboardType(.decimalPad)
                     .padding(8).background(Theme.page, in: RoundedRectangle(cornerRadius: 8))
                     .accessibilityLabel("Paid now")
-                if let n = tierNote { Text(n).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true) }
+                if let n = tierNote { Text(n).font(.caption).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true) }
                 Text(duesLine)
                     .font(.caption)
-                    .foregroundStyle(duesOver ? Color.red : Color.secondary)
+                    .foregroundStyle(duesOver ? Theme.negative : Color.secondary)
             }
         }
     }
@@ -608,6 +616,8 @@ struct BillLine: Identifiable {
                 Text(t.map { Fmt.money($0.total) } ?? "₹0.00")
                     .font(.system(.title, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(Theme.accent)
                     .lineLimit(1).minimumScaleFactor(0.5)
+                    .numberRoll(t?.total ?? 0)
+                    .addedEffect(addedTick)
                 Text("\(lines.count) item\(lines.count == 1 ? "" : "s") · \(lines.reduce(0) { $0 + $1.totalPcs }) pcs").font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     saveButton(ready: ready)
@@ -617,13 +627,19 @@ struct BillLine: Identifiable {
         }
     }
 
-    private func saveButton(ready: Bool) -> some View {
+    /// `compact`: the bar under the bill on a phone, where "Save & print" was cut off; there it reads "Save" and never shrinks.
+    private func saveButton(ready: Bool, compact: Bool = false) -> some View {
         Button { Task { await save() } } label: {
-            Label(editingId != nil ? "Update" : "Save & print", systemImage: "printer").lineLimit(1)
+            Label(editingId != nil ? "Update" : (compact ? "Save" : "Save & print"), systemImage: "printer").lineLimit(1)
+                .fixedSize()
+                .frame(minHeight: compact ? 30 : nil)
         }
+        .accessibilityLabel(editingId != nil ? "Update bill" : "Save and print bill")
         .buttonStyle(.borderedProminent)
         .keyboardShortcut("s", modifiers: .command)
         .disabled(busy || lines.isEmpty || (!ready && errorText != nil))
+        .savedEffect(savedTick)
+        .errorEffect(errorTick)
     }
 
     private func row(_ a: String, _ b: String) -> some View {
@@ -761,6 +777,7 @@ struct BillLine: Identifiable {
                 r = try await API.objRaw("POST", "/invoices", body: payload(override: override || app.settings.str("bill_credit_check") == "0"))
             }
             app.notify("\(wasEdit != nil ? "Updated" : "Saved") \(r.str("invoice_no")) · \(Fmt.money(r, "total"))")
+            savedTick += 1
             let keptParty = partyId
             clear()
             if app.settings.str("bill_keep_party") == "1" && wasEdit == nil { partyId = keptParty }   // Settings › Billing › next bill for the same party
@@ -774,7 +791,9 @@ struct BillLine: Identifiable {
             }
         } catch let e as APIError where e.code == "CREDIT_LIMIT" && !override {
             creditAlert = e.message
+            errorTick += 1
         } catch {
+            errorTick += 1
             app.notify(error.localizedDescription, error: true)
         }
     }

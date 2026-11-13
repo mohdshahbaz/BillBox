@@ -88,14 +88,14 @@ struct PLine: Identifiable {
                 let usedCount = max(1, (parsed.obj("pages").raw["used"] as? [Any])?.count ?? 1)
                 DisclosureGroup {
                     VStack(alignment: .leading, spacing: 3) {
-                        ForEach(Array(warnings.enumerated()), id: \.offset) { _, w in Text("• \(w)").foregroundStyle(.red).font(.callout) }
+                        ForEach(Array(warnings.enumerated()), id: \.offset) { _, w in Text("• \(w)").foregroundStyle(Theme.negative).font(.callout) }
                     }
                 } label: {
                     Text("Filled in from the PDF (\(usedCount) Original page\(usedCount == 1 ? "" : "s") read). Check every field against the paper bill before saving.")
                         .fontWeight(.semibold).font(.callout)
                 }
                 .padding(10)
-                .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
             }
             header
             linesTable
@@ -107,7 +107,8 @@ struct PLine: Identifiable {
 
     @ViewBuilder private func chrome<V: View>(_ v: V) -> some View {
         v
-        .navigationTitle(editingId != nil ? "Edit purchase bill \(editingNo)" : "Purchase bill")
+        // short, so it is not cut off beside the company switcher and three toolbar buttons on a phone
+        .navigationTitle(editingId != nil ? "Edit \(editingNo)" : "Purchase")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -224,7 +225,7 @@ struct PLine: Identifiable {
     }
 
     private var linesTable: some View {
-        DataGrid(lines, layoutKey: "purchase", rowHeight: 56) {
+        DataGrid(lines, layoutKey: "purchase", rowHeight: 56, sortable: false) {
             GridColumn("S.No", id: "sno", min: 36, ideal: 44) { (l: PLine) in
                 Text("\((lines.firstIndex(where: { $0.id == l.id }) ?? 0) + 1)").monospacedDigit().foregroundStyle(.secondary)
             }
@@ -232,7 +233,7 @@ struct PLine: Identifiable {
                 VStack(alignment: .leading, spacing: 2) {
                     if !l.matched && !l.desc.isEmpty {
                         HStack {
-                            Text("“\(l.desc)” is not in your stock list.").font(.caption).foregroundStyle(.red).lineLimit(1)
+                            Text("“\(l.desc)” is not in your stock list.").font(.caption).foregroundStyle(Theme.negative).lineLimit(1)
                             Button("Create this item") { newItemFor = l }.controlSize(.small)
                         }
                     }
@@ -314,7 +315,7 @@ struct PLine: Identifiable {
                 VStack(alignment: .leading, spacing: 2) {
                     if let pt = printedTotal {
                         Text("Printed on bill: \(Fmt.money(pt))").monospacedDigit().font(.callout)
-                            .foregroundStyle(mismatch ? Color.red : Color.secondary).fontWeight(mismatch ? .semibold : .regular)
+                            .foregroundStyle(mismatch ? Theme.negative : Color.secondary).fontWeight(mismatch ? .semibold : .regular)
                     }
                     if let p { Text(Fmt.money(p, "total")).font(.system(.title, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(.teal) }
                 }
@@ -326,7 +327,7 @@ struct PLine: Identifiable {
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(busy || p == nil)
             }
-            if let errorText { Text(errorText).foregroundStyle(.red).font(.callout) }
+            if let errorText { Text(errorText).foregroundStyle(Theme.negative).font(.callout) }
         }
         .padding(10)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 10))

@@ -454,7 +454,7 @@ class _PurchaseState extends State<PurchaseScreen> {
         : (it != null && perBox > 1 ? '1 box = $perBox pcs' : '');
     final note = !l.matched && l.desc.isNotEmpty
         ? Row(children: [
-            Flexible(child: Text('On the bill: "${l.desc}" is not in your stock list.', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Palette.brick, fontSize: 12))),
+            Flexible(child: Text('On the bill: "${l.desc}" is not in your stock list.', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Palette.brick, fontSize: 12))),
             TextButton(onPressed: () => _createItem(l), child: const Text('Create this item')),
           ])
         : (l.desc.isNotEmpty || pcsHint.isNotEmpty
@@ -464,7 +464,7 @@ class _PurchaseState extends State<PurchaseScreen> {
     return Container(
       key: l.key,
       padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Palette.line))),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Palette.line))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (wide)
           Row(children: [
@@ -500,10 +500,10 @@ class _PurchaseState extends State<PurchaseScreen> {
 
   Widget _head(double width) {
     if (width < 860) return const SizedBox.shrink();
-    TextStyle st = const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Palette.muted);
+    TextStyle st = TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Palette.muted);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Palette.line))),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Palette.line))),
       child: Row(children: [
         SizedBox(width: _wSno, child: Text('S.No', style: st)),
         Expanded(child: Text('Item name', style: st)),
@@ -612,7 +612,7 @@ class _PurchaseState extends State<PurchaseScreen> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Filled in from the PDF (${(pg['used'] as List?)?.length ?? 1} Original page${((pg['used'] as List?)?.length ?? 1) == 1 ? '' : 's'} read). Check every field against the paper bill before saving.',
                   style: const TextStyle(fontWeight: FontWeight.w600)),
-              for (final w in warnings) Text('• $w', style: const TextStyle(color: Palette.brick)),
+              for (final w in warnings) Text('• $w', style: TextStyle(color: Palette.brick)),
             ]),
           ),
         FormWrap([
@@ -663,7 +663,7 @@ class _PurchaseState extends State<PurchaseScreen> {
             ),
           ),
         ),
-        if (error != null) Padding(padding: const EdgeInsets.only(top: 6, bottom: 6), child: Text(error!, style: const TextStyle(color: Palette.brick))),
+        if (error != null) Padding(padding: const EdgeInsets.only(top: 6, bottom: 6), child: Text(error!, style: TextStyle(color: Palette.brick))),
         const SizedBox(height: 8),
         _totalsPanel(p),
       ]),

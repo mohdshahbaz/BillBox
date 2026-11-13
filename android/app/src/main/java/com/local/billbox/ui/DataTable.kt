@@ -1,5 +1,8 @@
 package com.local.billbox.ui
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -72,7 +75,9 @@ class Col<R>(val title: String, val id: String = title, val width: Int = 100, va
 @Composable
 fun Cell(text: String, color: Color = Color.Unspecified, bold: Boolean = false, end: Boolean = false, lines: Int = 1) {
     Text(text, color = color, fontWeight = if (bold) FontWeight.SemiBold else null, maxLines = lines, overflow = TextOverflow.Ellipsis,
-        style = MaterialTheme.typography.bodyMedium, textAlign = if (end) TextAlign.End else TextAlign.Start, modifier = Modifier.fillMaxWidth())
+        // right-aligned cells are amounts and counts: tabular figures so the digits line up down the column
+        style = if (end) MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum") else MaterialTheme.typography.bodyMedium,
+        textAlign = if (end) TextAlign.End else TextAlign.Start, modifier = Modifier.fillMaxWidth())
 }
 
 /** A row's long-press menu entry. */
@@ -172,11 +177,14 @@ fun <R> DataTable(
     fun w(c: Col<R>): Dp = (layout.widths[c.id] ?: c.width.toFloat()).dp
 
     val header: @Composable () -> Unit = {
-        Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer), verticalAlignment = Alignment.CenterVertically) {
+        // the heading band: the card colour tinted with 6% of the accent (docs/DESIGN_SYSTEM.md, Table)
+        Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)),
+            verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f).horizontalScroll(h)) {
                 visible.forEach { c ->
                     Box(Modifier.width(w(c)).heightIn(min = 34.dp)) {
-                        Text(c.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
+                        Text(c.title.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (c.isIndex || c.id == "sno") 1 else 2,
                             textAlign = if (c.end) TextAlign.End else TextAlign.Start,
                             modifier = Modifier.fillMaxWidth().align(Alignment.CenterStart).padding(horizontal = 8.dp, vertical = 6.dp))
                         // the resize grip takes the heading's own height (matchParentSize), never the space left on screen: with
@@ -234,7 +242,11 @@ fun <R> DataTable(
     }
 
     val fabSpace = LocalFabSpace.current
-    Column(modifier.fillMaxSize()) {
+    // the table is a rounded card with a 10 dp side margin and 8 dp above (docs/DESIGN_SYSTEM.md, Table)
+    Column(modifier.fillMaxSize().padding(horizontal = 10.dp).padding(top = 8.dp)
+        .clip(RoundedCornerShape(DS.radiusCard * ui.cornerFactor))
+        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(DS.radiusCard * ui.cornerFactor))
+        .background(MaterialTheme.colorScheme.surfaceContainer)) {
         if (lazy) {
             // the end of the list scrolls clear of the floating button
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = fabSpace)) {

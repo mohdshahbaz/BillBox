@@ -46,7 +46,7 @@ extension View {
         }
     }
 
-    func card(_ radius: CGFloat = 10) -> some View { self.modifier(CardBackground(radius: radius)) }
+    func card(_ radius: CGFloat = DS.Radius.card) -> some View { self.modifier(CardBackground(radius: radius)) }
 }
 
 /// A Settings tab. macOS 13+: the grouped form. macOS 12 (Monterey): a Form inside a scroll view drew nothing on tabs with
@@ -117,7 +117,7 @@ struct BarPair: Identifiable {
 
 struct BarChartView: View {
     let data: [BarPair]
-    var colors: [Color] = [.teal, .orange, .green]
+    var colors: [Color] = [.teal, Theme.warning, Theme.positive]
     var showThird = false
 
     var body: some View {

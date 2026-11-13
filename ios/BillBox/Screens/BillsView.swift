@@ -14,6 +14,7 @@ import SwiftUI
     @State private var selection = Set<JSON.ID>()
     @State private var selecting = false
     @State private var loading = true
+    @State private var loadError: String?
     @State private var busy = false
     @State private var viewing: JSON?
     @State private var ewbRow: JSON?
@@ -47,7 +48,8 @@ import SwiftUI
         .onChange(of: app.dataVersion) { _ in Task { await load() } }
         .task {
             if from.isEmpty {
-                from = app.isCurrentFY ? app.monthStartInFY : app.fyFrom
+                // Settings › Billing & Dashboard › All Bills opens on: today's bills, or this month's (the default)
+                from = app.isCurrentFY ? (app.settings.str("bills_open") == "today" ? app.dateInFY : app.monthStartInFY) : app.fyFrom
                 to = app.isCurrentFY ? app.dateInFY : app.fyTo
             }
             if app.openUnprinted { app.openUnprinted = false; from = app.fyFrom; to = app.dateInFY; unprinted = true }
@@ -95,25 +97,27 @@ import SwiftUI
                 Button(role: .destructive) { confirmBulkDelete = true } label: { Label("Delete \(selection.count) selected…", systemImage: "trash") }
             }
         }) }) {
-            GridColumn("Date", id: "date", min: 86, ideal: 96) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
-            GridColumn("Type", id: "type", min: 70, ideal: 80) { (r: JSON) in
-                Text(billTypeName(r)).fontWeight(.semibold).foregroundStyle(billTypeColor(r))
+            GridColumn("Date", id: "date", min: 122, ideal: 124) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).monospacedDigit() }
+            GridColumn("Type", id: "type", min: 70, ideal: 80, sort: { (r: JSON) -> Any? in r.str("type") }) { (r: JSON) in
+                StatusPill(text: billTypeName(r), tint: billTypeColor(r))
             }
-            GridColumn("Bill no", id: "no", min: 110, ideal: 130) { (r: JSON) in Text(r.str("no")).monospacedDigit() }
+            GridColumn("Bill no", id: "no", min: 110, ideal: 150) { (r: JSON) in Text(r.str("no")).monospacedDigit().lineLimit(1).truncationMode(.middle) }
             GridColumn("Supplier bill", id: "ref", min: 80, ideal: 110) { (r: JSON) in Text(r.str("ref")) }
             GridColumn("Party", id: "party", min: 140, ideal: 200) { (r: JSON) in Text(r.str("party")).lineLimit(2) }
             GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).monospacedDigit() }
             GridColumn("Paid", id: "paid", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "paid")).monospacedDigit() }
-            GridColumn("Printed", id: "printed", min: 54, ideal: 64) { (r: JSON) in
-                Text(r.str("type") != "SALE" ? "" : r.int("printed") == 1 ? "Yes" : "Not yet").foregroundStyle(r.int("printed") == 1 ? Color.secondary : Color.orange)
+            GridColumn("Printed", id: "printed", min: 70, ideal: 84, sort: { (r: JSON) -> Any? in r.str("type") == "SALE" ? r.int("printed") : nil }) { (r: JSON) in
+                StatusPill(text: r.str("type") != "SALE" ? "" : r.int("printed") == 1 ? "Yes" : "Not yet", tint: r.int("printed") == 1 ? Color.secondary : Theme.warning)
             }
-            GridColumn("Due", id: "due", min: 90, ideal: 110, align: .trailing) { (r: JSON) in
+            GridColumn("Due", id: "due", min: 90, ideal: 110, align: .trailing, sort: { (r: JSON) -> Any? in r.num("total") - r.num("paid") }) { (r: JSON) in
                 let due = r.num("total") - r.num("paid")
-                Text(Fmt.money(due)).monospacedDigit().fontWeight(.semibold).foregroundStyle(due > 0.5 ? Color.red : Color.primary)
+                Text(Fmt.money(due)).monospacedDigit().fontWeight(.semibold).foregroundStyle(due > 0.5 ? Theme.negative : Color.primary)
             }
         }
         .overlay {
-            if loading { ProgressView() }
+            if loading && rows.isEmpty { SkeletonRows() }
+            else if loading { ProgressView() }
+            else if let loadError, rows.isEmpty { ErrorState(message: loadError) { Task { await load() } } }
             else if rows.isEmpty { EmptyState(title: "No bills match these filters", symbol: "doc.text.magnifyingglass") }
         }
     }
@@ -139,22 +143,14 @@ import SwiftUI
     }
 
     private var footer: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 16) { footerItems }
-            VStack(alignment: .leading, spacing: 2) { footerItems }
-        }
-        .font(.callout)
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card)
-    }
-
-    @ViewBuilder private var footerItems: some View {
-        Text("\(rows.count) bills").foregroundStyle(.secondary)
-        Text("Sales \(Fmt.money(totals, "sales"))").monospacedDigit()
-        Text("Purchases \(Fmt.money(totals, "purchases"))").monospacedDigit()
-        if totals.num("debit_notes") > 0 { Text("Debit notes \(Fmt.money(totals, "debit_notes"))").monospacedDigit() }
-        Text("Due \(Fmt.money(totals, "due"))").monospacedDigit().fontWeight(.bold)
+        var items: [SummaryCard.Item] = [
+            .init(label: "Bills", value: "\(rows.count)"),
+            .init(label: "Sales", value: Fmt.money(totals, "sales")),
+            .init(label: "Purchases", value: Fmt.money(totals, "purchases")),
+        ]
+        if totals.num("debit_notes") > 0 { items.append(.init(label: "Debit notes", value: Fmt.money(totals, "debit_notes"))) }
+        items.append(.init(label: "Due", value: Fmt.money(totals, "due"), strong: true, tint: totals.num("due") > 0.5 ? .red : nil))
+        return SummaryCard(items: items)
     }
 
     private func delete(_ r: JSON) async {
@@ -231,7 +227,7 @@ import SwiftUI
     }
 
     private func load() async {
-        await app.guarded {
+        loadError = await app.loading {
             let r = try await API.obj("GET", "/bills", query: ["type": type, "from": from, "to": to, "q": query, "unpaid": unpaid ? 1 : 0, "unprinted": unprinted ? 1 : 0])
             // a sale, a purchase and a debit note can share the same database id, so rows get a unique table id
             // (purchases negative, debit notes from 1,000,000,000)
@@ -276,13 +272,13 @@ import SwiftUI
                     .foregroundStyle(.secondary).font(.callout)
                 DataGrid(b.list("lines"), layoutKey: "billdetail") {
                     GridColumn("S.No", id: "sno", min: 44, ideal: 48, align: .trailing) { (l: JSON) in Text("\(l.rid)").monospacedDigit().foregroundStyle(.secondary) }
-                    GridColumn("Item", id: "item", min: 150, ideal: 240) { (l: JSON) in Text(l.str("item_name")).lineLimit(2) }
-                    GridColumn("Qty (box + pcs)", id: "qty", min: 90, ideal: 120, align: .trailing) { (l: JSON) in // a purchase line's qty is in its unit (boxes for BOX); pcs_qty is the pieces
+                    GridColumn("Item", id: "item", min: 150, ideal: 240, sort: { (l: JSON) -> Any? in l.str("item_name") }) { (l: JSON) in Text(l.str("item_name")).lineLimit(2) }
+                    GridColumn("Qty (box + pcs)", id: "qty", min: 90, ideal: 120, align: .trailing, sort: { (l: JSON) -> Any? in l.has("pcs_qty") ? l.int("pcs_qty") : l.int("qty") }) { (l: JSON) in // a purchase line's qty is in its unit (boxes for BOX); pcs_qty is the pieces
                         Text(Fmt.boxPcs(l.has("pcs_qty") ? l.int("pcs_qty") : l.int("qty"), l.int("pcs_per_box"))).monospacedDigit() }
-                    GridColumn("Free pcs", id: "free", min: 44, ideal: 60, align: .trailing) { (l: JSON) in Text(l.str("free_qty")).monospacedDigit() }
+                    GridColumn("Free pcs", id: "free", min: 44, ideal: 60, align: .trailing, sort: { (l: JSON) -> Any? in l.num("free_qty") }) { (l: JSON) in Text(l.str("free_qty")).monospacedDigit() }
                     GridColumn("Rate", id: "rate", min: 70, ideal: 90, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "rate")).monospacedDigit() }
                     GridColumn("Taxable", id: "taxable", min: 80, ideal: 100, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "taxable")).monospacedDigit() }
-                    GridColumn("GST", id: "gst", min: 44, ideal: 55, align: .trailing) { (l: JSON) in Text("\(l.str("gst_rate"))%").monospacedDigit() }
+                    GridColumn("GST", id: "gst", min: 44, ideal: 55, align: .trailing, sort: { (l: JSON) -> Any? in l.num("gst_rate") }) { (l: JSON) in Text("\(l.str("gst_rate"))%").monospacedDigit() }
                     GridColumn("Amount", id: "amount", min: 90, ideal: 110, align: .trailing) { (l: JSON) in Text(Fmt.money(l, "amount")).monospacedDigit().fontWeight(.semibold) }
                 }
             }

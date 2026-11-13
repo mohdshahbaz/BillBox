@@ -74,15 +74,15 @@ class _LicenseTabState extends State<LicenseTab> {
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(headline, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                Text(detail, style: const TextStyle(color: Palette.muted, fontSize: 12)),
+                Text(detail, style: TextStyle(color: Palette.muted, fontSize: 12)),
               ])),
             ]),
-            if (s['edition'] == 'admin') const Padding(padding: EdgeInsets.only(top: 8), child: Text('Admin (test) edition: test licence keys only.', style: TextStyle(color: Colors.orange, fontSize: 12))),
+            if (s['edition'] == 'admin') Padding(padding: const EdgeInsets.only(top: 8), child: Text('Admin (test) edition: test licence keys only.', style: TextStyle(color: Palette.turmeric, fontSize: 12))),
             const SizedBox(height: 14),
             if (state.isNotEmpty && state != 'unlimited') ...[
               if (state != 'licensed') ...[
                 _btn('Buy a licence…', Icons.shopping_cart_outlined, () => launchUrl(Uri.parse('${s['buy_url']}')), primary: true),
-                const Text('Yearly ₹1,499 · Lifetime ₹3,999 by UPI or bank transfer. Send the reference on the buy page; your licence key is ready there once the payment is confirmed (usually within a few hours). Enter it below.', style: TextStyle(color: Palette.muted, fontSize: 12)),
+                Text('Yearly ₹1,499 · Lifetime ₹3,999 by UPI or bank transfer. Send the reference on the buy page; your licence key is ready there once the payment is confirmed (usually within a few hours). Enter it below.', style: TextStyle(color: Palette.muted, fontSize: 12)),
                 const SizedBox(height: 12),
                 AppField(controller: keyCtl, label: 'Licence key (BB1.…)'),
                 const SizedBox(height: 8),
@@ -94,7 +94,7 @@ class _LicenseTabState extends State<LicenseTab> {
                 _btn('Remove the licence from this computer', Icons.remove_circle_outline, () => _run('/license/deactivate', {}), danger: true),
               ],
               Text('Device ${s['device']}. One licence works on 2 devices (Mac, Windows, Linux, iPhone or Android). BillBox checks it online every few weeks and keeps working offline in between. To move it, remove it here first.',
-                  style: const TextStyle(color: Palette.muted, fontSize: 12)),
+                  style: TextStyle(color: Palette.muted, fontSize: 12)),
               if (s['edition'] == 'admin') ...[
                 const SizedBox(height: 12),
                 _btn('Start the trial again (testing)', Icons.restart_alt, () => _run('/license/reset-trial', {}), danger: true),

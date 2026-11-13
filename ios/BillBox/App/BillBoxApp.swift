@@ -39,6 +39,7 @@ struct BillBoxApp: App {
                 .preferredColorScheme(appearance == "light" ? .light : (appearance == "dark" ? .dark : nil))
                 .modifier(TextSizeChoice())
                 .modifier(FontChoice())
+                .appChrome()
                 // no .id(theme) here: rebuilding every screen closed the open page (Settings › Appearance) on each change;
                 // the screens redraw instead, so the new colours show while the page stays open
                 .onAppear { BillBoxApp.tintWindows() }

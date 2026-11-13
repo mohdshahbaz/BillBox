@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:ui' show AppExitResponse;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +17,7 @@ import 'widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  Appearance.instance.load(Engine.dataDir);
   final engineError = await Engine.start();
   final state = AppState();
   if (engineError != null) {
@@ -29,15 +31,66 @@ Future<void> main() async {
   runApp(AppScope(state: state, child: const DistributorApp()));
 }
 
-class DistributorApp extends StatelessWidget {
+/// Applies the theme and light/dark mode from Settings › Appearance (or the system's mode on "Automatic") and
+/// repaints every screen when either changes, without losing open bills or the current page.
+class DistributorApp extends StatefulWidget {
   const DistributorApp({super.key});
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: 'BillBox',
-        debugShowCheckedModeBanner: false,
-        theme: buildTheme(),
-        home: const Gate(),
-      );
+  State<DistributorApp> createState() => _DistributorAppState();
+}
+
+class _DistributorAppState extends State<DistributorApp> with WidgetsBindingObserver {
+  final _look = Appearance.instance;
+  String _applied = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _look.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _look.removeListener(_changed);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() => _changed();
+
+  void _changed() => setState(() {});
+
+  bool get _dark => switch (_look.mode) {
+        'dark' => true,
+        'light' => false,
+        _ => WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = _dark;
+    final key = '${_look.themeId}/$dark';
+    Palette.apply(_look.theme, dark);
+    if (_applied.isNotEmpty && _applied != key) {
+      // Screens are mostly const widgets that read Palette directly: mark every element for a rebuild once.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        void mark(Element e) {
+          e.markNeedsBuild();
+          e.visitChildren(mark);
+        }
+        if (mounted) (context as Element).visitChildren(mark);
+      });
+    }
+    _applied = key;
+    return MaterialApp(
+      title: 'BillBox',
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(),
+      home: const Gate(),
+    );
+  }
 }
 
 /// Waits for the company list, then shows the shell. Shows a clear message if the backend is not running.
@@ -51,7 +104,7 @@ class Gate extends StatelessWidget {
       return Scaffold(
         body: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.cloud_off, size: 40, color: Palette.brick),
+            Icon(Icons.cloud_off, size: 40, color: Palette.brick),
             const SizedBox(height: 12),
             Text(app.error!, style: const TextStyle(fontSize: 15)),
             const SizedBox(height: 14),
@@ -60,7 +113,8 @@ class Gate extends StatelessWidget {
         ),
       );
     }
-    return const Shell();
+    // window title "BillBox — Company" (docs/DESIGN_SYSTEM.md §7)
+    return Title(title: 'BillBox — ${app.companyName}', color: Palette.teal, child: const Shell());
   }
 }
 
@@ -128,7 +182,7 @@ class _ShellState extends State<Shell> {
 
   Widget _sidebar(AppState app, bool compact) => Container(
         width: compact ? 68 : 214,
-        color: Palette.ink,
+        color: Palette.sidebar,
         child: Column(children: [
           const SizedBox(height: 14),
           PopupMenuButton<int>(
@@ -167,12 +221,12 @@ class _ShellState extends State<Shell> {
                         padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 12, vertical: 10),
                         decoration: BoxDecoration(color: _i == n ? Palette.teal : Colors.transparent, borderRadius: BorderRadius.circular(9)),
                         child: compact
-                            ? Center(child: Icon(_nav[n].$1, size: 20, color: _i == n ? Colors.white : Colors.white60))
+                            ? Center(child: Icon(_nav[n].$1, size: 20, color: _i == n ? Palette.onAccent : Colors.white60))
                             : Row(children: [
-                                Icon(_nav[n].$1, size: 19, color: _i == n ? Colors.white : Colors.white60),
+                                Icon(_nav[n].$1, size: 19, color: _i == n ? Palette.onAccent : Colors.white60),
                                 const SizedBox(width: 12),
-                                Expanded(child: Text(_nav[n].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _i == n ? Colors.white : Colors.white70, fontWeight: _i == n ? FontWeight.w600 : FontWeight.w400))),
-                                if (n < 9) Text('⌘${n + 1}', style: const TextStyle(color: Colors.white24, fontSize: 11)),
+                                Expanded(child: Text(_nav[n].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _i == n ? Palette.onAccent : Colors.white70, fontWeight: _i == n ? FontWeight.w600 : FontWeight.w400))),
+                                if (n < 9) Text('${Platform.isMacOS ? '⌘' : 'Ctrl+'}${n + 1}', style: const TextStyle(color: Colors.white38, fontSize: 11)),
                               ]),
                       ),
                     ),
@@ -194,7 +248,11 @@ class _ShellState extends State<Shell> {
     return Focus(
       autofocus: true,
       child: CallbackShortcuts(
-        bindings: {for (var n = 0; n < _nav.length; n++) SingleActivator(digits[n], meta: true): () => _go(n)},
+        // ⌘1… on a Mac keyboard, Ctrl+1… on Windows and Linux (the same screens as the Mac app's shortcuts)
+        bindings: {
+          for (var n = 0; n < _nav.length; n++) SingleActivator(digits[n], meta: true): () => _go(n),
+          for (var n = 0; n < _nav.length; n++) SingleActivator(digits[n], control: true): () => _go(n),
+        },
         child: Scaffold(
           body: Row(children: [
             _sidebar(app, MediaQuery.sizeOf(context).width < kNarrow),

@@ -16,7 +16,7 @@ import SwiftUI
             Section {
                 HStack(spacing: 12) {
                     Image(systemName: state == "licensed" || state == "unlimited" ? "checkmark.seal.fill" : state == "trial" ? "hourglass" : "lock.fill")
-                        .font(.title2).foregroundStyle(state == "expired" ? Color.red : Theme.accent)
+                        .font(.title2).foregroundStyle(state == "expired" ? Theme.negative : Theme.accent)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(headline).font(.headline)
                         Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -25,7 +25,7 @@ import SwiftUI
                 .padding(.vertical, 4)
                 if s.str("edition") == "admin" {
                     Label("Admin (test) edition: test licence keys only.", systemImage: "wrench.and.screwdriver")
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.caption).foregroundStyle(Theme.warning)
                 }
             } header: { Text("This device") }
 

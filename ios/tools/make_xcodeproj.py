@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes BillBox.xcodeproj (Xcode 14.2 or newer, iOS 16+) from the files on disk.  Run again after adding or removing a source file:
+"""Writes BillBox.xcodeproj (Xcode 16 or newer, iOS 18+) from the files on disk.  Run again after adding or removing a source file:
     python3 tools/make_xcodeproj.py
 Targets:
   BillBox       the iPhone app: BillBox/**.swift + the engine (BillBoxCore/Sources/BillBoxCore)
@@ -14,7 +14,7 @@ def uid(*parts):
 
 app_sources = sorted(glob.glob('BillBox/*/*.swift'))
 core_sources = sorted(glob.glob('BillBoxCore/Sources/BillBoxCore/*.swift'))
-test_sources = sorted(f for f in glob.glob('BillBoxCore/Tests/BillBoxCoreTests/*.swift') if not os.path.islink(f)) + ['BillBoxCore/Sources/ParityKit/ParityRunner.swift']
+test_sources = sorted(f for f in glob.glob('BillBoxCore/Tests/BillBoxCoreTests/*.swift') if not os.path.islink(f) and os.path.basename(f) != 'BillMath.swift') + ['BillBoxCore/Sources/ParityKit/ParityRunner.swift']
 golden = 'BillBoxCore/Tests/BillBoxCoreTests/Golden'
 assets = 'BillBox/Resources/Assets.xcassets'
 pdfreader = 'BillBox/Resources/PDFReader'   # the Mac's PDF reader (pdf.js 1.10.100 + pdfExtract.js), a folder reference
@@ -75,13 +75,24 @@ def phase(kind, target, files):
 
 app_src = phase('Sources', 'app', build_files('app', app_sources + core_sources))
 app_res = phase('Resources', 'app', build_files('app', [assets, pdfreader]))
-app_fw = phase('Frameworks', 'app', [])
+# ---- Swift packages (MIT): Pow (EmergeTools) for effects, PopupView (exyte) for toasts
+packages = [('Pow', 'https://github.com/EmergeTools/Pow', '1.0.0'), ('PopupView', 'https://github.com/exyte/PopupView.git', '4.0.0')]
+pkg_ids, dep_ids, pkg_builds = [], [], []
+for name, url, version in packages:
+    pkg, dep, bld = uid('package', name), uid('packagedep', 'app', name), uid('build', 'app', name)
+    add(pkg, f'{pkg} /* XCRemoteSwiftPackageReference "{name}" */ = {{isa = XCRemoteSwiftPackageReference; repositoryURL = "{url}"; requirement = {{kind = upToNextMajorVersion; minimumVersion = {version}; }}; }};')
+    add(dep, f'{dep} /* {name} */ = {{isa = XCSwiftPackageProductDependency; package = {pkg} /* XCRemoteSwiftPackageReference "{name}" */; productName = {name}; }};')
+    add(bld, f'{bld} /* {name} in Frameworks */ = {{isa = PBXBuildFile; productRef = {dep} /* {name} */; }};')
+    pkg_ids.append(pkg); dep_ids.append(dep); pkg_builds.append(bld)
+pkg_list = ''.join(f'\n\t\t\t\t{i},' for i in pkg_ids)
+dep_list = ''.join(f'\n\t\t\t\t{i},' for i in dep_ids)
+app_fw = phase('Frameworks', 'app', pkg_builds)
 test_src = phase('Sources', 'tests', build_files('tests', core_sources + test_sources + ['BillBox/Shared/BillMath.swift']))
 test_res = phase('Resources', 'tests', build_files('tests', [golden]))
 test_fw = phase('Frameworks', 'tests', [])
 
 common = {
-    'IPHONEOS_DEPLOYMENT_TARGET': '16.0', 'SDKROOT': 'iphoneos', 'SWIFT_VERSION': '5.0', 'TARGETED_DEVICE_FAMILY': '1',
+    'IPHONEOS_DEPLOYMENT_TARGET': '18.0', 'SDKROOT': 'iphoneos', 'SWIFT_VERSION': '5.0', 'TARGETED_DEVICE_FAMILY': '1',
     'CLANG_ENABLE_MODULES': 'YES', 'ALWAYS_SEARCH_USER_PATHS': 'NO', 'ENABLE_STRICT_OBJC_MSGSEND': 'YES',
     'GCC_C_LANGUAGE_STANDARD': 'gnu11', 'MTL_FAST_MATH': 'YES', 'CODE_SIGN_STYLE': 'Automatic',
 }
@@ -99,9 +110,9 @@ def config_list(owner, debug, release):
     return i
 
 proj_debug = config('Debug', 'project', {**common, 'DEBUG_INFORMATION_FORMAT': 'dwarf', 'ONLY_ACTIVE_ARCH': 'YES', 'SWIFT_OPTIMIZATION_LEVEL': '-Onone',
-                                         'SWIFT_ACTIVE_COMPILATION_CONDITIONS': 'DEBUG', 'ENABLE_TESTABILITY': 'YES', 'GCC_OPTIMIZATION_LEVEL': '0'})
+                                         'SWIFT_ACTIVE_COMPILATION_CONDITIONS': 'DEBUG XCODE_BUILD', 'ENABLE_TESTABILITY': 'YES', 'GCC_OPTIMIZATION_LEVEL': '0'})
 proj_release = config('Release', 'project', {**common, 'DEBUG_INFORMATION_FORMAT': 'dwarf-with-dsym', 'SWIFT_OPTIMIZATION_LEVEL': '-O',
-                                             'SWIFT_COMPILATION_MODE': 'wholemodule', 'VALIDATE_PRODUCT': 'YES'})
+                                             'SWIFT_COMPILATION_MODE': 'wholemodule', 'SWIFT_ACTIVE_COMPILATION_CONDITIONS': 'XCODE_BUILD', 'VALIDATE_PRODUCT': 'YES'})
 proj_list = config_list('project', proj_debug, proj_release)
 
 app_settings = {'PRODUCT_NAME': 'BillBox', 'PRODUCT_BUNDLE_IDENTIFIER': 'com.local.billbox', 'INFOPLIST_FILE': plist,
@@ -118,7 +129,8 @@ add(app_target, f'''{app_target} /* BillBox */ = {{isa = PBXNativeTarget; buildC
 				{app_src} /* Sources */,
 				{app_fw} /* Frameworks */,
 				{app_res} /* Resources */,
-			); buildRules = (); dependencies = (); name = BillBox; productName = BillBox; productReference = {app_product} /* BillBox.app */; productType = "com.apple.product-type.application"; }};''')
+			); buildRules = (); dependencies = (); name = BillBox; packageProductDependencies = ({dep_list}
+			); productName = BillBox; productReference = {app_product} /* BillBox.app */; productType = "com.apple.product-type.application"; }};''')
 add(test_target, f'''{test_target} /* BillBoxTests */ = {{isa = PBXNativeTarget; buildConfigurationList = {test_list}; buildPhases = (
 				{test_src} /* Sources */,
 				{test_fw} /* Frameworks */,
@@ -129,7 +141,8 @@ project = uid('project')
 root_group = group_for('')[0]
 add(project, f'''{project} /* Project object */ = {{isa = PBXProject; attributes = {{BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1420; LastUpgradeCheck = 1420; TargetAttributes = {{ {app_target} = {{CreatedOnToolsVersion = 14.2;}}; {test_target} = {{CreatedOnToolsVersion = 14.2;}}; }}; }};
 			buildConfigurationList = {proj_list}; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, );
-			mainGroup = {root_group}; productRefGroup = {products_group} /* Products */; projectDirPath = ""; projectRoot = ""; targets = (
+			mainGroup = {root_group}; packageReferences = ({pkg_list}
+			); productRefGroup = {products_group} /* Products */; projectDirPath = ""; projectRoot = ""; targets = (
 				{app_target} /* BillBox */,
 				{test_target} /* BillBoxTests */,
 			); }};''')

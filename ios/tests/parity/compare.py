@@ -26,10 +26,23 @@ def same(a, b, path, diffs, loose):
         return
     if a != b: diffs.append(f'{path}: {a!r:.120} != {b!r:.120}')
 
+def strip_local(o):
+    """The licence's device id and trial start are written by the app itself when it opens (on the Android emulator
+    that can happen while the session replays), so they are per-device, not part of the books: left out of dumps."""
+    if isinstance(o, dict):
+        for k, v in o.items():
+            if k == 'app_settings' and isinstance(v, list):
+                o[k] = [r for r in v if not (isinstance(r, dict) and str(r.get('key', '')).startswith('license_'))]
+            else:
+                strip_local(v)
+    elif isinstance(o, list):
+        for v in o: strip_local(v)
+    return o
+
 def main():
     scen = json.load(open(sys.argv[1]))
-    mac = [json.loads(l) for l in open(sys.argv[2]) if l.strip()]
-    ios = [json.loads(l) for l in open(sys.argv[3]) if l.strip()]
+    mac = [strip_local(json.loads(l)) for l in open(sys.argv[2]) if l.strip()]
+    ios = [strip_local(json.loads(l)) for l in open(sys.argv[3]) if l.strip()]
     bad = 0
     if len(mac) != len(ios): print(f'step count differs: Mac {len(mac)}, iOS {len(ios)}'); bad += 1
     for m, i in zip(mac, ios):

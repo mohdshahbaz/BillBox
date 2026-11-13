@@ -47,6 +47,8 @@ object SelfTest {
     /** True while the session is being replayed (the screen shows a short note instead of the app). */
     var replaying by androidx.compose.runtime.mutableStateOf(false)
     private var started = false
+    /** The emulator self-test is running (no "new version" banner over its screenshots). */
+    val active: Boolean get() = started
     private var current: java.lang.ref.WeakReference<Activity>? = null
 
     /** Runs once per app launch, on the app's own scope: Android may recreate the screen while it runs (the first run was
@@ -116,6 +118,16 @@ object SelfTest {
         for (p in listOf(Page.Billing, Page.Bills, Page.Stock, Page.Parties, Page.Purchases, Page.DebitNotes, Page.Salesmen, Page.Dashboard, Page.Reports, Page.Settings)) {
             app.section = p
             shot(p.name)
+        }
+        // the main screens again in dark mode (Settings › Appearance › Dark), then the phone's own setting back
+        (ctx as? com.local.billbox.BillBoxApp)?.ui?.let { ui ->
+            val was = ui.appearance
+            ui.set("appearance", "dark")
+            for (p in listOf(Page.Billing, Page.Bills, Page.Parties, Page.Dashboard, Page.Reports)) {
+                app.section = p
+                shot("dark_" + p.name)
+            }
+            ui.set("appearance", was)
         }
         // page 1 of a printed bill, as the PDF that goes to the printer
         runCatching {

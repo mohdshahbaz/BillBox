@@ -33,7 +33,7 @@ import SwiftUI
                     }
                     if !d.str("ewb_no").isEmpty {
                         Label("E-way bill \(d.str("ewb_no"))" + (d.str("ewb_valid").isEmpty ? "" : " · valid until \(Fmt.dmy(d.str("ewb_valid")))"), systemImage: "checkmark.seal.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Theme.positive)
                     }
                 }
                 Section {
@@ -58,8 +58,8 @@ import SwiftUI
                 Section {
                     Button { Task { await makeFile() } } label: { Label("Make the e-way bill file", systemImage: "doc.badge.arrow.up") }
                         .buttonStyle(.borderedProminent).disabled(working)
-                    if let problem { Text(problem).foregroundStyle(.red).font(.callout) }
-                    ForEach(warnings, id: \.self) { w in Text(w).font(.caption).foregroundStyle(.orange) }
+                    if let problem { Text(problem).foregroundStyle(Theme.negative).font(.callout) }
+                    ForEach(warnings, id: \.self) { w in Text(w).font(.caption).foregroundStyle(Theme.warning) }
                     if !made.isEmpty { Text("Saved \(made).").font(.callout) }
                     Link(destination: URL(string: "https://ewaybillgst.gov.in")!) { Label("Open the e-way bill portal", systemImage: "safari") }
                 } header: { Text("2. File for the portal") } footer: {

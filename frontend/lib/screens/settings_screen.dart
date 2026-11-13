@@ -13,13 +13,13 @@ import 'update_screen.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
   @override
-  Widget build(BuildContext context) => DefaultTabController(
-        length: 7,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+  Widget build(BuildContext context) => const DefaultTabController(
+        length: 8,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           PageHeader('Settings'),
-          TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Companies'), Tab(text: 'Backup'), Tab(text: 'Printing'), Tab(text: 'Stock'), Tab(text: 'Sync'), Tab(text: 'Updates'), Tab(text: 'Licence')]),
+          TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Companies'), Tab(text: 'Appearance'), Tab(text: 'Backup'), Tab(text: 'Printing'), Tab(text: 'Stock'), Tab(text: 'Sync'), Tab(text: 'Updates'), Tab(text: 'Licence')]),
           SizedBox(height: 14),
-          Expanded(child: TabBarView(children: [_Companies(), _Backup(), _Printing(), _StockSettings(), SyncTab(), UpdateTab(), LicenseTab()])),
+          Expanded(child: TabBarView(children: [_Companies(), _Appearance(), _Backup(), _Printing(), _StockSettings(), SyncTab(), UpdateTab(), LicenseTab()])),
         ]),
       );
 }
@@ -66,7 +66,7 @@ class _Companies extends StatelessWidget {
     final app = AppScope.of(context);
     return ListView(children: [
       Row(children: [
-        const Expanded(child: Text('Each company has its own separate books: items, parties, bills and ledgers. Switching never mixes data.', style: TextStyle(color: Palette.muted))),
+        Expanded(child: Text('Each company has its own separate books: items, parties, bills and ledgers. Switching never mixes data.', style: TextStyle(color: Palette.muted))),
         FilledButton.icon(onPressed: () => _add(context), icon: const Icon(Icons.add_business_outlined), label: const Text('Add company')),
       ]),
       const SizedBox(height: 14),
@@ -76,7 +76,7 @@ class _Companies extends StatelessWidget {
           child: Panel(
             padding: const EdgeInsets.all(16),
             child: Row(children: [
-              CircleAvatar(backgroundColor: Palette.teal.withOpacity(.12), child: Text('${c['name']}'.substring(0, 1).toUpperCase(), style: const TextStyle(color: Palette.teal, fontWeight: FontWeight.w700))),
+              CircleAvatar(backgroundColor: Palette.teal.withValues(alpha: .12), child: Text('${c['name']}'.substring(0, 1).toUpperCase(), style: TextStyle(color: Palette.teal, fontWeight: FontWeight.w700))),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -85,7 +85,7 @@ class _Companies extends StatelessWidget {
                 ]),
               ),
               if (c['id'] == app.companyId)
-                const Chip(label: Text('Open now'), backgroundColor: Color(0x1F2E7D5B))
+                Chip(label: const Text('Open now'), backgroundColor: Palette.leaf.withValues(alpha: .14))
               else
                 OutlinedButton(onPressed: () => guard(context, () => app.switchCompany(c['id'] as int)), child: const Text('Switch to')),
               const SizedBox(width: 8),
@@ -94,6 +94,85 @@ class _Companies extends StatelessWidget {
           ),
         ),
     ]);
+  }
+}
+
+// ---------------------------------------------------------------- appearance
+
+/// Theme (the same 24 as the iPhone and Mac) and light / dark / automatic. Kept on this computer only.
+class _Appearance extends StatelessWidget {
+  const _Appearance();
+  @override
+  Widget build(BuildContext context) {
+    final look = Appearance.instance;
+    return ListenableBuilder(
+      listenable: look,
+      builder: (context, _) => ListView(children: [
+        Panel(
+          title: 'Mode',
+          child: SegmentedButton<String>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: 'auto', icon: Icon(Icons.brightness_auto_outlined), label: Text('Automatic')),
+              ButtonSegment(value: 'light', icon: Icon(Icons.light_mode_outlined), label: Text('Light')),
+              ButtonSegment(value: 'dark', icon: Icon(Icons.dark_mode_outlined), label: Text('Dark')),
+            ],
+            selected: {look.mode},
+            onSelectionChanged: (v) => look.set(appearance: v.first),
+          ),
+        ),
+        const SizedBox(height: DS.cardGap),
+        Panel(
+          title: 'Theme',
+          child: Wrap(spacing: DS.s12, runSpacing: DS.s12, children: [
+            for (final t in kThemes) _ThemeSwatch(t, selected: t.id == look.themeId, onTap: () => look.set(theme: t.id)),
+          ]),
+        ),
+        const SizedBox(height: DS.s8),
+        Text('Bills always print in black on white, whatever the theme.', style: TextStyle(color: Palette.muted, fontSize: 12)),
+      ]),
+    );
+  }
+}
+
+class _ThemeSwatch extends StatelessWidget {
+  final BBTheme t;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ThemeSwatch(this.t, {required this.selected, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(Palette.dark ? t.accentDark : t.accent);
+    final page = Color(Palette.dark ? t.pageDark : t.page);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${t.name} theme',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(DS.radiusControl),
+        child: Container(
+          width: 120,
+          constraints: const BoxConstraints(minHeight: DS.hitTarget),
+          padding: const EdgeInsets.all(DS.s8),
+          decoration: BoxDecoration(
+            color: Palette.card,
+            borderRadius: BorderRadius.circular(DS.radiusControl),
+            border: Border.all(color: selected ? accent : Palette.line, width: selected ? 2 : 1),
+          ),
+          child: Row(children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: accent, border: Border.all(color: page, width: 5)),
+            ),
+            const SizedBox(width: DS.s8),
+            Expanded(child: Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: selected ? FontWeight.w600 : FontWeight.w400))),
+            if (selected) Icon(Icons.check_circle, size: 16, color: accent),
+          ]),
+        ),
+      ),
+    );
   }
 }
 
@@ -216,7 +295,7 @@ class _BackupState extends State<_Backup> {
           if (lastStatus.isNotEmpty)
             Text(ok ? 'Last backup OK: ${lastStatus.substring(3)}' : lastStatus, style: TextStyle(color: ok ? Palette.leaf : Palette.brick, fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          const Text('Each backup is a new folder named FMCG_Backup_YYYYMMDD_HHMMSS holding a verified copy of every company\'s database — the same backup the Mac, iPhone and Android make, so it restores on any of them.',
+          Text('Each backup is a new folder named FMCG_Backup_YYYYMMDD_HHMMSS holding a verified copy of every company\'s database — the same backup the Mac, iPhone and Android make, so it restores on any of them.',
               style: TextStyle(color: Palette.muted, fontSize: 12)),
           const SizedBox(height: 12),
           Wrap(spacing: 10, runSpacing: 10, children: [
@@ -231,7 +310,7 @@ class _BackupState extends State<_Backup> {
       Panel(
         title: 'Backups in this folder',
         child: backups.isEmpty
-            ? const Text('No backups yet.', style: TextStyle(color: Palette.muted))
+            ? Text('No backups yet.', style: TextStyle(color: Palette.muted))
             : table(['Folder', 'Created', 'Files', 'Size', ''], [
                 for (final b in backups)
                   [
@@ -300,7 +379,7 @@ class _PrintingState extends State<_Printing> {
           if (loading)
             const LinearProgressIndicator()
           else if (printers.isEmpty)
-            const Text('No printer list available. The system print sheet is used when you press Print.', style: TextStyle(color: Palette.muted))
+            Text('No printer list available. The system print sheet is used when you press Print.', style: TextStyle(color: Palette.muted))
           else
             AppDropdown<String>(
               width: 480,
@@ -333,7 +412,7 @@ class _PrintingState extends State<_Printing> {
             child: const Text('Save'),
           ),
           const SizedBox(height: 14),
-          const Text('Half-A4 means 210 × 148.5 mm. Load half-A4 stationery (or A5 landscape) and choose that paper size for the printer. For plain A4 paper, use the "Original on top, Duplicate below" layout and cut along the line.',
+          Text('Half-A4 means 210 × 148.5 mm. Load half-A4 stationery (or A5 landscape) and choose that paper size for the printer. For plain A4 paper, use the "Original on top, Duplicate below" layout and cut along the line.',
               style: TextStyle(color: Palette.muted, fontSize: 12)),
         ]),
       ),
@@ -369,7 +448,7 @@ class _StockSettingsState extends State<_StockSettings> {
         Panel(
           title: 'Low stock alert',
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('An item that has been stocked before is listed as low when its stock is at or below this many pieces. The same level applies to every item.', style: TextStyle(color: Palette.muted)),
+            Text('An item that has been stocked before is listed as low when its stock is at or below this many pieces. The same level applies to every item.', style: TextStyle(color: Palette.muted)),
             const SizedBox(height: 12),
             Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
               AppField(width: 200, controller: low, number: true, label: 'Low stock level (pieces)'),

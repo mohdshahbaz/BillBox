@@ -59,7 +59,7 @@ import AppKit
 
             GridColumn("Stock (box + pcs)", id: "stock", min: 110, ideal: 140) { (it: JSON) in
                 Text(stockText(it)).mono().fw(.semibold)
-                    .foregroundStyle(it.num("stock") <= app.lowStockQty ? Color.orange : Color.primary)
+                    .foregroundStyle(it.num("stock") <= app.lowStockQty ? Theme.warning : Color.primary)
             }
 
             GridColumn("Pcs per box", id: "box", min: 70, ideal: 90) { (it: JSON) in Text(it.int("pcs_per_box") > 1 ? "\(it.int("pcs_per_box"))" : "–") }
@@ -565,7 +565,7 @@ import AppKit
                 }
             }
             Section {
-                if let problem { Text(problem).foregroundStyle(.red).font(.callout) }
+                if let problem { Text(problem).foregroundStyle(Theme.negative).font(.callout) }
                 if let r = result {
                     Text("\(r.int("would_update")) items will change" + (r.int("skipped_no_mrp") > 0 ? " · \(r.int("skipped_no_mrp")) without an MRP left as they are" : "") + ".")
                         .font(.callout.weight(.medium))
@@ -634,7 +634,7 @@ import AppKit
                             if it.num(k + "_old_bill") > 0 && abs(it.num(k + "_old_bill") - it.num(k + "_bill")) >= 0.5 {
                                 Text(Fmt.money(it.num(k + "_old_bill"))).strikethrough().foregroundStyle(.secondary)
                             }
-                            Text(Fmt.money(it.num(k + "_bill"))).fw(.semibold).foregroundStyle(k == "retail" ? Color.teal : Color.orange)
+                            Text(Fmt.money(it.num(k + "_bill"))).fw(.semibold).foregroundStyle(k == "retail" ? Color.teal : Theme.warning)
                             Text("(\(Fmt.qty(it.num(k + "_below_pct")))% below)").foregroundStyle(.secondary)
                         }
                     }
@@ -686,7 +686,7 @@ import AppKit
                     DataGrid(names.enumerated().map { (i, n) in JSON(["id": i + 1, "name": n, "found": (by[n] as? [String: Any])?["found"] ?? 0, "missing": (by[n] as? [String: Any])?["missing"] ?? 0]) }, layoutKey: "mrpreport") {
                         GridColumn("Category") { (r: JSON) in Text(r.str("name")) }
                         GridColumn("MRP found", min: 90, ideal: 90) { (r: JSON) in Text(r.str("found")).mono() }
-                        GridColumn("Still missing", min: 100, ideal: 100) { (r: JSON) in Text(r.str("missing")).mono().foregroundStyle(r.int("missing") > 0 ? Color.orange : Color.primary) }
+                        GridColumn("Still missing", min: 100, ideal: 100) { (r: JSON) in Text(r.str("missing")).mono().foregroundStyle(r.int("missing") > 0 ? Theme.warning : Color.primary) }
                     }
                     .frame(height: max(120, CGFloat(names.count) * 28 + 40))
                     let missing = report.list("missing")

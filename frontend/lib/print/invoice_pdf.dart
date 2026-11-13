@@ -34,8 +34,8 @@ class Geo {
   static const double m = 5; // sheet margin (kept small: more of the sheet is bill)
   static const double rowH = 12, headFirst = 76, headNext = 30, tableHead = 14, foot = 22, totals = 92;
   static const double inner = h - 2 * m;
-  static final halfFormat = PdfPageFormat(w, h, marginAll: 0);
-  static final a4Format = PdfPageFormat(w, h * 2, marginAll: 0);
+  static const halfFormat = PdfPageFormat(w, h, marginAll: 0);
+  static const a4Format = PdfPageFormat(w, h * 2, marginAll: 0);
 
   /// How many item rows fit on a sheet.
   static int cap({required bool first, required bool last}) =>

@@ -11,6 +11,7 @@ import SwiftUI
     @State private var selection = Set<JSON.ID>()
     @State private var selecting = false
     @State private var loading = true
+    @State private var loadError: String?
     @State private var editing: JSON?
     @State private var creating = false
     @State private var autoRoutes = false
@@ -47,19 +48,23 @@ import SwiftUI
     private var grid: some View {
         DataGrid(parties, layoutKey: "parties", selection: $selection, selecting: $selecting, onOpen: { openLedger($0) }, menu: { AnyView(partyMenu($0)) }) {
             GridColumn("Party", id: "name", min: 150, ideal: 220) { (p: JSON) in Text(p.str("name")).fontWeight(.medium).lineLimit(2) }
-            GridColumn("Type", id: "type", min: 70, ideal: 90) { (p: JSON) in Text(p.str("type").capitalized) }
+            GridColumn("Type", id: "type", min: 100, ideal: 124) { (p: JSON) in
+                StatusPill(text: p.str("type").capitalized, tint: p.str("type").lowercased().hasPrefix("whole") ? Color.purple : Theme.accent)
+            }
             GridColumn("GSTIN", id: "gstin", min: 110, ideal: 150) { (p: JSON) in Text(p.str("gstin")).monospacedDigit() }
-            GridColumn("Route", id: "route", min: 80, ideal: 140) { (p: JSON) in Text(p.str("route_name")) }
-            GridColumn("Price tier", id: "tier", min: 70, ideal: 90) { (p: JSON) in Text(p.str("price_tier").capitalized) }
-            GridColumn("Contact", id: "contact", min: 100, ideal: 150) { (p: JSON) in Text(p.str("mobiles").isEmpty ? (p.str("phone").isEmpty ? p.str("tel") : p.str("phone")) : p.str("mobiles")).lineLimit(1) }
-            GridColumn("Credit limit", id: "limit", min: 90, ideal: 110, align: .trailing) { (p: JSON) in Text(p.num("credit_limit") > 0 ? Fmt.money(p, "credit_limit") : "–").monospacedDigit() }
+            GridColumn("Route", id: "route", min: 80, ideal: 140, sort: { (p: JSON) -> Any? in p.str("route_name") }) { (p: JSON) in Text(p.str("route_name")) }
+            GridColumn("Price tier", id: "tier", min: 70, ideal: 90, sort: { (p: JSON) -> Any? in p.str("price_tier") }) { (p: JSON) in Text(p.str("price_tier").capitalized) }
+            GridColumn("Contact", id: "contact", min: 100, ideal: 150, sort: { (p: JSON) -> Any? in p.str("mobiles").isEmpty ? (p.str("phone").isEmpty ? p.str("tel") : p.str("phone")) : p.str("mobiles") }) { (p: JSON) in Text(p.str("mobiles").isEmpty ? (p.str("phone").isEmpty ? p.str("tel") : p.str("phone")) : p.str("mobiles")).lineLimit(1) }
+            GridColumn("Credit limit", id: "limit", min: 90, ideal: 110, align: .trailing, sort: { (p: JSON) -> Any? in p.num("credit_limit") }) { (p: JSON) in Text(p.num("credit_limit") > 0 ? Fmt.money(p, "credit_limit") : "–").monospacedDigit() }
             GridColumn("Balance", id: "balance", min: 110, ideal: 130, align: .trailing) { (p: JSON) in
                 Text(balanceText(p.num("balance"))).monospacedDigit().fontWeight(.semibold)
-                    .foregroundStyle(p.num("balance") > 0.5 ? Color.orange : (p.num("balance") < -0.5 ? Color.red : Color.secondary))
+                    .foregroundStyle(p.num("balance") > 0.5 ? Theme.warning : (p.num("balance") < -0.5 ? Theme.negative : Color.secondary))
             }
         }
         .overlay {
-            if loading { ProgressView() }
+            if loading && parties.isEmpty { SkeletonRows() }
+            else if loading { ProgressView() }
+            else if let loadError, parties.isEmpty { ErrorState(message: loadError) { Task { await load() } } }
             else if parties.isEmpty { EmptyState(title: supplier ? "No suppliers" : "No customers", symbol: "person.2", message: supplier ? "Suppliers are added automatically when you scan their bill." : "Add your first customer.") }
         }
     }
@@ -148,7 +153,7 @@ import SwiftUI
     }
 
     private func load() async {
-        await app.guarded {
+        loadError = await app.loading {
             async let p = API.list("/parties", query: ["q": query, "kind": kind])
             async let r = API.list("/routes")
             async let s = API.list("/salesmen")
@@ -343,15 +348,15 @@ extension PartiesView {
             VStack(alignment: .leading, spacing: 8) {
                 Text(balanceText(bal) + (bal > 0.005 ? "  (they owe you)" : (bal < -0.005 ? "  (you owe them)" : "")))
                     .font(.headline)
-                    .foregroundStyle(bal > 0.5 ? Color.orange : (bal < -0.5 ? Color.red : Color.green))
+                    .foregroundStyle(bal > 0.5 ? Theme.warning : (bal < -0.5 ? Theme.negative : Theme.positive))
                 if let d = data, abs(d.num("opening_balance")) > 0.005 {
                     Text("Opening balance for FY \(shownYear), brought forward from earlier years: \(balanceText(d.num("opening_balance")))")
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 DataGrid(entries, layoutKey: "ledger", onOpen: { askDelete($0) }, menu: { AnyView(rowMenu($0)) }) {
-                    GridColumn("Date", id: "date", min: 80, ideal: 95) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
+                    GridColumn("Date", id: "date", min: 122, ideal: 124) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
                     GridColumn("Type", id: "type", min: 70, ideal: 90) { (r: JSON) in Text(r.str("type")) }
-                    GridColumn("Reference", id: "ref", min: 80, ideal: 120) { (r: JSON) in Text(r.str("ref_no")) }
+                    GridColumn("Reference", id: "ref", min: 80, ideal: 120, sort: { (r: JSON) -> Any? in r.str("ref_no") }) { (r: JSON) in Text(r.str("ref_no")) }
                     GridColumn("Narration", id: "narration", min: 120, ideal: 220) { (r: JSON) in Text(r.str("narration")).lineLimit(1) }
                     GridColumn("Debit", id: "debit", min: 80, ideal: 100, align: .trailing) { (r: JSON) in Text(r.num("debit") > 0 ? Fmt.money(r, "debit") : "").mono() }
                     GridColumn("Credit", id: "credit", min: 80, ideal: 100, align: .trailing) { (r: JSON) in Text(r.num("credit") > 0 ? Fmt.money(r, "credit") : "").mono() }

@@ -5,6 +5,8 @@ const { today } = require('../utils/misc');
 const addDays = (n, base = new Date()) => { const d = new Date(base); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA'); };
 const one = (sql, ...a) => db.prepare(sql).get(...a);
 const monthOf = (d) => d.slice(0, 7);
+/** A YYYY-MM month as a date range, so queries use the date index (substr(date,1,7)=? scanned every row). */
+const monthSpan = (m) => [m + '-01', m + '-31'];
 
 const { fyRange } = require('../utils/fy');
 const clamp = (d, r) => (d < r.from ? r.from : d > r.to ? r.to : d);
@@ -13,16 +15,21 @@ const clamp = (d, r) => (d < r.from ? r.from : d > r.to ? r.to : d);
  * Profit = selling value (ex-GST, after discounts) minus what the sold pieces cost (batch purchase price, else the item's
  * purchase price). Free pieces count as cost. Lines whose cost is unknown are counted and reported, not guessed.
  */
-function profit(from, to) {
-  const r = one(
-    `SELECT COALESCE(SUM(l.taxable),0) revenue,
+const PROFIT_COLS = `COALESCE(SUM(l.taxable),0) revenue,
             COALESCE(SUM((l.qty+l.free_qty) * COALESCE(NULLIF(b.purchase_price,0), NULLIF(it.purchase_price,0), 0)),0) cost,
             COALESCE(SUM(CASE WHEN COALESCE(NULLIF(b.purchase_price,0), NULLIF(it.purchase_price,0), 0)=0 THEN 1 ELSE 0 END),0) unknown_cost_lines
      FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id JOIN items it ON it.id=l.item_id LEFT JOIN batches b ON b.id=l.batch_id
-     WHERE i.date BETWEEN ? AND ?`, from, to);
+     WHERE i.date BETWEEN ? AND ?`;
+const profitOf = (r) => {
   const p = r2(r.revenue - r.cost);
   return { revenue: r2(r.revenue), cost: r2(r.cost), profit: p, margin_pct: r.revenue > 0 ? r2((p / r.revenue) * 100) : 0, unknown_cost_lines: r.unknown_cost_lines };
+};
+function profit(from, to) {
+  return profitOf(one(`SELECT ${PROFIT_COLS}`, from, to));
 }
+/** SUM(col) per key (date or month) between two dates, one query instead of one per day / month. */
+const sumsBy = (table, col, key, from, to) =>
+  new Map(db.prepare(`SELECT ${key} k, COALESCE(SUM(${col}),0) v FROM ${table} WHERE date BETWEEN ? AND ? GROUP BY k`).all(from, to).map((r) => [r.k, r2(r.v)]));
 
 const sumBetween = (table, col, from, to) => r2(one(`SELECT COALESCE(SUM(${col}),0) v FROM ${table} WHERE date BETWEEN ? AND ?`, from, to).v);
 
@@ -43,17 +50,22 @@ function dashboard(fyLabel) {
     - one(`SELECT COALESCE(SUM(cgst+sgst+igst),0) v FROM debit_notes WHERE date BETWEEN ? AND ?`, f, to).v;
   const bal = one(`SELECT COALESCE(SUM(CASE WHEN b>0 THEN b ELSE 0 END),0) rec, COALESCE(-SUM(CASE WHEN b<0 THEN b ELSE 0 END),0) pay
                    FROM (SELECT SUM(debit)-SUM(credit) b FROM ledger WHERE date <= ? GROUP BY party_id)`, fy.to);
+  // last 14 days and the 12 months of the year: grouped queries (the same sums as one query per day / month)
+  const s0 = addDays(-13, new Date(t + 'T12:00:00'));
+  const daySales = sumsBy('invoices', 'total', 'date', s0, t), dayBuys = sumsBy('purchases', 'total', 'date', s0, t);
   const series = [];
   for (let i = 13; i >= 0; i--) {
     const d = addDays(-i, new Date(t + 'T12:00:00'));
     if (d < fy.from) continue;
-    series.push({ date: d, sales: sumBetween('invoices', 'total', d, d), purchases: sumBetween('purchases', 'total', d, d) });
+    series.push({ date: d, sales: daySales.get(d) || 0, purchases: dayBuys.get(d) || 0 });
   }
+  const ym = (k) => `${fy.start_year + (k + 3 >= 12 ? 1 : 0)}-${String(((k + 3) % 12) + 1).padStart(2, '0')}`;
+  const mFirst = ym(0) + '-01', mLast = ym(11) + '-31';
+  const mSales = sumsBy('invoices', 'total', 'substr(date,1,7)', mFirst, mLast), mBuys = sumsBy('purchases', 'total', 'substr(date,1,7)', mFirst, mLast);
   const monthly = [];
   for (let k = 0; k < 12; k++) {
-    const y = fy.start_year + (k + 3 >= 12 ? 1 : 0), mo = ((k + 3) % 12) + 1;
-    const from = `${y}-${String(mo).padStart(2, '0')}-01`, to = `${y}-${String(mo).padStart(2, '0')}-31`;
-    monthly.push({ month: from.slice(0, 7), sales: sumBetween('invoices', 'total', from, to), purchases: sumBetween('purchases', 'total', from, to), profit: profit(from, to).profit });
+    const m = ym(k);
+    monthly.push({ month: m, sales: mSales.get(m) || 0, purchases: mBuys.get(m) || 0, profit: profit(m + '-01', m + '-31').profit });
   }
   const low = lowStock(8);
   const fyProfit = profit(fy.from, fy.to), monthProfit = profit(mFrom, t), dayProfit = profit(t, t);
@@ -116,23 +128,23 @@ function gstOutward(month, fyLabel) {
   if (!/^\d{4}-\d{2}$/.test(m)) throw Object.assign(new Error('Month must be YYYY-MM'), { status: 400 });
   const rows = db.prepare(
     `SELECT l.gst_rate rate, SUM(l.taxable) taxable, SUM(l.cgst) cgst, SUM(l.sgst) sgst, SUM(l.igst) igst, COUNT(DISTINCT l.invoice_id) invoices
-     FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id WHERE substr(i.date,1,7)=? GROUP BY l.gst_rate`).all(m);
+     FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id WHERE i.date BETWEEN ? AND ? GROUP BY l.gst_rate`).all(...monthSpan(m));
   const byRate = new Map(rows.map((r) => [r.rate, r]));
   const rates = [...new Set([...STD_RATES, ...rows.map((r) => r.rate)])].sort((a, b) => a - b);
   const out = rates.map((rate) => {
     const r = byRate.get(rate) || { taxable: 0, cgst: 0, sgst: 0, igst: 0, invoices: 0 };
     const tax = r2(r.cgst + r.sgst + r.igst);
-    // the IGST column of this report carries the whole tax of the slab: CGST + SGST (+ any true IGST)
-    return { rate, taxable: r2(r.taxable), cgst: r2(r.cgst), sgst: r2(r.sgst), igst: tax, tax, value: r2(r.taxable + tax), invoices: r.invoices };
+    // IGST is only the integrated tax of inter-state bills; the whole tax of the slab is in "tax"
+    return { rate, taxable: r2(r.taxable), cgst: r2(r.cgst), sgst: r2(r.sgst), igst: r2(r.igst), tax, value: r2(r.taxable + tax), invoices: r.invoices };
   });
   const tot = (k) => r2(out.reduce((a, r) => a + r[k], 0));
   const split = (cond) => one(
     `SELECT COALESCE(SUM(l.taxable),0) taxable, COALESCE(SUM(l.cgst+l.sgst+l.igst),0) tax FROM invoice_lines l
-     JOIN invoices i ON i.id=l.invoice_id LEFT JOIN parties p ON p.id=i.party_id WHERE substr(i.date,1,7)=? AND ${cond}`, m);
+     JOIN invoices i ON i.id=l.invoice_id LEFT JOIN parties p ON p.id=i.party_id WHERE i.date BETWEEN ? AND ? AND ${cond}`, ...monthSpan(m));
   const b2b = split(`COALESCE(p.gstin,'') <> ''`), b2c = split(`COALESCE(p.gstin,'') = ''`);
-  const inv = one('SELECT COUNT(*) n, COALESCE(SUM(round_off),0) ro FROM invoices WHERE substr(date,1,7)=?', m);
-  const bought = one(`SELECT COALESCE(SUM(cgst),0) c, COALESCE(SUM(sgst),0) s, COALESCE(SUM(igst),0) i FROM purchases WHERE substr(date,1,7)=?`, m);
-  const returned = one(`SELECT COALESCE(SUM(cgst),0) c, COALESCE(SUM(sgst),0) s, COALESCE(SUM(igst),0) i FROM debit_notes WHERE substr(date,1,7)=?`, m);
+  const inv = one('SELECT COUNT(*) n, COALESCE(SUM(round_off),0) ro FROM invoices WHERE date BETWEEN ? AND ?', ...monthSpan(m));
+  const bought = one(`SELECT COALESCE(SUM(cgst),0) c, COALESCE(SUM(sgst),0) s, COALESCE(SUM(igst),0) i FROM purchases WHERE date BETWEEN ? AND ?`, ...monthSpan(m));
+  const returned = one(`SELECT COALESCE(SUM(cgst),0) c, COALESCE(SUM(sgst),0) s, COALESCE(SUM(igst),0) i FROM debit_notes WHERE date BETWEEN ? AND ?`, ...monthSpan(m));
   const input = { c: bought.c - returned.c, s: bought.s - returned.s, i: bought.i - returned.i };
   return {
     month: m, rows: out,
@@ -151,12 +163,13 @@ function gstOutwardDetail(month, fyLabel) {
   const bills = db.prepare(
     `SELECT i.id, i.invoice_no, i.date, COALESCE(p.name,'Cash customer') party, COALESCE(p.gstin,'') gstin, COALESCE(p.state_code,'') state_code,
             i.taxable, i.cgst, i.sgst, i.igst, i.round_off, i.total
-     FROM invoices i LEFT JOIN parties p ON p.id=i.party_id WHERE substr(i.date,1,7)=? ORDER BY i.date, i.id`).all(base.month);
+     FROM invoices i LEFT JOIN parties p ON p.id=i.party_id WHERE i.date BETWEEN ? AND ? ORDER BY i.date, i.id`).all(...monthSpan(base.month));
   const rates = db.prepare(
-    `SELECT l.invoice_id, GROUP_CONCAT(DISTINCT l.gst_rate) rates FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id
-     WHERE substr(i.date,1,7)=? GROUP BY l.invoice_id`).all(base.month);
+    // INDEXED BY: rates listed in line order (as the iPhone engine does), not in the order of the covering index
+    `SELECT l.invoice_id, GROUP_CONCAT(DISTINCT l.gst_rate) rates FROM invoice_lines l INDEXED BY idx_invl_inv JOIN invoices i ON i.id=l.invoice_id
+     WHERE i.date BETWEEN ? AND ? GROUP BY l.invoice_id`).all(...monthSpan(base.month));
   const rm = new Map(rates.map((r) => [r.invoice_id, r.rates]));
-  const rows = bills.map((b) => ({ ...b, rates: (rm.get(b.id) || '').split(',').filter(Boolean).map((x) => x + '%').join(', '), tax: r2(b.cgst + b.sgst + b.igst), igst: r2(b.cgst + b.sgst + b.igst) }));   // IGST column = CGST + SGST (+ IGST)
+  const rows = bills.map((b) => ({ ...b, rates: (rm.get(b.id) || '').split(',').filter(Boolean).map((x) => x + '%').join(', '), tax: r2(b.cgst + b.sgst + b.igst) }));
   return { ...base, b2b_bills: rows.filter((b) => b.gstin), b2c_bills: rows.filter((b) => !b.gstin) };
 }
 

@@ -213,13 +213,13 @@ db.withCompany(id1, () => {
     const sum = [...d.b2b_bills, ...d.b2c_bills].reduce((a, b) => a + b.taxable, 0);
     assert.ok(Math.abs(sum - d.totals.taxable) < 0.05);
   });
-  ok('GST outward: the IGST column carries CGST + SGST (+ IGST), in the rate table, the totals and every bill row', () => {
+  ok('GST outward: IGST is only the integrated tax; total tax = CGST + SGST + IGST, in the rate table, the totals and every bill row', () => {
     const month = new Date().toLocaleDateString('en-CA').slice(0, 7);
     const g = R.gstOutward(month), d = R.gstOutwardDetail(month);
-    for (const r of g.rows) assert.ok(Math.abs(r.igst - (r.cgst + r.sgst)) < 0.02 || r.igst === r.tax, 'rate ' + r.rate);
-    assert.ok(g.rows.some((r) => r.cgst > 0 && r.igst >= r.cgst + r.sgst - 0.02), 'an intra-state slab shows its CGST+SGST in IGST');
-    assert.ok(Math.abs(g.totals.igst - g.totals.tax) < 0.02);
-    for (const b of [...d.b2b_bills, ...d.b2c_bills]) assert.ok(Math.abs(b.igst - b.tax) < 0.02);
+    for (const r of g.rows) assert.ok(Math.abs(r.tax - (r.cgst + r.sgst + r.igst)) < 0.02, 'rate ' + r.rate);
+    assert.ok(g.rows.some((r) => r.cgst > 0 && r.igst < r.cgst + r.sgst), 'an intra-state slab does not show its CGST + SGST as IGST');
+    assert.ok(Math.abs(g.totals.tax - (g.totals.cgst + g.totals.sgst + g.totals.igst)) < 0.05);
+    for (const b of [...d.b2b_bills, ...d.b2c_bills]) assert.ok(Math.abs(b.tax - (b.cgst + b.sgst + b.igst)) < 0.02);
   });
   ok('xlsx writer produces a valid zip package', () => {
     const buf = buildXlsx([{ name: 'A & B', title: 'T', cols: [{ h: 'x', k: 'x', w: 10 }, { h: 'n', k: 'n', t: 'num' }], rows: [{ x: 'a<b', n: 1.5 }], total: { n: 1.5 } }]);

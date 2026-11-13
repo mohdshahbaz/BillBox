@@ -88,7 +88,7 @@ enum AppUpdate {
         Form {
             Section {
                 Text("This \(AppUpdate.platform.hasPrefix("mac") ? "Mac" : "iPhone") has BillBox \(AppUpdate.version)\(AppUpdate.edition == "admin" ? " (admin)" : "")")
-                if let errorText { Text(errorText).foregroundStyle(.red).font(.callout) }
+                if let errorText { Text(errorText).foregroundStyle(Theme.negative).font(.callout) }
                 else if let u {
                     if u.bool("available") {
                         Text("BillBox \(u.str("latest")) is available").font(.headline)

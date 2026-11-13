@@ -83,8 +83,8 @@ import SwiftUI
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], spacing: 12) {
                         StatCard(title: "Target for \(p.str("month"))", value: Fmt.money(p, "target"))
                         StatCard(title: "Sales (\(p.int("invoices")) bills)", value: Fmt.money(p, "sales"), tint: .teal)
-                        StatCard(title: "Achievement", value: ach.map { "\(Fmt.qty($0))%" } ?? "No target set", tint: (ach ?? 0) >= 100 ? .green : .orange)
-                        StatCard(title: "Collections this month", value: Fmt.money(p, "collections"), tint: .green)
+                        StatCard(title: "Achievement", value: ach.map { "\(Fmt.qty($0))%" } ?? "No target set", tint: (ach ?? 0) >= 100 ? Theme.positive : Theme.warning)
+                        StatCard(title: "Collections this month", value: Fmt.money(p, "collections"), tint: Theme.positive)
                     }
                     if let ach { ProgressView(value: min(max(ach / 100, 0), 1)).tint(.teal) }
                     let d = p.obj("day")
@@ -111,7 +111,7 @@ import SwiftUI
                             GridColumn("Last order", id: "last", min: 90, ideal: 110) { (o: JSON) in Text(o.has("last_order") ? Fmt.dmy(o.str("last_order")) : "Never") }
                             GridColumn("Outstanding to collect", id: "outstanding", min: 140, ideal: 170, align: .trailing) { (o: JSON) in
                                 Text(Fmt.money(o, "outstanding")).mono().fw(.semibold)
-                                    .foregroundStyle(o.num("outstanding") > 0 ? Color.orange : Color.primary)
+                                    .foregroundStyle(o.num("outstanding") > 0 ? Theme.warning : Color.primary)
                             }
                         }
                         .frame(height: min(CGFloat(outlets.count) * 28 + 40, 420))

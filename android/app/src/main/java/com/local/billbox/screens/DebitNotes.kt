@@ -1,5 +1,7 @@
 package com.local.billbox.screens
 
+import com.local.billbox.ui.SummaryCard
+import com.local.billbox.ui.SummaryItem
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -152,14 +154,12 @@ fun DebitNotesScreen() {
                     Col("Total", "total", 110, end = true) { r -> Cell(Fmt.money(r, "total"), bold = true, end = true) },
                 ))
             }
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-                FlowRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("${totals.int("count")} notes", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Taxable ${Fmt.money(totals, "taxable")}")
-                    Text("GST reversed ${Fmt.money(totals.num("cgst") + totals.num("sgst") + totals.num("igst"))}")
-                    Text("Total ${Fmt.money(totals, "total")}", fontWeight = FontWeight.Bold)
-                }
-            }
+            SummaryCard(listOf(
+                SummaryItem("Notes", "${totals.int("count")}"),
+                SummaryItem("Taxable", Fmt.money(totals, "taxable")),
+                SummaryItem("GST reversed", Fmt.money(totals.num("cgst") + totals.num("sgst") + totals.num("igst"))),
+                SummaryItem("Total", Fmt.money(totals, "total"), strong = true, tint = MaterialTheme.colorScheme.primary),
+            ))
         }
     }
     viewing?.let { r -> DebitNoteDetail(r.id, { viewing = null }, onEdit = { viewing = null; editing = DNEdit(noteId = r.id) }, onDelete = { viewing = null; deleting = r }) }

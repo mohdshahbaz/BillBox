@@ -1,5 +1,7 @@
 package com.local.billbox.screens
 
+import com.local.billbox.ui.SummaryCard
+import com.local.billbox.ui.SummaryItem
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -118,13 +120,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.Book(type: String) {
             Col("Total", "total", 110, end = true) { r -> Cell(Fmt.money(r, "total"), bold = true, end = true) },
         ))
     }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-        FlowRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("${tot.int("count")} entries", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Taxable ${Fmt.money(tot, "taxable")}"); Text("CGST ${Fmt.money(tot, "cgst")}"); Text("SGST ${Fmt.money(tot, "sgst")}")
-            Text("IGST ${Fmt.money(tot, "igst")}"); Text("Total ${Fmt.money(tot, "total")}", fontWeight = FontWeight.Bold)
-        }
-    }
+    SummaryCard(listOf(
+        SummaryItem("Entries", "${tot.int("count")}"),
+        SummaryItem("Taxable", Fmt.money(tot, "taxable")), SummaryItem("CGST", Fmt.money(tot, "cgst")), SummaryItem("SGST", Fmt.money(tot, "sgst")),
+        SummaryItem("IGST", Fmt.money(tot, "igst")), SummaryItem("Total", Fmt.money(tot, "total"), strong = true, tint = MaterialTheme.colorScheme.primary),
+    ))
 }
 
 @OptIn(ExperimentalLayoutApi::class)

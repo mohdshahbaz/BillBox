@@ -5,7 +5,13 @@ The repository builds itself on GitHub (GitHub Actions). Two workflows live in `
 | Workflow | Runs when | What it does |
 |---|---|---|
 | **CI** (`ci.yml`) | every push to `main` and every pull request | Mac engine checks; the iPhone engine and the Android engine replayed against the Mac engine (461-step working session, 1,647 random bills, PDF parser, Marg import, backups across apps, unit tests); builds the Android app and keeps the debug APK for 14 days (Actions › the run › Artifacts). |
+| **Desktop** (`desktop.yml`) | every push touching `frontend/`, `backend/src/` or `desktop/` | `flutter analyze`, builds Linux (Ubuntu 22.04) and Windows (10+) and smoke-tests each: the engine starts and the books open. |
+| **iPhone self-test** (`ios-selftest.yml`) | run by hand (Actions › iPhone self-test) | Builds for the Simulator, replays the 543-step session against the Mac engine, screenshots every screen (light and dark) and draws bills as they print: the newest four in every design, and the first in every design × paper layout (`layout_<design>_<layout>.pdf`). Results on the `selftest-results` branch, folder `ios/`. |
+| **Android self-test** (`android-selftest.yml`) | run by hand | Android 12 and 14 emulators: the same session and screenshots (light and dark). |
 | **Release** (`release.yml`) | you push a tag `v…` (or run it by hand) | Builds the Android APK, the Mac app (one app for Apple silicon and Intel) and the iPhone `.ipa`, and publishes them together as a GitHub release with install notes and the list of changes. |
+
+Backend speed: `cd backend && node test/bench.js` times the slow paths on a large made-up company and prints a checksum
+of every answer; see `docs/BACKEND_PERF.md`. A speed change is only kept when the checksum stays the same.
 
 ## Upload the project (first time and after every change)
 
@@ -38,6 +44,11 @@ git push origin v15.2.0
 
 or on GitHub: **Actions › Release › Run workflow**, type the version (e.g. `15.2.1`), Run. A version with a dash
 (`15.3.0-beta1`), or the "pre-release" tick, makes a test release that is not shown as the latest.
+
+**One app only**: in Run workflow, set **Platform** to `android`, `mac`, `iphone` or `windows-linux`. Only that app is
+built (minutes instead of half an hour) and it is left under the run's **Summary › Artifacts**; no release is made. Tick
+**Publish as a release** to publish it anyway: it is always a pre-release, so the website and the other apps' updaters
+keep the last full release.
 
 About 20–30 minutes later the release is under **Releases** with:
 

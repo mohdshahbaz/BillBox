@@ -78,11 +78,11 @@ struct PLine: Identifiable {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Filled in from the PDF (\(usedCount) Original page\(usedCount == 1 ? "" : "s") read). Check every field against the paper bill before saving.")
                         .fw(.semibold)
-                    ForEach(Array(warnings.enumerated()), id: \.offset) { _, w in Text("• \(w)").foregroundStyle(.red).font(.callout) }
+                    ForEach(Array(warnings.enumerated()), id: \.offset) { _, w in Text("• \(w)").foregroundStyle(Theme.negative).font(.callout) }
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
             }
             header
             linesTable
@@ -194,7 +194,7 @@ struct PLine: Identifiable {
                 VStack(alignment: .leading, spacing: 2) {
                     if !l.matched && !l.desc.isEmpty {
                         HStack {
-                            Text("“\(l.desc)” is not in your stock list.").font(.caption).foregroundStyle(.red).lineLimit(1)
+                            Text("“\(l.desc)” is not in your stock list.").font(.caption).foregroundStyle(Theme.negative).lineLimit(1)
                             Button("Create this item") { newItemFor = l }.controlSize(.small)
                         }
                     }
@@ -273,7 +273,7 @@ struct PLine: Identifiable {
                     Picker("Mode", selection: $payMode) { ForEach(["CASH", "UPI", "BANK", "CHEQUE"], id: \.self) { Text($0).tag($0) } }.frame(width: 190)
                     Spacer()
                     if let pt = printedTotal {
-                        Text("Printed on bill: \(Fmt.money(pt))").mono().foregroundStyle(mismatch ? Color.red : Color.secondary).fw(mismatch ? .semibold : .regular)
+                        Text("Printed on bill: \(Fmt.money(pt))").mono().foregroundStyle(mismatch ? Theme.negative : Color.secondary).fw(mismatch ? .semibold : .regular)
                     }
                     if let p { Text(Fmt.money(p, "total")).font(.system(size: 26, weight: .bold, design: .rounded)).mono().foregroundStyle(.teal) }
                     Button(editingId != nil ? "Cancel edit" : "Clear") { reset() }
@@ -282,7 +282,7 @@ struct PLine: Identifiable {
                         .keyboardShortcut("s", modifiers: .command)
                         .disabled(busy || p == nil)
                 }
-                if let errorText { Text(errorText).foregroundStyle(.red).font(.callout) }
+                if let errorText { Text(errorText).foregroundStyle(Theme.negative).font(.callout) }
             }
         }
     }

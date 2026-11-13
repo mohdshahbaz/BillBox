@@ -1,5 +1,5 @@
 #!/bin/bash
-# BillBox for iPhone: build, test and install from Terminal on a Mac with Xcode 14.2 or newer.
+# BillBox for iPhone: build, test and install from Terminal on a Mac with Xcode 16 or newer.
 #
 #   ./build.sh               tests, then build and install on the iPhone plugged in by USB (or on Wi-Fi with "Connect via network")
 #   ./build.sh test          unit tests only (on a simulator)
@@ -17,7 +17,7 @@
 #   SIM_NAME    which simulator to use (default: the first iPhone simulator found)
 #
 # First time only: open Xcode › Settings › Accounts and sign in with your Apple ID, plug in the iPhone and tap "Trust".
-# On the iPhone (iOS 16+): Settings › Privacy & Security › Developer Mode › On.
+# On the iPhone (iOS 18+): Settings › Privacy & Security › Developer Mode › On.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -45,10 +45,10 @@ pretty() {
 }
 
 check_tools() {
-    command -v xcodebuild >/dev/null 2>&1 || fail "Xcode is not installed. Install Xcode 14.2 or newer, open it once, then run: sudo xcode-select -s /Applications/Xcode.app"
+    command -v xcodebuild >/dev/null 2>&1 || fail "Xcode is not installed. Install Xcode 16 or newer, open it once, then run: sudo xcode-select -s /Applications/Xcode.app"
     xcodebuild -version >/dev/null 2>&1 || fail "Xcode's command-line tools are not selected. Run: sudo xcode-select -s /Applications/Xcode.app"
     XCODE_MAJOR="$(xcodebuild -version | awk 'NR==1 {split($2, v, "."); print v[1]}')"
-    [ "$XCODE_MAJOR" -ge 14 ] || fail "Xcode $(xcodebuild -version | head -1) is too old; BillBox needs Xcode 14.2 or newer."
+    [ "$XCODE_MAJOR" -ge 16 ] || fail "Xcode $(xcodebuild -version | head -1) is too old; BillBox needs Xcode 16 or newer (macOS Sonoma 14.5 or later)."
     echo "$(xcodebuild -version | head -1), macOS $(sw_vers -productVersion)"
     mkdir -p "$BUILD"
 }

@@ -520,7 +520,7 @@ The "Server is not running" screen, Start server, Choose backend folder, `server
 - [x] ✅ **GST Outward**:
   - Month title MM-YYYY with ‹ › arrows that stay inside the open FY. Default = dateInFY's month.
   - **Export month to Excel** (shows "Preparing…" while working) → save `GST-Outward-YYYY-MM.xlsx` (iOS: Files exporter / share).
-  - Rate table (layout key `gst-rates`, no S.No column): GST rate · Taxable value · CGST · SGST · IGST (CGST+SGST) · Total tax · Invoice value, plus a bold **Total** row.
+  - Rate table (layout key `gst-rates`, no S.No column): GST rate · Taxable value · CGST · SGST · IGST · Total tax · Invoice value, plus a bold **Total** row.
   - Rates shown: always 0, 5, 12, 18, 28, plus any other rate used.
   - Stat cards:
     - Invoices in YYYY-MM
@@ -536,11 +536,11 @@ The "Server is not running" screen, Start server, Choose backend folder, `server
     - Rows: B2B (registered parties) · B2C (unregistered / cash) · Total outward supplies · Less: input tax credit (purchases) · Net GST payable
   - **B2B Bills**:
     - Title "B2B bills - YYYY-MM"
-    - Columns: Invoice No, Date, Party Name, GSTIN, State, GST Rates, Taxable Value, CGST, SGST, IGST (CGST+SGST), Round Off, Invoice Value
+    - Columns: Invoice No, Date, Party Name, GSTIN, State, GST Rates, Taxable Value, CGST, SGST, IGST, Round Off, Invoice Value
     - Total row
   - **B2C Bills**: same columns without GSTIN, plus a Total row. A walk-in party is "Cash customer".
   - **Rate-wise Summary**:
-    - Columns: GST Rate %, Invoices, Taxable Value, CGST, SGST, IGST (CGST+SGST), Total Tax, Total Value
+    - Columns: GST Rate %, Invoices, Taxable Value, CGST, SGST, IGST, Total Tax, Total Value
     - Total row
   - Note: the date column holds YYYY-MM-DD text, exactly as the Mac export writes it.
 
@@ -647,6 +647,11 @@ The "Server is not running" screen, Start server, Choose backend folder, `server
   - Mode: Automatic / Light / Dark.
   - Note "The theme changes the accent colour and the page and panel backgrounds. It applies at once and is remembered."
   - Stored per device (`theme`, `appearance`).
+  - Windows/Linux (UI overhaul, 2026-11): Settings › **Appearance** tab with Automatic / Light / Dark and the same theme
+    list (accent, page and dark panel colours from `Themes.swift`), stored on the computer in `<data folder>/appearance.json`.
+- [x] ✅ **Tables sort** by a click / tap on a column heading on every platform (amounts and dates by value; on
+  Windows/Linux a closing Total row stays last). Status pills for bill type and printed state, a summary card for totals
+  (docs/DESIGN_SYSTEM.md §5).
 - [x] ✅ Themes (accent / card / page, light and dark):
   - Classic (system accent and system backgrounds)
   - Ocean 0E7C9B/35B6D6
@@ -794,7 +799,7 @@ The "Server is not running" screen, Start server, Choose backend folder, `server
   - beat: active parties on that salesman's routes visiting that weekday (the `days` list or the old `day_of_week`); outstanding up to the FY end; last order up to the FY end; total outstanding
 - [x] ✅ **13.10 GST outward**:
   - per rate from invoice lines of the month
-  - the IGST column carries CGST + SGST + IGST
+  - the IGST column carries only IGST (inter-state); total tax = CGST + SGST + IGST
   - B2B (party GSTIN not empty) and B2C splits
   - invoice count, round off
   - input credit = purchase taxes of the month
@@ -899,7 +904,7 @@ How each part is verified:
 | Backups Mac ⇄ iPhone | `tests/parity/test_backup.py`: Mac backup restored on iOS, iOS backup restored on the Mac, Merge, single company file, refusals | 20/20 checks (year files included) |
 | Unit tests in Xcode (`BillBoxTests`, also `swift test`) | Golden answers recorded from the Mac engine, replayed on the iOS engine | 16/16 tests pass (`swift test`) |
 | Live bill arithmetic on the billing screen (BillMath, the Mac file unchanged) | 3,000 random bills vs the Mac's BillMath | identical to the paisa |
-| iOS screens | Type-checked against the iOS 16 SDK surface (builders limited to 10 children as in Xcode 14), 0 errors, 0 warnings (`tests/typecheck/stubs/build.sh`) | Not yet run on a device: there is no Xcode here. First build on your Mac is the remaining check. |
+| iOS screens | Type-checked against the iOS 16 SDK surface (builders limited to 10 children as in Xcode 14), 0 errors, 0 warnings (`tests/typecheck/stubs/build.sh`). The app now targets iOS 18 (Xcode 16+); Swift Charts and Pow code is behind `#if canImport` and is checked only by Xcode | Not yet run on a device: there is no Xcode here. First build on your Mac is the remaining check. |
 
 Mac bugs found while porting (fixed in the Mac app too, so both behave the same):
 - **Beat plan showed no outlets**: the weekday was bound as `'1.0'` instead of `'1'` (`backend/src/routes/salesmen.js`).

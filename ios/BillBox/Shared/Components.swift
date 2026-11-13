@@ -28,7 +28,7 @@ import PDFKit
             Form {
                 content
                 if let errorText {
-                    Section { Text(errorText).font(.callout).foregroundStyle(.red) }
+                    Section { Label(errorText, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(Theme.negative) }
                 }
             }
             .groupedForm()
@@ -181,10 +181,15 @@ struct Choice: Identifiable, Hashable {
     var body: some View {
         HStack(spacing: 6) {
             Button { open = true } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar")
-                    Text(iso.isEmpty ? (title ?? "Choose date") : (title.map { "\($0)  " } ?? "") + Fmt.dmy(iso)).lineLimit(1).monospacedDigit()
+                HStack(spacing: 5) {
+                    Image(systemName: "calendar").font(.callout)
+                    if let title, !iso.isEmpty { Text(title).font(.caption.weight(.medium)).foregroundStyle(.secondary) }
+                    Text(iso.isEmpty ? (title ?? "Choose date") : Fmt.dmy(iso)).font(.callout.weight(.medium)).monospacedDigit()
                 }
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(Theme.accent.opacity(0.10), in: Capsule())
             }
             .accessibilityLabel((title ?? "Date") + ": " + (iso.isEmpty ? "not set" : Fmt.dmy(iso)))
             .popover(isPresented: $open) {
@@ -216,15 +221,15 @@ struct Choice: Identifiable, Hashable {
     var tint: Color = Theme.accent
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.subheadline).foregroundStyle(.secondary)
-            Text(value).font(.system(.title, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(tint)
+        VStack(alignment: .leading, spacing: DS.Space.xxs) {
+            Text(title).font(.dsCallout).foregroundStyle(Theme.textSecondary)
+            Text(value).font(.dsMoney).monospacedDigit().foregroundStyle(tint)
                 .lineLimit(1).minimumScaleFactor(0.5)
-            if !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+            if !note.isEmpty { Text(note).font(.dsCaption).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true) }
         }
-        .padding(14)
+        .padding(DS.Pad.card)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(10)
+        .card(DS.Radius.card)
         .accessibilityElement(children: .combine)
     }
 }
@@ -258,7 +263,8 @@ struct Choice: Identifiable, Hashable {
             }
         }
         .font(.callout)
-        .padding(.horizontal, 12).padding(.vertical, 6)
+        .padding(.horizontal, DS.Space.s).padding(.vertical, 6)
+        .frame(minHeight: DS.hitTarget)
         .background(Theme.card)
     }
 }
@@ -282,19 +288,62 @@ func bulkDelete<ID>(_ ids: [ID], notify: (String) -> Void, delete: (ID) async ->
 
 enum BulkOutcome { case deleted, archived, failed(label: String, reason: String) }
 
+/// Totals under a table: label above, figure below, as many per line as fit; one figure can be marked as the main one.
+@MainActor struct SummaryCard: View {
+    struct Item { let label: String; let value: String; var strong = false; var tint: Color? = nil }
+    let items: [Item]
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: DS.Width.summaryCell), spacing: 10, alignment: .leading)], alignment: .leading, spacing: DS.Space.xs) {
+            ForEach(items.indices, id: \.self) { i in
+                let it = items[i]
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(it.label).font(.dsCaption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                    Text(it.value).font(it.strong ? .callout.weight(.bold) : .callout.weight(.medium)).monospacedDigit()
+                        .foregroundStyle(it.tint ?? Color.primary).lineLimit(1).minimumScaleFactor(0.7)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(.horizontal, DS.Pad.card).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(DS.Radius.card)
+        .padding(.horizontal, DS.Pad.tableSide).padding(.bottom, DS.Space.xs)
+    }
+}
+
+/// A small coloured label for a status in a table or list: Sale, Purchase, Not yet, Retailer …
+@MainActor struct StatusPill: View {
+    let text: String
+    var tint: Color = Theme.accent
+
+    var body: some View {
+        if text.isEmpty {
+            Text(" ").font(.caption)
+        } else {
+            Text(text).font(.dsCaption.weight(.semibold)).foregroundStyle(tint).lineLimit(1).fixedSize()
+                .padding(.horizontal, DS.Space.xs).padding(.vertical, 3)
+                .background(tint.opacity(DS.tint), in: Capsule())
+        }
+    }
+}
+
 @MainActor struct Banner: View {
     let text: String
     var symbol = "info.circle.fill"
-    var tint: Color = .orange
+    var tint: Color = Theme.warning
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: symbol).foregroundStyle(tint)
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(tint)
+                .frame(width: 26, height: 26).background(tint.opacity(0.16), in: Circle())
             Text(text).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 3)
         }
         .font(.callout)
-        .padding(10)
-        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .padding(DS.Space.s)
+        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous).stroke(tint.opacity(0.22), lineWidth: 0.5))
     }
 }
 
@@ -307,7 +356,7 @@ enum BulkOutcome { case deleted, archived, failed(label: String, reason: String)
             if let t = app.toast {
                 HStack(spacing: 8) {
                     Image(systemName: t.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                        .foregroundStyle(t.isError ? .red : .green)
+                        .foregroundStyle(t.isError ? Theme.negative : Theme.positive)
                     Text(t.text).font(.callout).lineLimit(4).textSelection(.enabled)
                     Button { app.toast = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain).accessibilityLabel("Dismiss")
                 }

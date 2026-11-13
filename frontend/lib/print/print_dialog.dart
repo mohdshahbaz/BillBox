@@ -196,7 +196,7 @@ class _PrintManagerState extends State<PrintManager> {
           ),
           Container(
             width: 330,
-            decoration: const BoxDecoration(color: Palette.paper, border: Border(left: BorderSide(color: Palette.line))),
+            decoration: BoxDecoration(color: Palette.paper, border: Border(left: BorderSide(color: Palette.line))),
             padding: const EdgeInsets.all(18),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const Text('Print settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -216,7 +216,7 @@ class _PrintManagerState extends State<PrintManager> {
                 const LinearProgressIndicator()
               else if (printers.isEmpty)
                 Text(direct ? 'No printers found. Add one in System Settings > Printers.' : 'Printer list is not available here. The system print sheet will open when you press Print.',
-                    style: const TextStyle(color: Palette.muted))
+                    style: TextStyle(color: Palette.muted))
               else
                 AppDropdown<Printer>(
                   width: 294,
@@ -248,7 +248,7 @@ class _PrintManagerState extends State<PrintManager> {
                   listenable: PrintJobs.instance,
                   builder: (_, __) {
                     final jobs = PrintJobs.instance.jobs;
-                    if (jobs.isEmpty) return const Center(child: Text('Nothing printed yet', style: TextStyle(color: Palette.muted)));
+                    if (jobs.isEmpty) return Center(child: Text('Nothing printed yet', style: TextStyle(color: Palette.muted)));
                     return ListView(children: [
                       for (final j in jobs)
                         ListTile(
@@ -256,8 +256,8 @@ class _PrintManagerState extends State<PrintManager> {
                           contentPadding: EdgeInsets.zero,
                           leading: switch (j.status) {
                             JobStatus.printing => const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                            JobStatus.done => const Icon(Icons.check_circle, color: Palette.leaf, size: 20),
-                            JobStatus.failed => const Icon(Icons.error, color: Palette.brick, size: 20),
+                            JobStatus.done => Icon(Icons.check_circle, color: Palette.leaf, size: 20),
+                            JobStatus.failed => Icon(Icons.error, color: Palette.brick, size: 20),
                           },
                           title: Text(j.title, maxLines: 1, overflow: TextOverflow.ellipsis),
                           subtitle: Text(j.status == JobStatus.failed ? '${j.printer} · ${j.error}' : '${j.printer} · ${j.copies} × ${j.layout}', maxLines: 2, overflow: TextOverflow.ellipsis),

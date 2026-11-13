@@ -102,7 +102,7 @@ class _SalesmenState extends State<SalesmenScreen> {
                       }),
                     ),
                 ]),
-                if (err != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(err!, style: const TextStyle(color: Palette.brick))),
+                if (err != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(err!, style: TextStyle(color: Palette.brick))),
               ]),
             ),
             actions: [
@@ -177,7 +177,7 @@ class _SalesmenState extends State<SalesmenScreen> {
                               ),
                               IconButton(
                                 tooltip: 'Delete',
-                                icon: const Icon(Icons.delete_outline, color: Palette.brick),
+                                icon: Icon(Icons.delete_outline, color: Palette.brick),
                                 onPressed: () async {
                                   if (!await confirm(context, 'Delete ${r['name']}?', 'Its outlets stay: those on other routes too keep them, the others are left without a route.', ok: 'Delete', danger: true)) return;
                                   if (!mounted) return;
@@ -218,7 +218,7 @@ class _SalesmenState extends State<SalesmenScreen> {
               for (final s in sms)
                 ListTile(
                   selected: s['id'] == sel,
-                  selectedTileColor: Palette.teal.withOpacity(.1),
+                  selectedTileColor: Palette.teal.withValues(alpha: .1),
                   title: Text(s['name']),
                   subtitle: Text(s['phone'] ?? ''),
                   onTap: () {
