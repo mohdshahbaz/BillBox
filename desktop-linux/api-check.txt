@@ -19,11 +19,10 @@ Stock tools
   ok   merge two items
   ok   items from a pasted list, then bulk add
 Marg import
-  FAIL a folder that is not a Marg backup gets a readable answer: HTTP 500
-::error title=Desktop API check::a folder that is not a Marg backup gets a readable answer: HTTP 500
+  ok   a folder that is not a Marg backup gets a readable answer
 A new year's books
   ok   carried-forward year file, then back to the main books
 Error replies
   ok   errors carry message and code
 
-16 passed, 1 failed
+17 passed, 0 failed
