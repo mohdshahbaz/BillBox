@@ -77,6 +77,18 @@ enum SimSelfTest {
             if let inv = busy {
                 var marg = app.settings.raw
                 marg["print_style"] = "marg"
+                // the owner's set-up: bank details beside "Amount in words" with the receiver's and the company's signature boxes
+                // in the same band (only bank name, account name, number and IFSC, so the bank fits there)
+                var band = app.settings.raw
+                band["print_style"] = "classic"; band["print_compact"] = "1"; band["print_receiver"] = "1"; band["print_signature"] = "1"
+                band["print_gst_table"] = "0"; band["bank_branch"] = ""; band["bank_branch_code"] = ""; band["bank_address"] = ""
+                if app.settings.str("bank_name").isEmpty { band["bank_name"] = "Punjab National Bank"; band["bank_ac_name"] = "AK Enterprises"; band["bank_ac_no"] = "2058102100001765"; band["bank_ifsc"] = "PUNB0205810" }
+                for (name, lay) in [("band_bank_half", PrintLayout.single), ("band_bank_a4", PrintLayout.a4TwoUp)] {
+                    if let data = invoicePDF(inv, company: JSON(band), layout: lay)?.dataRepresentation() {
+                        try data.write(to: dir.appendingPathComponent("\(name).pdf"))
+                        log.append("\(name).pdf \(inv.str("invoice_no")) \(inv.list("lines").count) lines")
+                    }
+                }
                 for (name, co) in [("busy_classic", app.settings), ("busy_marg", JSON(marg))] {
                     if let data = invoicePDF(inv, company: co, layout: .single)?.dataRepresentation() {
                         try data.write(to: dir.appendingPathComponent("\(name).pdf"))

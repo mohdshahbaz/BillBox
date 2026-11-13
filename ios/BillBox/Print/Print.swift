@@ -298,6 +298,9 @@ private let muted = Color.black.opacity(0.62)
 private let frameLine: CGFloat = 1.1      // outer frame and band dividers
 private let ruleLine: CGFloat = 0.6       // inner dividers
 private let outerLine: CGFloat = 2.0      // the outer border of the bill (thicker than the band dividers)
+/// The grey divider between the boxes of the totals band (words | bank | receiver | signature): one style for all of them,
+/// inset 4 pt from the band's top and bottom lines.
+private func bandDivider() -> some View { vRule(0.7, color: muted).padding(.vertical, 4) }
 private let shade = Color.black.opacity(0.09)
 
 /// Column widths (points, before the page multiplier). The Item column takes whatever is left.
@@ -441,16 +444,15 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             .padding(.horizontal, 5).padding(.vertical, 3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             vRule()
-            VStack(alignment: .trailing, spacing: 0.5) {
-                // Bill to as on a Marg bill, against the right edge: "M/s" and the party in bold, then address, state code and
-                // phone, GSTIN, PAN / FSSAI
+            VStack(alignment: .leading, spacing: 0.5) {
+                // Bill to as on a Marg bill: "M/s" and the party in bold, then address, state code and phone, GSTIN, PAN / FSSAI
                 t(hc(partyTitle), 10.5, bold: true).lineLimit(1).minimumScaleFactor(0.6)
                 ForEach(Array(buyerLines.enumerated()), id: \.offset) { _, l in
-                    t(hc(l.0), 7.5, weight: l.1 ? .bold : .regular).lineLimit(1).minimumScaleFactor(0.65).multilineTextAlignment(.trailing)
+                    t(hc(l.0), 7.5, weight: l.1 ? .bold : .regular).lineLimit(1).minimumScaleFactor(0.65)
                 }
             }
             .padding(.horizontal, 5).padding(.vertical, 3)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(height: g.sellerBand)
         .clipped()
@@ -657,7 +659,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 .padding(.horizontal, 4).padding(.vertical, 4)
                 .frame(width: receiverBandWidth(g))
                 .frame(maxHeight: .infinity)
-                .overlay(alignment: .leading) { vRule(0.5, color: muted).padding(.vertical, 4) }
+                .overlay(alignment: .leading) { bandDivider() }
             }
             if sigHere {
                 // the company's signature, beside the bank details behind a ruled line: the footer keeps only the terms
@@ -670,7 +672,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 .padding(.horizontal, 5).padding(.vertical, 4)
                 .frame(width: signatureBandWidth(g))
                 .frame(maxHeight: .infinity)
-                .overlay(alignment: .leading) { vRule(0.5, color: muted).padding(.vertical, 4) }
+                .overlay(alignment: .leading) { bandDivider() }
             }
             sumColumn
                 .frame(maxHeight: .infinity)
@@ -715,8 +717,8 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
         }
         .padding(.leading, 6)
         .frame(maxHeight: .infinity, alignment: .bottomLeading)
-        // the divider between "Amount in words" and the bank details, down to the band's bottom line
-        .overlay(alignment: .leading) { vRule(ruleLine).padding(.bottom, -4) }
+        // the divider between "Amount in words" and the bank details (the band's 4 pt padding is already round it)
+        .overlay(alignment: .leading) { vRule(0.7, color: muted) }
     }
 
     /// Bank details, one per line with the labels lined up (BANK NAME:, ACCOUNT NUMBER: …).

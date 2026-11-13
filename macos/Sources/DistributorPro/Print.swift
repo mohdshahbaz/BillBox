@@ -397,16 +397,15 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             .padding(.horizontal, 5).padding(.vertical, 3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             vRule()
-            VStack(alignment: .trailing, spacing: 0.5) {
-                // Bill to as on a Marg bill, against the right edge: "M/s" and the party in bold, then address, state code and
-                // phone, GSTIN, PAN / FSSAI
+            VStack(alignment: .leading, spacing: 0.5) {
+                // Bill to as on a Marg bill: "M/s" and the party in bold, then address, state code and phone, GSTIN, PAN / FSSAI
                 t(hc(partyTitle), 10.5, bold: true).lineLimit(1).minimumScaleFactor(0.6)
                 ForEach(Array(buyerLines.enumerated()), id: \.offset) { _, l in
-                    t(hc(l.0), 7.5, weight: l.1 ? .bold : .regular).lineLimit(1).minimumScaleFactor(0.65).multilineTextAlignment(.trailing)
+                    t(hc(l.0), 7.5, weight: l.1 ? .bold : .regular).lineLimit(1).minimumScaleFactor(0.65)
                 }
             }
             .padding(.horizontal, 5).padding(.vertical, 3)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(height: g.sellerBand)
         .clipped()
@@ -588,8 +587,8 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             }
         }
         .padding(.leading, 6)
-        // the divider between "Amount in words" and the bank details, down to the band's bottom line
-        .overlay(alignment: .leading) { vRule(ruleLine).padding(.bottom, -4) }
+        // the grey divider between "Amount in words" and the bank details (same style as on the iPhone)
+        .overlay(alignment: .leading) { vRule(0.7, color: muted) }
     }
 
     /// Bank details, one per line with the labels lined up (BANK NAME:, ACCOUNT NUMBER: …).

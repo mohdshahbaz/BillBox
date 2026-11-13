@@ -332,15 +332,14 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         pen.vLine(x + half, y, y + g.sellerBand)
         val bx = x + half + 5; val bw = half - 10
         var by = y + 3
-        // Bill to as on a Marg bill, against the right edge: "M/s" and the party in bold, then address, state code and phone,
-        // GSTIN, PAN / FSSAI
+        // Bill to as on a Marg bill: "M/s" and the party in bold, then address, state code and phone, GSTIN, PAN / FSSAI
         val rowH = 13f * fs
-        pen.text(hc(partyTitle()), bx, by, bw, rowH, 10.5f * fs, 700, align = 2, minScale = 0.6f)
+        pen.text(hc(partyTitle()), bx, by, bw, rowH, 10.5f * fs, 700, minScale = 0.6f)
         by += rowH
         val lineH = 9.2f * fs
         for ((l, b) in buyerLines()) {
             if (by + lineH > y + g.sellerBand) break
-            pen.text(hc(l), bx, by, bw, lineH, 7.5f * fs, if (b) 700 else 400, align = 2, minScale = 0.65f)
+            pen.text(hc(l), bx, by, bw, lineH, 7.5f * fs, if (b) 700 else 400, minScale = 0.65f)
             by += lineH
         }
         pen.hLine(x, x + w, y + g.sellerBand + RULE / 2)
@@ -487,8 +486,8 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
             val bs = bankSize(co); val sc = bs.first; val lh = 7.6f * fs * sc
             val bx = lx + leftW * (1f - bs.second); val cwid = leftW * bs.second / cols; val labW = 36f * g.cw * sc
             val top = maxOf(ly + 2, minOf(wy, y + g.totals - 4 - per * lh))
-            // the divider between "Amount in words" and the bank details, down to the band's bottom line
-            pen.vLine(bx - 6f, top, y + g.totals, RULE)
+            // the grey divider between "Amount in words" and the bank details, beside the bank rows down to 4 pt above the band's line
+            pen.vLine(bx - 6f, top, y + g.totals - 4, 0.7f, MUTED)
             rows.forEachIndexed { i, (k, v) ->
                 val c = i / per; val cx = bx + c * cwid; val ry = top + (i % per) * lh
                 pen.text("$k:", cx, ry, labW, lh, 6.5f * fs * sc, 700, minScale = 0.8f)
