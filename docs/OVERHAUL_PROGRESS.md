@@ -8,12 +8,18 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 3. iPhone: screen by screen, self-test screenshots reviewed
 - [x] 4. Android: theme and components (Material 3), then screens; Android self-test
 - [x] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow
-- [ ] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI (in progress 2026-11-13 00:30 UTC)
-- [ ] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
+- [x] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
+- [ ] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green (in progress 2026-11-13 00:40 UTC)
 - [ ] 8. Bills: every style and layout checked from self-test PDFs
 - [ ] 9. Docs updated, one pull request into `main` (not merged)
 
 ## Log
+- 2026-11-13 (run 4, later): stage 6 done. Mac: `DesignSystem.swift` (DS tokens, type tokens, semantic colours
+  `Theme.positive/negative/warning/info` as light/dark pairs), `StatusPill`, `SummaryCard`, `SkeletonRows`, `ErrorState`
+  (all Monterey-safe); red/green/orange literals → semantic roles on every screen (73 lines; Print*.swift untouched);
+  All Bills: type and "Not yet" pills, skeleton while loading, summary card footer; `.card()` on the 14 pt radius.
+  Release workflow platform=mac (no publish) run 43337495512 on 4771e9e: Apple silicon and Intel builds green
+  (SwiftPM target macOS 12, so any unguarded newer API fails the build). CI 43337488567 green.
 - 2026-11-13 (run 4): stage 5 done. Flutter dark mode and the iPhone's 24 themes: `Palette` is now read at run time
   (`Palette.apply(theme, dark)`, light/dark pairs with AA text colours, `Palette.card` for panels, `sidebar`, `onAccent`);
   ~85 `const` expressions that read Palette were un-consted by a script; Settings › Appearance tab (Automatic / Light /
@@ -64,8 +70,9 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - iPhone/Android tables still run past the screen edge (sideways scroll by design).
 
 ## Next
-Stage 6 (Mac, Monterey-safe): sidebar, toolbar, tables on DS tokens; `macos/tests/typecheck/build.sh` (needs the Swift
-toolchain — blocked here, so the Release workflow's Mac job, platform=mac, artifacts only, is the check).
-Then 7 (backend perf + docs/BACKEND_PERF.md), 8 (bills from self-test PDFs), 9 (docs + PR).
+Stage 7 (backend): profile dashboard, All Bills with filters, stock list, GST reports + Excel export, backup/restore,
+PDF supplier-bill import; add indexes / cached prepared statements / transactions; record before/after in
+`docs/BACKEND_PERF.md`; `node backend/test/smoke.js` + CI parity must stay green. Then 8 (bills), 9 (docs + PR).
+Mac leftovers (nice to have): pills/summary cards on Stock, Parties, Debit Notes; skeletons on the other lists.
 Flutter leftovers (nice to have, not in the checklist): sticky table headings (header outside the vertical scroll),
 resizable columns, right-click menus on table rows, no desktop screenshots in CI yet.
