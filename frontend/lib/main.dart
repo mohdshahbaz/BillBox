@@ -226,7 +226,7 @@ class _ShellState extends State<Shell> {
                                 Icon(_nav[n].$1, size: 19, color: _i == n ? Palette.onAccent : Colors.white60),
                                 const SizedBox(width: 12),
                                 Expanded(child: Text(_nav[n].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _i == n ? Palette.onAccent : Colors.white70, fontWeight: _i == n ? FontWeight.w600 : FontWeight.w400))),
-                                if (n < 9) Text('${Platform.isMacOS ? '⌘' : 'Ctrl+'}${n + 1}', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                if (n < 9) Text('${Platform.isMacOS ? '⌘' : 'Ctrl+'}${n + 1}', style: TextStyle(color: _i == n ? Palette.onAccent.withValues(alpha: .7) : Colors.white38, fontSize: 11)),
                               ]),
                       ),
                     ),

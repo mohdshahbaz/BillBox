@@ -70,7 +70,8 @@ class Palette {
   /// Navigation sidebar: stays dark in both modes (white text on it).
   static Color get sidebar => dark ? const Color(0xFF09090B) : const Color(0xFF18181B);
   /// Text and icons on an accent-filled surface.
-  static Color get onAccent => teal.computeLuminance() > .45 ? const Color(0xFF18181B) : Palette.card;
+  /// Whichever of near-black and white reads better on the accent (equal contrast at luminance ≈ 0.18).
+  static Color get onAccent => teal.computeLuminance() > .179 ? const Color(0xFF18181B) : Colors.white;
 }
 
 /// Theme and light/dark choice for this computer, kept in `<data folder>/appearance.json` (like the iPhone's

@@ -560,6 +560,8 @@ class BillingScreenState extends State<BillingScreen> {
           ButtonSegment(value: 'CARD', label: Text('Card')),
           ButtonSegment(value: 'CREDIT', label: Text('Credit')),
         ],
+        // four segments in the 344-pt side panel: no tick, so "Cash" is not broken over two lines
+        showSelectedIcon: false,
         selected: {payMode},
         onSelectionChanged: (s) => setState(() => payMode = s.first),
       ),

@@ -25,14 +25,20 @@ pass() {   # $1 = light | dark
   local win=""
   for i in $(seq 1 30); do win=$(xdotool search --pid $pid --onlyvisible 2>/dev/null | head -1); [ -n "$win" ] && break; sleep 1; done
   [ -n "$win" ] || { echo "::error::no app window ($mode)"; cat "$log"; fail=1; kill $pid 2>/dev/null; return; }
-  xdotool windowsize "$win" 1440 900 windowmove "$win" 0 0 windowactivate --sync "$win" 2>/dev/null || true
+  xdotool windowsize "$win" 1440 900 windowmove "$win" 0 0 2>/dev/null || true
   sleep 4
   for n in $(seq 1 9); do
     kill -0 $pid 2>/dev/null || { echo "::error::the app quit while opening screen $n ($mode)"; tail -40 "$log"; fail=1; return; }
-    xdotool windowactivate --sync "$win" key --clearmodifiers "ctrl+$n" 2>/dev/null || true
+    # a click on the sidebar entry (the virtual screen has no window manager to give the window keyboard focus,
+    # so Ctrl+1…9 would not arrive); entries start at y≈89 and are 42 px apart at 1440×900
+    xdotool mousemove 105 $((89 + (n - 1) * 42)) click 1 2>/dev/null || true
+    xdotool mousemove 1300 880 2>/dev/null || true   # pointer out of the way (no hover tint in the shot)
     sleep 3
     import -window root "$OUT/$(printf '%02d' $n)_${NAMES[$((n-1))]}_$mode.png"
   done
+  # nine different screens must give (nearly) nine different pictures, or the clicks did not arrive
+  local distinct; distinct=$(md5sum "$OUT"/0?_*_"$mode".png | cut -d' ' -f1 | sort -u | wc -l)
+  [ "$distinct" -ge 7 ] || { echo "::error title=Linux UI ($mode)::only $distinct different screens in 9 screenshots: navigation did not work"; fail=1; }
   # Flutter prints uncaught errors even in release builds; a layout or build error shows up here
   if grep -nE "Stack Overflow|Unhandled Exception|EXCEPTION CAUGHT|RenderFlex overflowed|Another exception was thrown" "$log" | head -10 | tee /tmp/ui-errors-$mode.txt | grep -q .; then
     sed "s/^/::error title=Linux UI ($mode)::/" /tmp/ui-errors-$mode.txt; fail=1
