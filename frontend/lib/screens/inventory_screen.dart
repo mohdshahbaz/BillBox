@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../state/app_state.dart';
 import '../widgets.dart';
+import 'item_tools.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -260,6 +261,29 @@ class _InventoryState extends State<InventoryScreen> {
           OutlinedButton.icon(onPressed: _renameCategory, icon: const Icon(Icons.edit_outlined), label: const Text('Rename category')),
           OutlinedButton.icon(onPressed: _deleteCategory, icon: const Icon(Icons.delete_outline), label: const Text('Delete category')),
         ],
+        PopupMenuButton<String>(
+          tooltip: 'More stock tools',
+          onSelected: (v) async {
+            final changed = switch (v) {
+              'mrp' => await autoMrpDialog(context),
+              'pack' => await autoPack(context),
+              'tidy' => await tidyDialog(context),
+              'online' => await onlineItemsDialog(context),
+              'table' => await pricePerMrpDialog(context, categoryId: catId),
+              _ => false,
+            };
+            if (changed) _load();
+          },
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 'mrp', child: Text('Auto-fill missing MRPs')),
+            PopupMenuItem(value: 'pack', child: Text('Pieces per box from item names')),
+            PopupMenuItem(value: 'table', child: Text('Price for each MRP…')),
+            PopupMenuDivider(),
+            PopupMenuItem(value: 'tidy', child: Text('Tidy names & merge duplicates…')),
+            PopupMenuItem(value: 'online', child: Text('Items from the internet…')),
+          ],
+          child: const Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.more_horiz), SizedBox(width: 6), Text('More')])),
+        ),
         FilledButton.icon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('New item')),
       ]),
       FormWrap([
@@ -319,6 +343,12 @@ class _InventoryState extends State<InventoryScreen> {
                     return [
                       RowAction('Edit item', () => _edit(it), icon: Icons.edit_outlined),
                       RowAction('Add opening stock', () => _addStock(it), icon: Icons.add_box_outlined),
+                      RowAction('Set stock count…', () async {
+                        if (await setStockDialog(context, it)) _load();
+                      }, icon: Icons.inventory_outlined),
+                      RowAction('Merge duplicates into this…', () async {
+                        if (await mergeIntoDialog(context, it, items)) _load();
+                      }, icon: Icons.merge_type),
                       RowAction('Add scheme', () => _addScheme(it), icon: Icons.local_offer_outlined),
                       RowAction('Delete', () => _delete(it), icon: Icons.delete_outline, danger: true),
                     ];
