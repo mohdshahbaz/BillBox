@@ -172,9 +172,9 @@ class _Bars extends StatelessWidget {
       ),
       const SizedBox(height: 8),
       Row(children: [
-        Icon(Icons.circle, size: 10, color: Palette.teal), SizedBox(width: 4), Text('Sales', style: TextStyle(fontSize: 12)),
-        SizedBox(width: 14),
-        Icon(Icons.circle, size: 10, color: Palette.turmeric), SizedBox(width: 4), Text('Purchases', style: TextStyle(fontSize: 12)),
+        Icon(Icons.circle, size: 10, color: Palette.teal), const SizedBox(width: 4), const Text('Sales', style: TextStyle(fontSize: 12)),
+        const SizedBox(width: 14),
+        Icon(Icons.circle, size: 10, color: Palette.turmeric), const SizedBox(width: 4), const Text('Purchases', style: TextStyle(fontSize: 12)),
       ]),
     ]);
   }

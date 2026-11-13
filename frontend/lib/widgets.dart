@@ -64,7 +64,7 @@ class Palette {
   static Color get info => dark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB); // notices, bills to print
   static Color get line => dark ? const Color(0xFF2F2F35) : const Color(0xFFE4E4E7); // borders and dividers
   static Color get muted => dark ? const Color(0xFFA1A1AA) : const Color(0xFF6B6B74); // secondary text
-  static Color get hint => dark ? const Color(0xFF8A8A93) : const Palette.hint;
+  static Color get hint => dark ? const Color(0xFF8A8A93) : const Color(0xFF8C979B);
   /// Table heading band: the accent at 6% (10% in dark) over the panel colour.
   static Color get headerBand => Color.alphaBlend(teal.withValues(alpha: dark ? .10 : .06), card);
   /// Navigation sidebar: stays dark in both modes (white text on it).

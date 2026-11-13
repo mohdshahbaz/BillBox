@@ -10,9 +10,9 @@ String _csv(List<List<dynamic>> rows) => rows.map((r) => r.map((c) => '"${'$c'.r
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
   @override
-  Widget build(BuildContext context) => DefaultTabController(
+  Widget build(BuildContext context) => const DefaultTabController(
         length: 3,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           PageHeader('Books and GST'),
           TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Sales book'), Tab(text: 'Purchase book'), Tab(text: 'GST outward supplies')]),
           SizedBox(height: 12),

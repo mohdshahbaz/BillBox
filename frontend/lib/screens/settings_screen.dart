@@ -13,9 +13,9 @@ import 'update_screen.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
   @override
-  Widget build(BuildContext context) => DefaultTabController(
+  Widget build(BuildContext context) => const DefaultTabController(
         length: 8,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           PageHeader('Settings'),
           TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Companies'), Tab(text: 'Appearance'), Tab(text: 'Backup'), Tab(text: 'Printing'), Tab(text: 'Stock'), Tab(text: 'Sync'), Tab(text: 'Updates'), Tab(text: 'Licence')]),
           SizedBox(height: 14),
