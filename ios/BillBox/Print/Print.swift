@@ -501,6 +501,11 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             ForEach(Array(right.enumerated()), id: \.offset) { _, kv in item(kv) }
             if !copy.isEmpty { t(copy, 6, bold: true).lineLimit(1).minimumScaleFactor(0.7).layoutPriority(1) }
         }
+        // the packed row: salesman and payment at full size, the copy label takes what is left (down to half size)
+        let rightPacked = HStack(alignment: .firstTextBaseline, spacing: 8) {
+            ForEach(Array(right.enumerated()), id: \.offset) { _, kv in item(kv).fixedSize() }
+            if !copy.isEmpty { t(copy, 6, bold: true).lineLimit(1).minimumScaleFactor(0.5) }
+        }
         let title = t(docTitle, 8.5, bold: true).lineLimit(1).fixedSize()
         // three parts on one baseline: the outer two take equal widths, so the title stays in the centre of the row.
         // When the right side (salesman, payment, a long copy label) would not fit half the row, the title moves left
@@ -518,7 +523,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 Spacer(minLength: 4)
                 title
                 Spacer(minLength: 4)
-                rightPart.layoutPriority(1)
+                rightPacked.layoutPriority(1)
             }
         }
         .padding(.horizontal, 5)
