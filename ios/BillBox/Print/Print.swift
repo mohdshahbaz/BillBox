@@ -298,9 +298,8 @@ private let muted = Color.black.opacity(0.62)
 private let frameLine: CGFloat = 1.1      // outer frame and band dividers
 private let ruleLine: CGFloat = 0.6       // inner dividers
 private let outerLine: CGFloat = 2.0      // the outer border of the bill (thicker than the band dividers)
-/// The grey divider between the boxes of the totals band (words | bank | receiver | signature): one style for all of them,
-/// inset 4 pt from the band's top and bottom lines.
-private func bandDivider() -> some View { vRule(0.7, color: muted).padding(.vertical, 4) }
+/// The grey dividers of the totals band (words | bank | receiver | signature): one style for all of them.
+private let bandDividerWidth: CGFloat = 0.7
 private let shade = Color.black.opacity(0.09)
 
 /// Column widths (points, before the page multiplier). The Item column takes whatever is left.
@@ -659,7 +658,6 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 .padding(.horizontal, 4).padding(.vertical, 4)
                 .frame(width: receiverBandWidth(g))
                 .frame(maxHeight: .infinity)
-                .overlay(alignment: .leading) { bandDivider() }
             }
             if sigHere {
                 // the company's signature, beside the bank details behind a ruled line: the footer keeps only the terms
@@ -672,7 +670,6 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 .padding(.horizontal, 5).padding(.vertical, 4)
                 .frame(width: signatureBandWidth(g))
                 .frame(maxHeight: .infinity)
-                .overlay(alignment: .leading) { bandDivider() }
             }
             sumColumn
                 .frame(maxHeight: .infinity)
@@ -680,6 +677,19 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 .overlay(alignment: .leading) { vRule(frameLine) }
         }
         .frame(height: g.totals, alignment: .top)
+        // the grey lines before the receiver's box and before the company's signature, drawn as vector strokes at their
+        // measured places (a ruled view inside these boxes did not print), inset 4 pt like the one beside the bank details
+        .overlay(alignment: .topLeading) {
+            Canvas { ctx, size in
+                var xs: [CGFloat] = []
+                if recvHere { xs.append(bandLeftW) }
+                if sigHere { xs.append(bandLeftW + (recvHere ? receiverBandWidth(g) : 0)) }
+                var p = Path()
+                for x in xs { p.move(to: CGPoint(x: x, y: 4)); p.addLine(to: CGPoint(x: x, y: size.height - 4)) }
+                ctx.stroke(p, with: .color(muted), lineWidth: bandDividerWidth)
+            }
+            .allowsHitTesting(false)
+        }
     }
 
     /// The bank details sit in the totals band, left of the totals, on the last page when they fit there.
@@ -718,7 +728,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
         .padding(.leading, 6)
         .frame(maxHeight: .infinity, alignment: .bottomLeading)
         // the divider between "Amount in words" and the bank details (the band's 4 pt padding is already round it)
-        .overlay(alignment: .leading) { vRule(0.7, color: muted) }
+        .overlay(alignment: .leading) { vRule(bandDividerWidth, color: muted) }
     }
 
     /// Bank details, one per line with the labels lined up (BANK NAME:, ACCOUNT NUMBER: …).
