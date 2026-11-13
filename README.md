@@ -24,6 +24,19 @@ flutter run -d macos
 Every push is checked by GitHub Actions (all engines compared, Android app built); pushing a tag such as `v15.2.0` builds
 the Android APK, the Mac app and the iPhone .ipa and publishes them as a release. See `docs/CI_CD.md`.
 
+## UI overhaul (branch `ui-overhaul`) — one design system on every app
+
+- **One design language** (`docs/DESIGN_SYSTEM.md`): colour roles with AA contrast in light and dark, a 4/8 pt spacing
+  grid, radii, type scale with equal-width money digits, and shared components (summary cards, status pills, skeleton
+  loading, error states with Try again) on iPhone, Mac, Android and Windows/Linux.
+- **iPhone (iOS 18)**: Swift Charts dashboard, tables as rounded cards that sort, nothing clipped, semantic colours.
+- **Android 12+**: Material 3 on the design-system tokens, Android 12 splash, predictive back, dark mode checked on the
+  Android 12 and 14 self-tests; fixed company save on Android 12 (`crypto.randomUUID` missing in the WebView).
+- **Windows / Linux**: dark mode and all themes (Settings › Appearance), sortable tables, Ctrl+1…9, window title with the company.
+- **Mac (Monterey and later)**: design-system tokens and components, semantic colours on every screen.
+- **Engine**: faster dashboard (−24 %), profit (−42 %) and GST reports (−41 %) with no figure changed (`docs/BACKEND_PERF.md`).
+- Bills: same fields and layouts; the iPhone self-test now draws every design in every paper layout.
+
 ## v15.9.2 — Bill print stays inside its margins, faster WhatsApp Web sending
 
 - **Print layout (iPhone and Mac, BillBox clean design)**: the bill's frame was wider than the page's printable width, so the border

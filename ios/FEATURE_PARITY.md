@@ -647,6 +647,11 @@ The "Server is not running" screen, Start server, Choose backend folder, `server
   - Mode: Automatic / Light / Dark.
   - Note "The theme changes the accent colour and the page and panel backgrounds. It applies at once and is remembered."
   - Stored per device (`theme`, `appearance`).
+  - Windows/Linux (UI overhaul, 2026-11): Settings › **Appearance** tab with Automatic / Light / Dark and the same theme
+    list (accent, page and dark panel colours from `Themes.swift`), stored on the computer in `<data folder>/appearance.json`.
+- [x] ✅ **Tables sort** by a click / tap on a column heading on every platform (amounts and dates by value; on
+  Windows/Linux a closing Total row stays last). Status pills for bill type and printed state, a summary card for totals
+  (docs/DESIGN_SYSTEM.md §5).
 - [x] ✅ Themes (accent / card / page, light and dark):
   - Classic (system accent and system backgrounds)
   - Ocean 0E7C9B/35B6D6
