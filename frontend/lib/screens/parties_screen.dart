@@ -4,6 +4,7 @@ import '../print/print_dialog.dart';
 import '../api.dart';
 import '../state/app_state.dart';
 import '../widgets.dart';
+import 'payment_sheet.dart';
 
 const _dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -249,6 +250,14 @@ class _PartiesState extends State<PartiesScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       PageHeader('Parties', actions: [
         if (kind != 'SUPPLIER') OutlinedButton.icon(onPressed: _autoRoutes, icon: const Icon(Icons.alt_route), label: const Text('Assign routes')),
+        if (kind != 'SUPPLIER')
+          OutlinedButton.icon(
+            onPressed: () async {
+              if (await showPaymentSheet(context)) _load();
+            },
+            icon: const Icon(Icons.playlist_add_check),
+            label: const Text('Payments from a list'),
+          ),
         FilledButton.icon(onPressed: () => _form(), icon: const Icon(Icons.add), label: Text(kind == 'SUPPLIER' ? 'New supplier' : 'New customer')),
       ]),
       FormWrap([

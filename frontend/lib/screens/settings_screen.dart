@@ -5,6 +5,8 @@ import '../api.dart';
 import '../print/invoice_pdf.dart';
 import '../state/app_state.dart';
 import '../widgets.dart';
+import 'bill_tools.dart' show kWaTemplate;
+import 'marg_import.dart';
 import 'drive_backup.dart';
 import 'license_screen.dart';
 import 'sync_screen.dart';
@@ -14,12 +16,12 @@ class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
   @override
   Widget build(BuildContext context) => const DefaultTabController(
-        length: 8,
+        length: 9,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           PageHeader('Settings'),
-          TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Companies'), Tab(text: 'Appearance'), Tab(text: 'Backup'), Tab(text: 'Printing'), Tab(text: 'Stock'), Tab(text: 'Sync'), Tab(text: 'Updates'), Tab(text: 'Licence')]),
+          TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Companies'), Tab(text: 'Appearance'), Tab(text: 'Backup'), Tab(text: 'Printing'), Tab(text: 'Stock'), Tab(text: 'Marg import'), Tab(text: 'Sync'), Tab(text: 'Updates'), Tab(text: 'Licence')]),
           SizedBox(height: 14),
-          Expanded(child: TabBarView(children: [_Companies(), _Appearance(), _Backup(), _Printing(), _StockSettings(), SyncTab(), UpdateTab(), LicenseTab()])),
+          Expanded(child: TabBarView(children: [_Companies(), _Appearance(), _Backup(), _Printing(), _StockSettings(), MargImportTab(), SyncTab(), UpdateTab(), LicenseTab()])),
         ]),
       );
 }
@@ -93,6 +95,8 @@ class _Companies extends StatelessWidget {
             ]),
           ),
         ),
+      const SizedBox(height: 6),
+      const _YearBooks(),
     ]);
   }
 }
@@ -416,7 +420,121 @@ class _PrintingState extends State<_Printing> {
               style: TextStyle(color: Palette.muted, fontSize: 12)),
         ]),
       ),
+      const SizedBox(height: 12),
+      const _WhatsAppSettings(),
     ]);
+  }
+}
+
+/// All bills › Send on WhatsApp: the country code for 10-digit numbers and the message (same settings as the Mac).
+class _WhatsAppSettings extends StatefulWidget {
+  const _WhatsAppSettings();
+  @override
+  State<_WhatsAppSettings> createState() => _WhatsAppSettingsState();
+}
+
+class _WhatsAppSettingsState extends State<_WhatsAppSettings> {
+  late final TextEditingController cc, msg;
+  @override
+  void initState() {
+    super.initState();
+    final s = AppScope.read(context).settings;
+    cc = TextEditingController(text: '${s['wa_cc'] ?? ''}'.isEmpty ? '91' : '${s['wa_cc']}');
+    msg = TextEditingController(text: '${s['wa_message'] ?? ''}'.trim().isEmpty ? kWaTemplate : '${s['wa_message']}');
+  }
+
+  @override
+  void dispose() {
+    cc.dispose();
+    msg.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Panel(
+        title: 'WhatsApp',
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('All bills › right-click a sale › Send on WhatsApp saves the bill PDF and opens the customer\'s chat with this message. Attach the PDF there and press Send.',
+              style: TextStyle(color: Palette.muted)),
+          const SizedBox(height: 10),
+          AppField(width: 160, label: 'Country code', number: true, controller: cc),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: 640,
+            child: TextField(controller: msg, maxLines: 3, decoration: const InputDecoration(labelText: 'Message ({name}, {invoice}, {total}, {company} are filled in)', constraints: BoxConstraints()), style: const TextStyle(fontSize: 14)),
+          ),
+          const SizedBox(height: 10),
+          FilledButton(
+            onPressed: () => guard(context, () async {
+              await AppScope.read(context).saveSettings({'wa_cc': cc.text.replaceAll(RegExp(r'\D'), ''), 'wa_message': msg.text.trim() == kWaTemplate ? '' : msg.text.trim()});
+              if (context.mounted) toast(context, 'WhatsApp settings saved for this company');
+            }),
+            child: const Text('Save'),
+          ),
+        ]),
+      );
+}
+
+/// A new financial year's books as their own file (as in Marg): carried forward (items, parties, opening balances and
+/// stock) or empty (for importing that year from Marg). POST /companies/:id/years, then the app opens the new books.
+class _YearBooks extends StatefulWidget {
+  const _YearBooks();
+  @override
+  State<_YearBooks> createState() => _YearBooksState();
+}
+
+class _YearBooksState extends State<_YearBooks> {
+  static int get _thisStart {
+    final n = DateTime.now();
+    return n.month >= 4 ? n.year : n.year - 1;
+  }
+
+  static String _label(int y) => '$y-${'${(y + 1) % 100}'.padLeft(2, '0')}';
+  int start = _thisStart + 1;
+  bool busy = false;
+
+  Future<void> _add({required bool carry}) async {
+    final app = AppScope.read(context);
+    final id = app.companyId;
+    if (id == null) return;
+    setState(() => busy = true);
+    await guard(context, () async {
+      final r = await Api.post('/companies/$id/years', {'fy': _label(start), 'carry': carry}) as Json;
+      await app.reloadCompanies();
+      await app.switchCompany(r['id'] as int);
+      if (mounted) {
+        toast(context, carry ? 'FY ${r['fy']} books are ready: items, parties and opening balances carried forward.' : 'FY ${r['fy']} books are ready (empty).');
+      }
+    });
+    if (mounted) setState(() => busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final years = [for (var y = _thisStart - 6; y <= _thisStart + 1; y++) y];
+    final siblings = app.companies.where((c) => '${c['name']}'.trim().toLowerCase() == app.companyName.trim().toLowerCase() && '${c['fy'] ?? ''}'.isNotEmpty).toList();
+    return Panel(
+      title: 'Financial years of ${app.companyName}',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Keep each year in its own file, as in Marg. Items, parties, stock and opening balances can be carried into the new year.', style: TextStyle(color: Palette.muted)),
+        if (siblings.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final c in siblings)
+              c['id'] == app.companyId
+                  ? Chip(label: Text('FY ${c['fy']} · open now'), backgroundColor: Palette.leaf.withValues(alpha: .14))
+                  : ActionChip(label: Text('Open FY ${c['fy']}'), onPressed: () => guard(context, () => app.switchCompany(c['id'] as int))),
+          ]),
+        ],
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          AppDropdown<int>(width: 160, label: 'Year', value: start, options: {for (final y in years) y: 'FY ${_label(y)}'}, onChanged: (v) => setState(() => start = v ?? start)),
+          FilledButton(onPressed: busy ? null : () => _add(carry: true), child: const Text('Start as its own file, carrying forward')),
+          OutlinedButton(onPressed: busy ? null : () => _add(carry: false), child: const Text('Add as an empty file (for Marg data)')),
+        ]),
+      ]),
+    );
   }
 }
 

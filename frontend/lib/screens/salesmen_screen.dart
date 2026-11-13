@@ -60,6 +60,52 @@ class _SalesmenState extends State<SalesmenScreen> {
     });
   }
 
+  Json? get _selected => sms.cast<Json?>().firstWhere((s) => s!['id'] == sel, orElse: () => null);
+
+  Future<void> _editSalesman(Json s) async {
+    final v = await formDialog(context, 'Edit ${s['name']}', [
+      FieldSpec('name', 'Name', initial: '${s['name'] ?? ''}'),
+      FieldSpec('phone', 'Phone', initial: '${s['phone'] ?? ''}'),
+      FieldSpec('monthly_target', 'Monthly sales target (₹)', number: true, initial: '${s['monthly_target'] ?? 0}'),
+    ]);
+    if (v == null || !mounted) return;
+    await guard(context, () async {
+      await Api.put('/salesmen/${s['id']}', {...v, 'active': true});
+      await _load();
+    });
+  }
+
+  /// Moves every bill, receipt and route of [s] to another salesman, then removes [s] (as on the Mac).
+  Future<void> _mergeSalesman(Json s) async {
+    final others = {for (final o in sms.where((o) => o['id'] != s['id'])) o['id'] as int: '${o['name']}'};
+    if (others.isEmpty) return;
+    final into = await pickFromList<int>(context, title: 'Merge ${s['name']} into…', options: others);
+    if (into == null || !mounted) return;
+    if (!await confirm(context, 'Merge ${s['name']} into ${others[into]}?', "All of ${s['name']}'s bills, receipts and routes move to ${others[into]}, and ${s['name']} is removed.", ok: 'Merge')) return;
+    if (!mounted) return;
+    await guard(context, () async {
+      final r = await Api.post('/salesmen/${s['id']}/merge', {'into': into}) as Json;
+      final m = (r['moved'] as Json?) ?? {};
+      if (mounted) toast(context, 'Merged: ${m['invoices'] ?? 0} bills, ${m['receipts'] ?? 0} receipts and ${m['routes'] ?? 0} routes moved.');
+      sel = into;
+      await _load();
+    });
+  }
+
+  Future<void> _deleteSalesman(Json s) async {
+    if (!await confirm(context, 'Delete ${s['name']}?', 'Their routes are left without a salesman. Bills and receipts keep the name. To move their bills to someone else, use Merge instead.', ok: 'Delete', danger: true)) return;
+    if (!mounted) return;
+    await guard(context, () async {
+      await Api.delete('/salesmen/${s['id']}');
+      if (sel == s['id']) {
+        sel = null;
+        perf = null;
+        beat = null;
+      }
+      await _load();
+    });
+  }
+
   /// New route, or edit one: name, salesman, visit days. Returns true when saved.
   Future<bool> _routeForm([Json? existing]) async {
     final name = TextEditingController(text: existing == null ? '' : '${existing['name'] ?? ''}');
@@ -208,6 +254,23 @@ class _SalesmenState extends State<SalesmenScreen> {
       PageHeader('Salesmen and routes', actions: [
         OutlinedButton.icon(onPressed: _routes, icon: const Icon(Icons.list_alt), label: const Text('Routes')),
         OutlinedButton.icon(onPressed: sms.isEmpty ? null : _addRoute, icon: const Icon(Icons.route), label: const Text('New route')),
+        PopupMenuButton<String>(
+          tooltip: 'Salesman',
+          enabled: _selected != null,
+          onSelected: (v) {
+            final s = _selected;
+            if (s == null) return;
+            if (v == 'edit') _editSalesman(s);
+            if (v == 'merge') _mergeSalesman(s);
+            if (v == 'delete') _deleteSalesman(s);
+          },
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'edit', child: Text('Edit salesman…')),
+            PopupMenuItem(value: 'merge', enabled: sms.length > 1, child: const Text('Merge into another…')),
+            PopupMenuItem(value: 'delete', child: Text('Delete salesman…', style: TextStyle(color: Palette.brick))),
+          ],
+          child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.more_horiz)),
+        ),
         FilledButton.icon(onPressed: _addSalesman, icon: const Icon(Icons.person_add_alt), label: const Text('New salesman')),
       ]),
       Expanded(
@@ -216,7 +279,18 @@ class _SalesmenState extends State<SalesmenScreen> {
             width: 240,
             child: ListView(children: [
               for (final s in sms)
-                ListTile(
+                GestureDetector(
+                  onSecondaryTapDown: (d) async {
+                    final v = await showMenu<String>(context: context, position: RelativeRect.fromLTRB(d.globalPosition.dx, d.globalPosition.dy, d.globalPosition.dx, d.globalPosition.dy), items: [
+                      const PopupMenuItem(value: 'edit', child: Text('Edit…')),
+                      PopupMenuItem(value: 'merge', enabled: sms.length > 1, child: const Text('Merge into another…')),
+                      PopupMenuItem(value: 'delete', child: Text('Delete…', style: TextStyle(color: Palette.brick))),
+                    ]);
+                    if (v == 'edit') _editSalesman(s);
+                    if (v == 'merge') _mergeSalesman(s);
+                    if (v == 'delete') _deleteSalesman(s);
+                  },
+                  child: ListTile(
                   selected: s['id'] == sel,
                   selectedTileColor: Palette.teal.withValues(alpha: .1),
                   title: Text(s['name']),
@@ -225,6 +299,7 @@ class _SalesmenState extends State<SalesmenScreen> {
                     setState(() => sel = s['id'] as int);
                     _loadSelected();
                   },
+                ),
                 ),
             ]),
           ),

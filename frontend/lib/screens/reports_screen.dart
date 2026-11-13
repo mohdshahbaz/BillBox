@@ -11,12 +11,15 @@ class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
   @override
   Widget build(BuildContext context) => const DefaultTabController(
-        length: 3,
+        length: 7,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           PageHeader('Books and GST'),
-          TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Sales book'), Tab(text: 'Purchase book'), Tab(text: 'GST outward supplies')]),
+          TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [
+            Tab(text: 'Sales book'), Tab(text: 'Purchase book'), Tab(text: 'Debit notes book'), Tab(text: 'GST outward supplies'),
+            Tab(text: 'Profit'), Tab(text: 'Outstanding'), Tab(text: 'Expiry'),
+          ]),
           SizedBox(height: 12),
-          Expanded(child: TabBarView(children: [_Book(type: 'sales'), _Book(type: 'purchase'), _Gst()])),
+          Expanded(child: TabBarView(children: [_Book(type: 'sales'), _Book(type: 'purchase'), _Book(type: 'debit'), _Gst(), _Profit(), _Outstanding(), _Expiry()])),
         ]),
       );
 }
@@ -98,7 +101,7 @@ class _BookState extends State<_Book> with AutomaticKeepAliveClientMixin {
             ? const Center(child: CircularProgressIndicator())
             : rows.isEmpty
                 ? Center(child: Text('No entries in this period.', style: TextStyle(color: Palette.muted)))
-                : table(['Date', sales ? 'Invoice' : 'Our ref', if (!sales) 'Supplier bill', 'Party', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Round off', 'Total'], [
+                : table(['Date', sales ? 'Invoice' : widget.type == 'debit' ? 'Note no' : 'Our ref', if (!sales) widget.type == 'debit' ? 'Against bill' : 'Supplier bill', 'Party', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Round off', 'Total'], [
                       for (final r in rows)
                         [t(dmy(r['date'])), t('${r['no']}'), if (!sales) t('${r['ref']}'), t('${r['party']}'), t('${r['gstin']}'), t(money(r['taxable'])), t(money(r['cgst'])), t(money(r['sgst'])), t(money(r['igst'])), t(money(r['round_off'])), t(money(r['total']), bold: true)],
                       [
@@ -216,6 +219,224 @@ class _GstState extends State<_Gst> with AutomaticKeepAliveClientMixin {
         const SizedBox(height: 10),
         Text('The Excel file has four sheets: Summary, B2B Bills, B2C Bills and Rate-wise Summary. Rates are taken from each invoice line. Round-off is excluded from taxable value. The net figure is an estimate (output tax minus purchase tax); confirm against your return before filing.',
             style: TextStyle(color: Palette.muted, fontSize: 12)),
+      ],
+    ]);
+  }
+}
+
+
+// ---------------------------------------------------------------- profit, outstanding, expiry
+
+/// Gross profit for a period: sales value less the purchase cost of the pieces sold (GET /reports/profit).
+class _Profit extends StatefulWidget {
+  const _Profit();
+  @override
+  State<_Profit> createState() => _ProfitState();
+}
+
+class _ProfitState extends State<_Profit> with AutomaticKeepAliveClientMixin {
+  String from = '${todayStr().substring(0, 7)}-01', to = todayStr();
+  Json? d;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() => guard(context, () async {
+        final r = await Api.get('/reports/profit', {'from': from, 'to': to}) as Json;
+        if (mounted) setState(() => d = r);
+      });
+
+  Widget _date(String label, String v, ValueChanged<String> set) => OutlinedButton.icon(
+        onPressed: () async {
+          final x = await pickDate(context, v);
+          if (x != null) {
+            set(x);
+            _load();
+          }
+        },
+        icon: const Icon(Icons.event, size: 16),
+        label: Text('$label ${dmy(v)}'),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final x = d;
+    return ListView(children: [
+      Wrap(spacing: 8, runSpacing: 8, children: [_date('From', from, (v) => from = v), _date('To', to, (v) => to = v)]),
+      const SizedBox(height: 16),
+      if (x == null)
+        const Center(child: CircularProgressIndicator())
+      else ...[
+        Wrap(spacing: 12, runSpacing: 12, children: [
+          Stat('Sales (taxable value)', money(x['revenue'])),
+          Stat('Cost of the pieces sold', money(x['cost'])),
+          Stat('Gross profit', money(x['profit']), color: num_(x['profit']) >= 0 ? Palette.leaf : Palette.brick),
+          Stat('Margin', '${x['margin_pct'] ?? 0}%'),
+        ]),
+        if (num_(x['unknown_cost_lines']) > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text('${x['unknown_cost_lines']} bill lines have no purchase price, so their cost is not counted. Set the cost in Stock to make the profit exact.',
+                style: TextStyle(color: Palette.turmeric)),
+          ),
+      ],
+    ]);
+  }
+}
+
+/// Who owes you and whom you owe, at the end of the year (GET /reports/outstanding).
+class _Outstanding extends StatefulWidget {
+  const _Outstanding();
+  @override
+  State<_Outstanding> createState() => _OutstandingState();
+}
+
+class _OutstandingState extends State<_Outstanding> with AutomaticKeepAliveClientMixin {
+  List<Json>? rows;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() => guard(context, () async {
+        final r = (await Api.get('/reports/outstanding') as List).cast<Json>();
+        if (mounted) setState(() => rows = r);
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final rs = rows;
+    if (rs == null) return const Center(child: CircularProgressIndicator());
+    final receive = rs.fold<num>(0, (a, r) => a + (num_(r['balance']) > 0 ? num_(r['balance']) : 0));
+    final pay = rs.fold<num>(0, (a, r) => a + (num_(r['balance']) < 0 ? -num_(r['balance']) : 0));
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: Text('Every party with a balance. To receive: they owe you. To pay: you owe them.', style: TextStyle(color: Palette.muted))),
+        OutlinedButton.icon(
+          onPressed: rs.isEmpty
+              ? null
+              : () {
+                  Clipboard.setData(ClipboardData(text: _csv([
+                    ['Party', 'Type', 'Route', 'Phone', 'Credit limit', 'Balance'],
+                    for (final r in rs) [r['name'], r['type'], r['route_name'] ?? '', r['phone'] ?? '', r['credit_limit'] ?? '', r['balance']],
+                  ])));
+                  toast(context, 'Copied ${rs.length} rows. Paste them into Excel.');
+                },
+          icon: const Icon(Icons.copy, size: 16),
+          label: const Text('Copy as CSV'),
+        ),
+      ]),
+      const SizedBox(height: 10),
+      Expanded(
+        child: rs.isEmpty
+            ? Center(child: Text('Every party is settled.', style: TextStyle(color: Palette.muted)))
+            : table(['Party', 'Type', 'Route', 'Phone', 'Credit limit', 'Balance'], [
+                for (final r in rs)
+                  [
+                    t('${r['name']}', bold: true),
+                    StatusPill('${r['type']}' == 'SUPPLIER' ? 'Supplier' : 'Customer', tint: '${r['type']}' == 'SUPPLIER' ? Palette.info : Palette.teal),
+                    t('${r['route_name'] ?? ''}'),
+                    t('${r['phone'] ?? ''}'),
+                    t(num_(r['credit_limit']) > 0 ? money(r['credit_limit']) : '–'),
+                    t(num_(r['balance']) > 0 ? 'To receive ${money(r['balance'])}' : 'To pay ${money(-num_(r['balance']))}',
+                        bold: true, color: num_(r['balance']) > 0 ? Palette.turmeric : Palette.brick),
+                  ],
+              ], numeric: {4, 5}),
+      ),
+      const SizedBox(height: 8),
+      SummaryCard([
+        SumItem('Parties', '${rs.length}'),
+        SumItem('To receive', money(receive), strong: true, tint: receive > 0.5 ? Palette.turmeric : null),
+        SumItem('To pay', money(pay), tint: pay > 0.5 ? Palette.brick : null),
+      ]),
+    ]);
+  }
+}
+
+/// Batches that have expired or expire within the chosen days (GET /reports/expiry).
+class _Expiry extends StatefulWidget {
+  const _Expiry();
+  @override
+  State<_Expiry> createState() => _ExpiryState();
+}
+
+class _ExpiryState extends State<_Expiry> with AutomaticKeepAliveClientMixin {
+  int days = 90;
+  List<Json>? rows;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() => guard(context, () async {
+        final r = (await Api.get('/reports/expiry', {'days': days}) as List).cast<Json>();
+        if (mounted) setState(() => rows = r);
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final rs = rows;
+    final value = (rs ?? const <Json>[]).fold<num>(0, (a, r) => a + num_(r['stock_value']));
+    final expired = (rs ?? const <Json>[]).where((r) => num_(r['days_left']) < 0).length;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        Text('Expiring within', style: TextStyle(color: Palette.muted)),
+        for (final d in [30, 60, 90, 180])
+          ChoiceChip(
+            label: Text('$d days'),
+            selected: days == d,
+            onSelected: (_) {
+              setState(() => days = d);
+              _load();
+            },
+          ),
+      ]),
+      const SizedBox(height: 10),
+      Expanded(
+        child: rs == null
+            ? const Center(child: CircularProgressIndicator())
+            : rs.isEmpty
+                ? Center(child: Text('Nothing expires within $days days.', style: TextStyle(color: Palette.muted)))
+                : table(['Item', 'Batch', 'Expiry', 'Days left', 'Pieces', 'Stock value (cost)'], [
+                    for (final r in rs)
+                      [
+                        t('${r['item_name']}'),
+                        t('${r['batch_no']}'),
+                        t(dmy(r['exp_date'])),
+                        num_(r['days_left']) < 0
+                            ? StatusPill('Expired', tint: Palette.brick)
+                            : t('${r['days_left']}', color: num_(r['days_left']) <= 30 ? Palette.turmeric : null, bold: true),
+                        t('${num_(r['qty']).toInt()}'),
+                        t(money(r['stock_value'])),
+                      ],
+                  ], numeric: {3, 4, 5}),
+      ),
+      if (rs != null && rs.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        SummaryCard([
+          SumItem('Batches', '${rs.length}'),
+          SumItem('Already expired', '$expired', tint: expired > 0 ? Palette.brick : null),
+          SumItem('Stock value at cost', money(value), strong: true),
+        ]),
       ],
     ]);
   }
