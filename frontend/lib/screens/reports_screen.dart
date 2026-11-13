@@ -97,7 +97,7 @@ class _BookState extends State<_Book> with AutomaticKeepAliveClientMixin {
         child: data == null
             ? const Center(child: CircularProgressIndicator())
             : rows.isEmpty
-                ? const Center(child: Text('No entries in this period.', style: TextStyle(color: Palette.muted)))
+                ? Center(child: Text('No entries in this period.', style: TextStyle(color: Palette.muted)))
                 : SingleChildScrollView(
                     child: table(['Date', sales ? 'Invoice' : 'Our ref', if (!sales) 'Supplier bill', 'Party', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Round off', 'Total'], [
                       for (final r in rows)
@@ -170,7 +170,7 @@ class _GstState extends State<_Gst> with AutomaticKeepAliveClientMixin {
         IconButton(onPressed: () => _shift(1), icon: const Icon(Icons.chevron_right)),
         FilledButton.icon(
           onPressed: x == null || exporting ? null : _export,
-          icon: exporting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.table_view_outlined),
+          icon: exporting ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Palette.onAccent)) : const Icon(Icons.table_view_outlined),
           label: const Text('Export month to Excel'),
         ),
         TextButton.icon(
@@ -209,7 +209,7 @@ class _GstState extends State<_Gst> with AutomaticKeepAliveClientMixin {
           Stat(num_(x['net_payable']) >= 0 ? 'Net GST payable (estimate)' : 'Credit carried forward', money(num_(x['net_payable']).abs()), color: num_(x['net_payable']) >= 0 ? Palette.brick : Palette.leaf),
         ]),
         const SizedBox(height: 10),
-        const Text('The Excel file has four sheets: Summary, B2B Bills, B2C Bills and Rate-wise Summary. Rates are taken from each invoice line. Round-off is excluded from taxable value. The net figure is an estimate (output tax minus purchase tax); confirm against your return before filing.',
+        Text('The Excel file has four sheets: Summary, B2B Bills, B2C Bills and Rate-wise Summary. Rates are taken from each invoice line. Round-off is excluded from taxable value. The net figure is an estimate (output tax minus purchase tax); confirm against your return before filing.',
             style: TextStyle(color: Palette.muted, fontSize: 12)),
       ],
     ]);

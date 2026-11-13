@@ -41,7 +41,7 @@ class _DashboardState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     if (err != null) {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(err!, style: const TextStyle(color: Palette.brick)),
+        Text(err!, style: TextStyle(color: Palette.brick)),
         const SizedBox(height: 12),
         FilledButton(onPressed: _load, child: const Text('Try again')),
       ]));
@@ -65,12 +65,12 @@ class _DashboardState extends State<DashboardScreen> {
                     child: Icon(icon, size: 18, color: color),
                   ),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(label, style: const TextStyle(color: Palette.muted, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Expanded(child: Text(label, style: TextStyle(color: Palette.muted, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
                 ]),
                 const SizedBox(height: 14),
                 Text(value, style: tabular.copyWith(fontSize: 25, fontWeight: FontWeight.w700, color: Palette.ink, letterSpacing: -.5)),
                 const SizedBox(height: 4),
-                Text(sub, style: const TextStyle(color: Palette.muted, fontSize: 12), maxLines: 2),
+                Text(sub, style: TextStyle(color: Palette.muted, fontSize: 12), maxLines: 2),
               ]),
             ),
           );
@@ -79,9 +79,9 @@ class _DashboardState extends State<DashboardScreen> {
         Panel(title: 'Sales and purchases, last 14 days', child: _Bars(series: (x['series'] as List).cast<Json>())),
         Panel(
           title: 'Low stock alerts',
-          trailing: Text('${x['low_stock_count']} items', style: const TextStyle(color: Palette.muted, fontSize: 12)),
+          trailing: Text('${x['low_stock_count']} items', style: TextStyle(color: Palette.muted, fontSize: 12)),
           child: (x['low_stock'] as List).isEmpty
-              ? const Text('No item is at or below the low-stock level.', style: TextStyle(color: Palette.muted))
+              ? Text('No item is at or below the low-stock level.', style: TextStyle(color: Palette.muted))
               : Column(children: [
                   for (final i in (x['low_stock'] as List).cast<Json>())
                     Padding(
@@ -96,7 +96,7 @@ class _DashboardState extends State<DashboardScreen> {
         Panel(
           title: 'Highest dues to collect',
           child: (x['top_dues'] as List).isEmpty
-              ? const Text('No pending dues.', style: TextStyle(color: Palette.muted))
+              ? Text('No pending dues.', style: TextStyle(color: Palette.muted))
               : Column(children: [
                   for (final p in (x['top_dues'] as List).cast<Json>())
                     Padding(
@@ -111,8 +111,8 @@ class _DashboardState extends State<DashboardScreen> {
         Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_greeting(), style: const TextStyle(color: Palette.muted, fontSize: 14)),
-              Text(company, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: Palette.ink, letterSpacing: -.6)),
+              Text(_greeting(), style: TextStyle(color: Palette.muted, fontSize: 14)),
+              Text(company, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: Palette.ink, letterSpacing: -.6)),
             ]),
           ),
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh), tooltip: 'Refresh'),
@@ -164,14 +164,14 @@ class _Bars extends StatelessWidget {
                     Container(width: 9, height: 2 + h * num_(s['purchases']).toDouble() / mx, decoration: BoxDecoration(color: Palette.turmeric, borderRadius: BorderRadius.circular(3))),
                   ]),
                   const SizedBox(height: 4),
-                  Text((s['date'] as String).substring(8, 10), style: const TextStyle(fontSize: 10, color: Palette.muted)),
+                  Text((s['date'] as String).substring(8, 10), style: TextStyle(fontSize: 10, color: Palette.muted)),
                 ]),
               ),
             ),
         ]),
       ),
       const SizedBox(height: 8),
-      const Row(children: [
+      Row(children: [
         Icon(Icons.circle, size: 10, color: Palette.teal), SizedBox(width: 4), Text('Sales', style: TextStyle(fontSize: 12)),
         SizedBox(width: 14),
         Icon(Icons.circle, size: 10, color: Palette.turmeric), SizedBox(width: 4), Text('Purchases', style: TextStyle(fontSize: 12)),

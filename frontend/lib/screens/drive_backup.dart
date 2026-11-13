@@ -220,7 +220,7 @@ class _DrivePanelState extends State<DrivePanel> {
             Expanded(child: Text(connected ? 'Connected: backups also go to Google Drive › BillBox Backups' : (code.isEmpty ? 'Not connected' : 'Waiting for Google…'),
                 style: const TextStyle(fontWeight: FontWeight.w600))),
           ]),
-          if (connected && last.isNotEmpty) Text('Last upload: $last · ${lastStatus == 'ok' ? 'done' : lastStatus}', style: const TextStyle(color: Palette.muted, fontSize: 12)),
+          if (connected && last.isNotEmpty) Text('Last upload: $last · ${lastStatus == 'ok' ? 'done' : lastStatus}', style: TextStyle(color: Palette.muted, fontSize: 12)),
           const SizedBox(height: 12),
           if (code.isNotEmpty) ...[
             const Text('1. Open google.com/device on any phone or computer.\n2. Enter this code and allow BillBox:'),
@@ -235,12 +235,12 @@ class _DrivePanelState extends State<DrivePanel> {
             _btn('Disconnect Google Drive', Icons.link_off, _disconnect, danger: true),
           ] else if (hasKeys && !editing) ...[
             _btn('Connect Google Drive', Icons.add_link, _connect, primary: true),
-            Text('Client ID: ${'${status['client_id']}'.split('.apps.googleusercontent.com').first}', style: const TextStyle(color: Palette.muted, fontSize: 12), overflow: TextOverflow.ellipsis),
+            Text('Client ID: ${'${status['client_id']}'.split('.apps.googleusercontent.com').first}', style: TextStyle(color: Palette.muted, fontSize: 12), overflow: TextOverflow.ellipsis),
             const SizedBox(height: 8),
             _btn('Change Google keys…', Icons.key, () => setState(() { editing = true; idCtl.text = '${status['client_id']}'; })),
           ] else ...[
             _btn('Import the downloaded JSON file…', Icons.upload_file, _import, primary: true),
-            const Text('or paste the two keys:', style: TextStyle(color: Palette.muted, fontSize: 12)),
+            Text('or paste the two keys:', style: TextStyle(color: Palette.muted, fontSize: 12)),
             const SizedBox(height: 6),
             AppField(controller: idCtl, label: 'Client ID (…apps.googleusercontent.com)'),
             const SizedBox(height: 8),
@@ -255,7 +255,7 @@ class _DrivePanelState extends State<DrivePanel> {
             connected
                 ? 'Every backup (Backup now and the daily backup) is also uploaded to your Google Drive, into a folder with the backup\'s name inside BillBox Backups. BillBox can see only the files it made itself in your Drive.'
                 : 'One-time setup (about 5 minutes, free): in console.cloud.google.com make a project, turn on the Google Drive API, set up the consent screen (External; add your Gmail as a test user), then Credentials › Create credentials › OAuth client ID › type “TVs and Limited Input devices”. Download its JSON and import it here, then Connect. The same keys work on the Mac, iPhone, Android, Windows and Linux.',
-            style: const TextStyle(color: Palette.muted, fontSize: 12),
+            style: TextStyle(color: Palette.muted, fontSize: 12),
           ),
         ]),
       ),

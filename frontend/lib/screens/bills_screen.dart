@@ -162,7 +162,7 @@ class _BillsState extends State<BillsScreen> {
         child: loading
             ? const Center(child: CircularProgressIndicator())
             : rows.isEmpty
-                ? const Center(child: Text('No bills match these filters.', style: TextStyle(color: Palette.muted)))
+                ? Center(child: Text('No bills match these filters.', style: TextStyle(color: Palette.muted)))
                 : SingleChildScrollView(
                     child: table(['Date', 'Type', 'Bill no', 'Supplier bill', 'Party', 'Total', 'Paid', 'Due', ''], [
                       for (final r in rows)

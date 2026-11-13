@@ -98,7 +98,7 @@ class _UpdateTabState extends State<UpdateTab> {
 
   @override
   Widget build(BuildContext context) {
-    const muted = TextStyle(color: Palette.muted, fontSize: 12);
+    final muted = TextStyle(color: Palette.muted, fontSize: 12);
     final x = u;
     return ListView(children: [
       Panel(
@@ -108,7 +108,7 @@ class _UpdateTabState extends State<UpdateTab> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('This computer has BillBox ${UpdateTab.version.isEmpty ? '(development build)' : UpdateTab.version}', style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
-            if (error != null) Text(error!, style: const TextStyle(color: Palette.brick)),
+            if (error != null) Text(error!, style: TextStyle(color: Palette.brick)),
             if (done != null) ...[
               const Text('The new version is installed.', style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),

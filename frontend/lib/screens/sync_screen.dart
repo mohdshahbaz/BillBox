@@ -85,7 +85,7 @@ class _SyncTabState extends State<SyncTab> {
   @override
   Widget build(BuildContext context) {
     final name = AppScope.of(context).companyName;
-    const muted = TextStyle(color: Palette.muted, fontSize: 12);
+    final muted = TextStyle(color: Palette.muted, fontSize: 12);
     return ListView(children: [
       Panel(
         title: 'Live sync',
@@ -93,13 +93,13 @@ class _SyncTabState extends State<SyncTab> {
           constraints: const BoxConstraints(maxWidth: 560),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
-              Icon(on ? Icons.cloud_sync : (signedIn ? Icons.cloud_outlined : Icons.cloud_off), color: on ? Colors.green : Palette.muted, size: 30),
+              Icon(on ? Icons.cloud_sync : (signedIn ? Icons.cloud_outlined : Icons.cloud_off), color: on ? Palette.leaf : Palette.muted, size: 30),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(!signedIn ? 'Not signed in' : on ? '$name is synced live' : 'Signed in as ${s['email']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                 if (signedIn) Text(on ? 'Changes made on any device show on the others within a few seconds.' : 'Turn on sync for $name to share it with your other devices.', style: muted),
                 if ('${s['last_sync'] ?? ''}'.isNotEmpty) Text('Last sync: ${s['last_sync']}${num_(s['pending']) > 0 ? ' · ${s['pending']} changes waiting' : ''}', style: muted),
-                if ('${s['last_error'] ?? ''}'.isNotEmpty) Text('${s['last_error']}', style: const TextStyle(color: Palette.brick, fontSize: 12)),
+                if ('${s['last_error'] ?? ''}'.isNotEmpty) Text('${s['last_error']}', style: TextStyle(color: Palette.brick, fontSize: 12)),
               ])),
             ]),
             const SizedBox(height: 14),
@@ -119,7 +119,7 @@ class _SyncTabState extends State<SyncTab> {
                 _btn('Turn on sync for $name', Icons.cloud_upload_outlined, () => _run('/sync/on', {}, '$name is synced now.'), primary: true),
               _btn('Sign out of sync', Icons.logout, () => _run('/sync/signout')),
             ],
-            const Text('Every device keeps its own copy of the books and works without internet; changes go across when it is online. Sign in with the same account on each device. '
+            Text('Every device keeps its own copy of the books and works without internet; changes go across when it is online. Sign in with the same account on each device. '
                 'Stock sold on two devices at once counts both sales; two bills made at the same moment keep different numbers.', style: muted),
           ]),
         ),
@@ -143,10 +143,10 @@ class _SyncTabState extends State<SyncTab> {
                   trailing: (b['same_name'] == true && canMerge)
                       ? FilledButton(onPressed: busy ? null : () => _confirmMerge('${b['key']}'), child: const Text('Merge'))
                       : b['on_this_device'] == true
-                      ? const Text('On this computer', style: muted)
+                      ? Text('On this computer', style: muted)
                       : TextButton(onPressed: busy ? null : () => _run('/sync/join', {'key': b['key']}, 'The company is on this computer now. Switch to it from the company menu.'), child: const Text('Bring here')),
                 ),
-              if (remote != null && remote!.isEmpty) const Text('No company is synced in this account yet.', style: muted),
+              if (remote != null && remote!.isEmpty) Text('No company is synced in this account yet.', style: muted),
               if (canMerge && (remote ?? []).any((b) => b['same_name'] == true))
                 Text('$name is in the account twice: each device turned on sync for its own copy, so they do not see each other\'s bills. '
                     'Merge brings that copy\'s bills, parties and stock changes into the open one (Open now), and the devices using that copy move to the open one by themselves. A backup is made first.', style: muted),
