@@ -42,31 +42,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ios/BillBoxCore/.build
-          key: selftest-swiftpm-${{ runner.os }}-${{ github.run_id }}
+          key: selftest-swiftpm-${{ runner.os }}-${{ hashFiles('ios/BillBoxCore/Package.swift', 'ios/BillBoxCore/Sources/**') }}
           restore-keys: selftest-swiftpm-${{ runner.os }}-
       # Xcode's build folder: the next run compiles only what changed (a cold build takes 2-3 min)
       - uses: actions/cache@v4
         with:
           path: build
-          key: selftest-xcode-${{ runner.os }}-${{ github.run_id }}   # saved after every run, restored from the newest
+          key: selftest-xcode-${{ runner.os }}-${{ hashFiles('ios/**/*.swift', 'ios/BillBox.xcodeproj/project.pbxproj') }}
           restore-keys: selftest-xcode-${{ runner.os }}-
-
-      - name: The working session, on the Mac engine and the iPhone engine
-        run: |
-          W=$PWD/st; mkdir -p $W/out
-          [ -d backend/node_modules/express ] || (cd backend && npm install --no-audit --no-fund)
-          python3 ios/tests/parity/gen_scenario.py $W >/dev/null
-          sed "s#{engine}#mac#g" $W/scenario.json > $W/scen-mac.json
-          sed "s#{engine}#ios#g" $W/scenario.json > $W/scen-ios.json
-          node --disable-warning=ExperimentalWarning ios/tests/parity/run-node.js $W/mac/data $W/scen-mac.json $W/mac/home/DistributorProBackups > $W/mac.jsonl
-          (cd ios/BillBoxCore && swift build -c debug)
-          BIN="$(cd ios/BillBoxCore && swift build --show-bin-path)/bbcheck"
-          "$BIN" $W/ios/data $W/scen-ios.json $W/ios/home/DistributorProBackups > $W/ios.jsonl
-          python3 ios/tests/parity/compare.py $W/scenario.json $W/mac.jsonl $W/ios.jsonl > $W/out/compare.txt 2>&1 || true
-          tail -1 $W/out/compare.txt
-          echo "::notice title=iPhone engine on macOS::$(tail -1 $W/out/compare.txt)"
-          # the app opens on the main company
-          sqlite3 $W/ios/data/registry.db "INSERT INTO app_settings(key,value) VALUES('last_company','1') ON CONFLICT(key) DO UPDATE SET value='1'"
 
       - name: Pick a simulator
         run: |
@@ -85,8 +68,25 @@ jobs:
           [ -n "$UDID" ] || { echo "no iPhone simulator"; exit 1; }
           xcrun simctl list devices | grep "$UDID" | tee -a st/out/xcode.txt
           echo "UDID=$UDID" >> $GITHUB_ENV
-          # booted after the engine replay (booting alongside it made the replay 8× slower), waited for after the build
+          # started first: the simulator boots while the engines replay the session and the app compiles
           xcrun simctl boot "$UDID" || true
+
+      - name: The working session, on the Mac engine and the iPhone engine
+        run: |
+          W=$PWD/st; mkdir -p $W/out
+          [ -d backend/node_modules/express ] || (cd backend && npm install --no-audit --no-fund)
+          python3 ios/tests/parity/gen_scenario.py $W >/dev/null
+          sed "s#{engine}#mac#g" $W/scenario.json > $W/scen-mac.json
+          sed "s#{engine}#ios#g" $W/scenario.json > $W/scen-ios.json
+          node --disable-warning=ExperimentalWarning ios/tests/parity/run-node.js $W/mac/data $W/scen-mac.json $W/mac/home/DistributorProBackups > $W/mac.jsonl
+          (cd ios/BillBoxCore && swift build -c debug)
+          BIN="$(cd ios/BillBoxCore && swift build --show-bin-path)/bbcheck"
+          "$BIN" $W/ios/data $W/scen-ios.json $W/ios/home/DistributorProBackups > $W/ios.jsonl
+          python3 ios/tests/parity/compare.py $W/scenario.json $W/mac.jsonl $W/ios.jsonl > $W/out/compare.txt 2>&1 || true
+          tail -1 $W/out/compare.txt
+          echo "::notice title=iPhone engine on macOS::$(tail -1 $W/out/compare.txt)"
+          # the app opens on the main company
+          sqlite3 $W/ios/data/registry.db "INSERT INTO app_settings(key,value) VALUES('last_company','1') ON CONFLICT(key) DO UPDATE SET value='1'"
 
       - name: Unit tests on the simulator
         if: github.event_name != 'workflow_dispatch' || inputs.unit_tests
@@ -99,7 +99,7 @@ jobs:
       - name: Build the app for the simulator
         run: |
           set -o pipefail
-          xcodebuild build -project ios/BillBox.xcodeproj -scheme BillBox -configuration Debug -destination "generic/platform=iOS Simulator" ARCHS=arm64 ONLY_ACTIVE_ARCH=NO -derivedDataPath build \
+          xcodebuild build -project ios/BillBox.xcodeproj -scheme BillBox -configuration Debug -destination "id=$UDID" -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO DEBUG_INFORMATION_FORMAT=dwarf 2>&1 | tee st/out/build.log | grep -E "error:|warning: unre|BUILD" | tail -30
           APP=$(find build/Build/Products -maxdepth 2 -name BillBox.app -path "*iphonesimulator*" | head -1)
           echo "APP=$APP" >> $GITHUB_ENV
