@@ -622,13 +622,14 @@ class _SortTableState extends State<SortTable> {
     return p.width;
   }
 
-  /// Width a cell needs: measured text, a pill, or a row of small buttons.
-  static double _cellW(Widget w) {
-    if (w is StatusPill) return w.text.isEmpty ? 0 : _textW(w.text, const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)) + 2 * DS.s8 + 2;
+  /// Width a cell needs: measured text, a pill, or a row of small buttons. `base` is the text style the cells
+  /// inherit (the theme's font), so the measure matches what is drawn.
+  static double _cellW(Widget w, TextStyle base) {
+    if (w is StatusPill) return w.text.isEmpty ? 0 : _textW(w.text, base.merge(const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))) + 2 * DS.s8 + 4;
     final s = _text(w);
-    if (s.isNotEmpty) return _textW(s, tabular.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600)) + 2;
-    if (w is Row) return w.children.fold(0.0, (a, c) => a + _cellW(c));
-    if (w is TextButton) return (w.child is Text ? _cellW(w.child!) : 24) + 28;
+    if (s.isNotEmpty) return _textW(s, base.merge(tabular).merge(const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))) + 6;
+    if (w is Row) return w.children.fold(0.0, (a, c) => a + _cellW(c, base));
+    if (w is TextButton) return (w.child is Text ? _cellW(w.child!, base) : 24) + 28;
     if (w is IconButton) return 40;
     if (w is Icon) return (w.size ?? 24) + 4;
     return 120;
@@ -637,12 +638,13 @@ class _SortTableState extends State<SortTable> {
   /// Automatic widths from the heading and up to 300 rows, each within [_minW, maxCell].
   List<double> _autoWidths() {
     if (_auto != null && identical(_measured, widget.rows) && _auto!.length == widget.cols.length) return _auto!;
-    const head = TextStyle(fontWeight: FontWeight.w600, fontSize: 12, letterSpacing: .4);
-    final w = [for (final c in widget.cols) _textW(c.toUpperCase(), head) + 18];
+    final base = DefaultTextStyle.of(context).style;
+    final head = base.merge(const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, letterSpacing: .4));
+    final w = [for (final c in widget.cols) _textW(c.toUpperCase(), head) + 20];
     final sample = widget.rows.length > 300 ? widget.rows.sublist(0, 300) : widget.rows;
     for (final r in sample) {
       for (var i = 0; i < r.length && i < w.length; i++) {
-        w[i] = math.max(w[i], _cellW(r[i]));
+        w[i] = math.max(w[i], _cellW(r[i], base));
       }
     }
     _measured = widget.rows;
