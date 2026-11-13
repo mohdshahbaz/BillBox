@@ -99,7 +99,7 @@ jobs:
       - name: Build the app for the simulator
         run: |
           set -o pipefail
-          xcodebuild build -project ios/BillBox.xcodeproj -scheme BillBox -configuration Debug -destination "id=$UDID" -derivedDataPath build \
+          xcodebuild build -project ios/BillBox.xcodeproj -scheme BillBox -configuration Debug -destination "generic/platform=iOS Simulator" -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO DEBUG_INFORMATION_FORMAT=dwarf 2>&1 | tee st/out/build.log | grep -E "error:|warning: unre|BUILD" | tail -30
           APP=$(find build/Build/Products -maxdepth 2 -name BillBox.app -path "*iphonesimulator*" | head -1)
           echo "APP=$APP" >> $GITHUB_ENV
