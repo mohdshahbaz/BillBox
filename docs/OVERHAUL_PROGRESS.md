@@ -7,13 +7,21 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 2. iPhone: shared components to the design system
 - [x] 3. iPhone: screen by screen, self-test screenshots reviewed
 - [x] 4. Android: theme and components (Material 3), then screens; Android self-test
-- [ ] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow (in progress 2026-11-13 00:15 UTC, part 2)
-- [ ] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
+- [x] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow
+- [ ] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI (in progress 2026-11-13 00:30 UTC)
 - [ ] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
 - [ ] 8. Bills: every style and layout checked from self-test PDFs
 - [ ] 9. Docs updated, one pull request into `main` (not merged)
 
 ## Log
+- 2026-11-13 (run 4): stage 5 done. Flutter dark mode and the iPhone's 24 themes: `Palette` is now read at run time
+  (`Palette.apply(theme, dark)`, light/dark pairs with AA text colours, `Palette.card` for panels, `sidebar`, `onAccent`);
+  ~85 `const` expressions that read Palette were un-consted by a script; Settings › Appearance tab (Automatic / Light /
+  Dark + theme swatches), kept in `<data folder>/appearance.json`; follows the system mode on Automatic and repaints
+  without losing an open bill. Every table sorts by a click on its heading (amounts and dd-mm-yyyy dates by value, the
+  Total row stays last). GST register summary card. Keyboard focus tint on the accent. Desktop workflow 43336337276
+  (d617fee): Linux and Windows build + smoke test green, `flutter analyze` 0 errors (infos: material.dart deprecation,
+  a few context-across-async notes). CI green on e49e3d8.
 - 2026-11-12 (run 3): stage 5 part 1. Flutter `Palette` now holds the design-system Clean colours (indigo accent,
   AA-contrast warning/negative/positive), `DS` tokens, radii 14/12, table heading band tinted + upper case,
   `SummaryCard`/`StatusPill` (All Bills uses both), Ctrl+1…9 on Windows/Linux (⌘ kept for Mac keyboards), window
@@ -56,9 +64,8 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - iPhone/Android tables still run past the screen edge (sideways scroll by design).
 
 ## Next
-Stage 5 part 2 (Flutter): dark mode and the 25 themes need `Palette` to stop being `const` (≈136 uses, many in
-`const` widgets) — plan: a `ThemeExtension<BillBoxColors>` read via `context.bb`, migrate screen by screen, then
-`darkTheme` + `themeMode`, plus an Appearance section in Settings (theme, light/dark) stored in app_settings;
-sticky table headings (header outside the vertical scroll); summary cards on Books & GST and Debit Notes;
-keyboard focus rings. Check every step with the Desktop workflow (push to ui-overhaul runs it; ~6 min).
-Then stage 6 (Mac), 7 (backend perf), 8 (bills), 9 (docs + PR).
+Stage 6 (Mac, Monterey-safe): sidebar, toolbar, tables on DS tokens; `macos/tests/typecheck/build.sh` (needs the Swift
+toolchain — blocked here, so the Release workflow's Mac job, platform=mac, artifacts only, is the check).
+Then 7 (backend perf + docs/BACKEND_PERF.md), 8 (bills from self-test PDFs), 9 (docs + PR).
+Flutter leftovers (nice to have, not in the checklist): sticky table headings (header outside the vertical scroll),
+resizable columns, right-click menus on table rows, no desktop screenshots in CI yet.
