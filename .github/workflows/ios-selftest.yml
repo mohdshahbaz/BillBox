@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: ios-selftest
-  cancel-in-progress: true
+  cancel-in-progress: false   # a second run waits instead of killing one half way (two sessions may share the results)
 
 jobs:
   simulator:
