@@ -816,7 +816,8 @@ class _SortTableState extends State<SortTable> {
         );
       }
       // the heading stays and only the rows scroll; the card is no taller than its rows
-      final need = _headH + body.length * _rowH + (pinned ? _rowH : 0) + 2;
+      // + room for the sideways scrollbar when the columns are wider than the card, so it does not cover the last row
+      final need = _headH + body.length * _rowH + (pinned ? _rowH : 0) + 2 + (total > width + .5 ? 12 : 0);
       return Align(
         alignment: Alignment.topLeft,
         child: SizedBox(
