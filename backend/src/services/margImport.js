@@ -70,7 +70,10 @@ function readSource(p) {
     const walk = (d, depth) => {
       for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
         const f = path.join(d, e.name);
-        if (e.isDirectory()) { if (depth < 3 && e.name !== '__MACOSX') walk(f, depth + 1); } else take(e.name, fs.readFileSync(f));
+        if (e.isDirectory()) { if (depth < 3 && e.name !== '__MACOSX') walk(f, depth + 1); continue; }
+        // only regular .csv files are read: a folder such as Downloads may hold large files, sockets or devices
+        if (!e.isFile() || !e.name.toLowerCase().endsWith('.csv') || e.name.toLowerCase() in files) continue;
+        try { take(e.name, fs.readFileSync(f)); } catch { /* unreadable: treated as missing */ }
       }
     };
     walk(p, 0);

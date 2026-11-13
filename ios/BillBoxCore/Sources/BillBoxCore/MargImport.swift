@@ -100,7 +100,8 @@ public enum MargImport {
                     var sub: ObjCBool = false
                     FileManager.default.fileExists(atPath: f, isDirectory: &sub)
                     if sub.boolValue { if depth < 3 && n != "__MACOSX" { walk(f, depth + 1) } }
-                    else if let data = FileManager.default.contents(atPath: f) { take(n, data) }
+                    // only .csv files are read: a folder such as Downloads may hold large files (as backend margImport.js)
+                    else if n.lowercased().hasSuffix(".csv"), let data = FileManager.default.contents(atPath: f) { take(n, data) }
                 }
             }
             walk(path, 0)

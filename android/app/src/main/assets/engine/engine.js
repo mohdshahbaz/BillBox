@@ -12507,7 +12507,13 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
               const f = path.join(d, e.name);
               if (e.isDirectory()) {
                 if (depth < 3 && e.name !== "__MACOSX") walk(f, depth + 1);
-              } else take(e.name, fs.readFileSync(f));
+                continue;
+              }
+              if (!e.isFile() || !e.name.toLowerCase().endsWith(".csv") || e.name.toLowerCase() in files) continue;
+              try {
+                take(e.name, fs.readFileSync(f));
+              } catch {
+              }
             }
           };
           walk(p, 0);
