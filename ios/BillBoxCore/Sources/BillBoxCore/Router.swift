@@ -13,6 +13,21 @@ public enum Reply {
     }
 }
 
+/// backend/src/utils/errors.js: an error reply (status 400 and up, a text `error`) also gets `message` (the same text)
+/// and `code` (its own, or one named after the status).
+enum ErrorBody {
+    static let statusCodes: [Int: String] = [
+        400: "BAD_REQUEST", 401: "UNAUTHORIZED", 402: "PAYMENT_REQUIRED", 403: "FORBIDDEN", 404: "NOT_FOUND", 405: "NOT_ALLOWED",
+        409: "CONFLICT", 413: "TOO_LARGE", 422: "INVALID", 423: "LOCKED", 429: "TOO_MANY", 500: "SERVER_ERROR", 502: "BAD_GATEWAY", 503: "UNAVAILABLE",
+    ]
+    static func normalize(_ r: Reply) -> Reply {
+        guard case .json(let status, let body) = r, status >= 400, var o = body as? [String: Any], o["error"] is String else { return r }
+        if o["message"] == nil || o["message"] is NSNull { o["message"] = o["error"] }
+        if o["code"] == nil || o["code"] is NSNull { o["code"] = statusCodes[status] ?? "ERROR" }
+        return .json(status, o)
+    }
+}
+
 /// The Mac app's server, in process: the same paths, the same bodies, the same replies and the same error texts
 /// (backend/src/server.js and routes/*.js). All calls are serialised, as the server's single event loop did.
 public final class Router {
@@ -50,7 +65,12 @@ public final class Router {
     let gate = AsyncGate()
 
     /// One request. `path` may start with "/api". Query values are strings, as Express gives them.
+    /// Every error reply carries `message` and `code` beside `error`, as backend/src/utils/errors.js does.
     public func handle(_ method: String, _ path: String, query: [String: String] = [:], body: Row = [:], companyId: Int? = nil) async -> Reply {
+        ErrorBody.normalize(await handleAny(method, path, query: query, body: body, companyId: companyId))
+    }
+
+    private func handleAny(_ method: String, _ path: String, query: [String: String], body: Row, companyId: Int?) async -> Reply {
         let seg = segments(path)
         if seg.count >= 2 && seg[0] == "backup" && seg[1] == "drive" {
             // Google Drive: not queued (an upload can take a while); Drive takes its turn for each settings read and write

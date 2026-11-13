@@ -225,7 +225,14 @@ function mergeInto(row, file) {
   const add = (k) => { stats.added[k] = (stats.added[k] || 0) + 1; };
   const skip = (k) => { stats.skipped[k] = (stats.skipped[k] || 0) + 1; };
   const all = (t) => { try { return src.prepare(`SELECT * FROM ${t}`).all(); } catch { return []; } };
-  const cols = (t) => dst.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name).filter((c) => c !== 'id');
+  const colCache = new Map();
+  const cols = (t) => {
+    let c = colCache.get(t);
+    if (!c) { c = dst.prepare(`PRAGMA table_info(${t})`).all().map((x) => x.name).filter((x) => x !== 'id'); colCache.set(t, c); }
+    return c;
+  };
+  // rows grouped by a column once, in their original order (was a scan of every line for every bill: minutes on big books)
+  const groupBy = (rows, k) => { const g = new Map(); for (const r of rows) { const a = g.get(r[k]); if (a) a.push(r); else g.set(r[k], [r]); } return g; };
   const insert = (t, rec) => {
     const cs = cols(t).filter((c) => rec[c] !== undefined);
     const r = dst.prepare(`INSERT INTO ${t}(${cs.join(',')}) VALUES(${cs.map(() => '?').join(',')})`).run(...cs.map((c) => rec[c]));
@@ -292,7 +299,7 @@ function mergeInto(row, file) {
       // documents: by number
       const document = (table, noCol, lineTable, fk, convert, lineConvert, label) => {
         const have = new Map(dst.prepare(`SELECT id,${noCol} no,date,total FROM ${table}`).all().map((r) => [r.no, r]));
-        const lines = all(lineTable);
+        const lines = groupBy(all(lineTable), fk);
         for (const r of all(table)) {
           const cur = have.get(r[noCol]);
           if (cur) {
@@ -303,7 +310,7 @@ function mergeInto(row, file) {
           }
           const id = insert(table, convert(r));
           maps[table].set(r.id, id); add(table);
-          for (const l of lines.filter((x) => x[fk] === r.id)) {
+          for (const l of lines.get(r.id) || []) {
             const itemId = m('items', l.item_id);
             if (itemId) insert(lineTable, { ...l, [fk]: id, ...lineConvert(l, itemId) });
           }
@@ -318,7 +325,7 @@ function mergeInto(row, file) {
       // debit notes: by number, with their lines and the batches the pieces left (stock of existing batches is not changed)
       {
         const have = new Map(dst.prepare('SELECT id,note_no no,date,total FROM debit_notes').all().map((r) => [r.no, r]));
-        const lines = all('debit_note_lines'), stock = all('debit_note_stock');
+        const lines = groupBy(all('debit_note_lines'), 'note_id'), stock = groupBy(all('debit_note_stock'), 'line_id');
         for (const r of all('debit_notes')) {
           const cur = have.get(r.note_no);
           if (cur) {
@@ -331,11 +338,11 @@ function mergeInto(row, file) {
           if (!pid) continue;
           const id = insert('debit_notes', { ...r, party_id: pid, purchase_id: m('purchases', r.purchase_id) });
           maps.debit_notes.set(r.id, id); add('debit_notes');
-          for (const l of lines.filter((x) => x.note_id === r.id)) {
+          for (const l of lines.get(r.id) || []) {
             const itemId = m('items', l.item_id);
             if (!itemId) continue;
             const lid = insert('debit_note_lines', { ...l, note_id: id, item_id: itemId, batch_id: m('batches', l.batch_id) });
-            for (const st of stock.filter((x) => x.line_id === l.id)) {
+            for (const st of stock.get(l.id) || []) {
               const b = m('batches', st.batch_id);
               if (b) insert('debit_note_stock', { ...st, line_id: lid, batch_id: b });
             }

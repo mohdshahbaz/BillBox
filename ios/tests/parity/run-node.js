@@ -13,6 +13,7 @@ globalThis.fetch = () => Promise.reject(new Error('offline'));   // category gue
 const SRC = path.join(__dirname, '../../../backend/src');
 const db = require(path.join(SRC, 'db'));
 const B = require(path.join(SRC, 'services/backup'));
+const { errorBody } = require(path.join(SRC, 'utils/errors'));
 const { parseInvoicePages } = require(path.join(SRC, 'services/pdfParser'));
 const { createMissing } = require(path.join(SRC, 'services/autoCreate'));
 const { settings } = require(path.join(SRC, 'services/billing'));
@@ -44,7 +45,7 @@ function request(step) {
     let status = 200, sent = false; const hdr = {};
     const res = {
       status(c) { status = c; return res; },
-      json(v) { if (!sent) { sent = true; resolve({ status, body: JSON.parse(JSON.stringify(v === undefined ? null : v)) }); } return res; },
+      json(v) { if (!sent) { sent = true; resolve({ status, body: JSON.parse(JSON.stringify(errorBody(status, v === undefined ? null : v))) }); } return res; },
       type() { return res; }, set(h) { Object.assign(hdr, h || {}); return res; },
       send(v) { if (!sent) { sent = true; resolve({ status, file: (/filename="([^"]+)"/.exec(hdr['Content-Disposition'] || '') || [])[1], bytes: Buffer.isBuffer(v) ? v : Buffer.from(String(v)) }); } return res; },
     };

@@ -7,7 +7,21 @@ const db = require('../src/db');
 const R = require('../src/services/reports');
 const { buildXlsx } = require('../src/utils/xlsx');
 
+const { parseInvoiceText } = require('../src/services/pdfParser');
+const B = require('../src/services/backup');
+
 const N = Number(process.argv[2]) || 20000;
+const PDF_TEXT = `ORIGINAL FOR RECIPIENT
+SUPPLIER 3 TRADERS
+GSTIN: 27ABCDE0003F1Z5 State Code: 27
+TAX INVOICE
+Invoice No: ST/26-27/0457 Invoice Date: 18/10/2026
+S.No Description of Goods HSN Qty Unit Rate Amount
+${Array.from({ length: 40 }, (_, i) => `${i + 1} Item ${i * 7} 3401 ${12 + i} PCS ${(40 + i).toFixed(2)} ${((12 + i) * (40 + i)).toFixed(2)}`).join('\n')}
+CGST 9% 100.00
+SGST 9% 100.00
+Grand Total 99999.00`;
+const pdfCtx = () => ({ items: db.prepare('SELECT id,name,hsn,gst_rate FROM items').all(), parties: db.prepare("SELECT id,name,gstin FROM parties WHERE type='SUPPLIER'").all(), companyGstin: '', companyName: '' });
 const id = db.firstCompanyId();
 const { fyRange } = require('../src/utils/fy');
 const fy = fyRange();
@@ -65,6 +79,16 @@ db.withCompany(id, () => {
     ['GST workbook (month, xlsx)', () => { const d = R.gstOutwardDetail(month); return { d, bytes: buildXlsx ? 1 : 0 }; }],
     ['low stock', () => R.lowStock()],
     ['profit (year)', () => R.profit(fy.from, fy.to)],
+    // Excel export: the whole year's sales book as one sheet (the biggest workbook the apps write)
+    ['Excel: sales book (year, xlsx)', () => {
+      const rows = R.book('sales', fy.from, fy.to);
+      const list = Array.isArray(rows) ? rows : rows.rows || [];
+      const keys = list.length ? Object.keys(list[0]) : [];
+      const buf = buildXlsx([{ name: 'Sales', title: 'Sales book', cols: keys.map((k) => ({ h: k, k, t: typeof list[0][k] === 'number' ? 'num' : 'text' })), rows: list }]);
+      return { bytes: buf.length, crc: crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16) };
+    }],
+    // PDF import: a 40-line supplier bill matched against the 400 items and 20 suppliers
+    ['PDF import: parse 40-line bill', () => parseInvoiceText(PDF_TEXT, pdfCtx())],
   ];
   const rows = [];
   const hash = crypto.createHash('sha256');
@@ -79,6 +103,26 @@ db.withCompany(id, () => {
     if (process.env.BENCH_DUMP) fs.appendFileSync(process.env.BENCH_DUMP, name + '\n' + JSON.stringify(JSON.parse(json), null, 1) + '\n');
     rows.push([name, times[3].toFixed(1)]);
   }
+  // backup and restore: timed once each (they write files); not part of the checksum
+  const once = (name, fn) => { const t0 = process.hrtime.bigint(); const out = fn(); rows.push([name, (Number(process.hrtime.bigint() - t0) / 1e6).toFixed(1)]); return out; };
+  B.saveConfig({ dir: path.join(process.env.DATA_DIR, 'backups') });
+  const made = once('backup now (all companies)', () => B.backupNow());
+  // the copy is renamed so the restore finds the new, empty company by name (restores match companies by name)
+  const copy = path.join(process.env.DATA_DIR, 'bench-copy.db');
+  fs.copyFileSync(path.join(made.folder, made.files.find((f) => f.company_id).file), copy);
+  { const { DatabaseSync } = require('node:sqlite'); const d = new DatabaseSync(copy); d.prepare("UPDATE settings SET value='Bench restore target' WHERE key='company_name'").run(); d.close(); }
+  const blank = db.createCompany({ name: 'Bench restore target' });
+  const res = once('restore: merge into empty books', () => B.restore({ file: copy, company_id: blank, mode: 'merge' }));
+  const added = res.merged[0] ? res.merged[0].added : {};
+  console.log('merged', JSON.stringify(added));
+  // what the merge wrote, row by row (must not change when the merge gets faster)
+  const mh = crypto.createHash('sha256');
+  db.withCompany(blank, () => {
+    for (const t of ['parties', 'items', 'batches', 'invoices', 'invoice_lines', 'purchases', 'purchase_lines', 'ledger', 'counters']) {
+      for (const r of db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all()) mh.update(t + JSON.stringify(r, (k, v) => (k === 'created_at' || k === 'updated_at' ? undefined : v)));
+    }
+  });
+  console.log('merge checksum', mh.digest('hex').slice(0, 16));
   console.log(`${N} sale bills, ${N / 10} purchases, 400 items, 300 parties (node ${process.version})`);
   for (const [n, t] of rows) console.log(`  ${n.padEnd(32)} ${t.padStart(8)} ms`);
   console.log('answers checksum', hash.digest('hex').slice(0, 16));

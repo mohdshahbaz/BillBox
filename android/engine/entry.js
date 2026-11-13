@@ -5,6 +5,7 @@
 const db = require('../../backend/src/db');
 const B = require('../../backend/src/services/backup');
 const { HttpError } = require('../../backend/src/utils/misc');
+const { errorBody } = require('../../backend/src/utils/errors');
 const { parseInvoicePages } = require('../../backend/src/services/pdfParser');
 const { createMissing } = require('../../backend/src/services/autoCreate');
 const { settings } = require('../../backend/src/services/billing');
@@ -45,7 +46,7 @@ function request(step) {
     const done = (r) => { if (!sent) { sent = true; globalThis.__bbStore = undefined; resolve(r); } };
     const res = {
       status(c) { status = c; return res; },
-      json(v) { done({ status, body: JSON.parse(JSON.stringify(v === undefined ? null : v)) }); return res; },
+      json(v) { done({ status, body: JSON.parse(JSON.stringify(errorBody(status, v === undefined ? null : v))) }); return res; },
       type(t) { kind = t; return res; },
       set(h) { Object.assign(hdr, h || {}); return res; },
       send(v) {
@@ -130,7 +131,7 @@ const BillBox = {
         const st = JSON.parse(json);
         out = (st.op ? await special(st) : null) || await request(st);
       } catch (e) {
-        out = { status: 500, body: { error: 'Server error', detail: String(e && e.message || e) } };
+        out = { status: 500, body: errorBody(500, { error: 'Server error', detail: String(e && e.message || e) }) };
       }
       globalThis.AndroidHost.reply(id, JSON.stringify(out));
     });

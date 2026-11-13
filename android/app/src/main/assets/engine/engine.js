@@ -1752,7 +1752,24 @@ content-type: application/octet-stream\r
             return [];
           }
         };
-        const cols = (t) => dst.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name).filter((c) => c !== "id");
+        const colCache = /* @__PURE__ */ new Map();
+        const cols = (t) => {
+          let c = colCache.get(t);
+          if (!c) {
+            c = dst.prepare(`PRAGMA table_info(${t})`).all().map((x) => x.name).filter((x) => x !== "id");
+            colCache.set(t, c);
+          }
+          return c;
+        };
+        const groupBy = (rows, k) => {
+          const g = /* @__PURE__ */ new Map();
+          for (const r of rows) {
+            const a = g.get(r[k]);
+            if (a) a.push(r);
+            else g.set(r[k], [r]);
+          }
+          return g;
+        };
         const insert = (t, rec) => {
           const cs = cols(t).filter((c) => rec[c] !== void 0);
           const r = dst.prepare(`INSERT INTO ${t}(${cs.join(",")}) VALUES(${cs.map(() => "?").join(",")})`).run(...cs.map((c) => rec[c]));
@@ -1837,7 +1854,7 @@ content-type: application/octet-stream\r
             }
             const document = (table, noCol, lineTable, fk, convert, lineConvert, label) => {
               const have = new Map(dst.prepare(`SELECT id,${noCol} no,date,total FROM ${table}`).all().map((r) => [r.no, r]));
-              const lines = all(lineTable);
+              const lines = groupBy(all(lineTable), fk);
               for (const r of all(table)) {
                 const cur = have.get(r[noCol]);
                 if (cur) {
@@ -1852,7 +1869,7 @@ content-type: application/octet-stream\r
                 const id = insert(table, convert(r));
                 maps[table].set(r.id, id);
                 add(table);
-                for (const l of lines.filter((x) => x[fk] === r.id)) {
+                for (const l of lines.get(r.id) || []) {
                   const itemId = m("items", l.item_id);
                   if (itemId) insert(lineTable, { ...l, [fk]: id, ...lineConvert(l, itemId) });
                 }
@@ -1878,7 +1895,7 @@ content-type: application/octet-stream\r
             );
             {
               const have = new Map(dst.prepare("SELECT id,note_no no,date,total FROM debit_notes").all().map((r) => [r.no, r]));
-              const lines = all("debit_note_lines"), stock = all("debit_note_stock");
+              const lines = groupBy(all("debit_note_lines"), "note_id"), stock = groupBy(all("debit_note_stock"), "line_id");
               for (const r of all("debit_notes")) {
                 const cur = have.get(r.note_no);
                 if (cur) {
@@ -1895,11 +1912,11 @@ content-type: application/octet-stream\r
                 const id = insert("debit_notes", { ...r, party_id: pid, purchase_id: m("purchases", r.purchase_id) });
                 maps.debit_notes.set(r.id, id);
                 add("debit_notes");
-                for (const l of lines.filter((x) => x.note_id === r.id)) {
+                for (const l of lines.get(r.id) || []) {
                   const itemId = m("items", l.item_id);
                   if (!itemId) continue;
                   const lid = insert("debit_note_lines", { ...l, note_id: id, item_id: itemId, batch_id: m("batches", l.batch_id) });
-                  for (const st of stock.filter((x) => x.line_id === l.id)) {
+                  for (const st of stock.get(l.id) || []) {
                     const b = m("batches", st.batch_id);
                     if (b) insert("debit_note_stock", { ...st, line_id: lid, batch_id: b });
                   }
@@ -3650,6 +3667,37 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
       module.exports = db2;
       syncReady = true;
       for (const [id, d] of open) syncAttach(id, d);
+    }
+  });
+
+  // ../../backend/src/utils/errors.js
+  var require_errors = __commonJS({
+    "../../backend/src/utils/errors.js"(exports, module) {
+      init_globals();
+      var STATUS_CODES = {
+        400: "BAD_REQUEST",
+        401: "UNAUTHORIZED",
+        402: "PAYMENT_REQUIRED",
+        403: "FORBIDDEN",
+        404: "NOT_FOUND",
+        405: "NOT_ALLOWED",
+        409: "CONFLICT",
+        413: "TOO_LARGE",
+        422: "INVALID",
+        423: "LOCKED",
+        429: "TOO_MANY",
+        500: "SERVER_ERROR",
+        502: "BAD_GATEWAY",
+        503: "UNAVAILABLE"
+      };
+      function errorBody2(status, body) {
+        if (!(status >= 400) || !body || typeof body !== "object" || Array.isArray(body) || typeof body.error !== "string") return body;
+        const o = { ...body };
+        if (o.message == null) o.message = o.error;
+        if (o.code == null) o.code = STATUS_CODES[status] || "ERROR";
+        return o;
+      }
+      module.exports = { errorBody: errorBody2, STATUS_CODES };
     }
   });
 
@@ -13343,7 +13391,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         }
         return t;
       })();
-      var crc32 = (buf) => {
+      var crc32 = typeof zlib.crc32 === "function" ? (buf) => zlib.crc32(buf) : (buf) => {
         let c = -1;
         for (let i = 0; i < buf.length; i++) c = CRC[(c ^ buf[i]) & 255] ^ c >>> 8;
         return (c ^ -1) >>> 0;
@@ -13553,6 +13601,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
   var db = require_db();
   var B2 = require_backup();
   var { HttpError } = require_misc();
+  var { errorBody } = require_errors();
   var { parseInvoicePages } = require_pdfParser();
   var { createMissing } = require_autoCreate();
   var { settings } = require_billing();
@@ -13613,7 +13662,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
           return res;
         },
         json(v) {
-          done({ status, body: JSON.parse(JSON.stringify(v === void 0 ? null : v)) });
+          done({ status, body: JSON.parse(JSON.stringify(errorBody(status, v === void 0 ? null : v))) });
           return res;
         },
         type(t) {
@@ -13739,7 +13788,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
           const st = JSON.parse(json);
           out = (st.op ? await special(st) : null) || await request(st);
         } catch (e) {
-          out = { status: 500, body: { error: "Server error", detail: String(e && e.message || e) } };
+          out = { status: 500, body: errorBody(500, { error: "Server error", detail: String(e && e.message || e) }) };
         }
         globalThis.AndroidHost.reply(id, JSON.stringify(out));
       });

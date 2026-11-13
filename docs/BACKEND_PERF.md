@@ -31,10 +31,21 @@ Answers checksum before and after: `6a04214f8649d201` (identical). `node test/sm
 - **Grouped dashboard series** (`sumsBy`): one `GROUP BY date` / `GROUP BY month` query per table. Monthly profit stays
   one query per month: a single grouped query needed a temporary sort and was slower (86 ms vs 65 ms).
 
+## Second pass (2026-11-13): Excel export, backup / restore, PDF import
+
+`test/bench.js` now also times these (backup and restore once each, as they write files). The restore prints its own
+**merge checksum** of every row it wrote, which must stay the same; `answers checksum` covers the Excel bytes.
+
+| Path | Before | After | What changed |
+|---|---:|---:|---|
+| **Restore, merge into empty books** (20 000 bills) | **64.8 s** | **1.9 s** | each bill looked for its lines by scanning *all* bill lines (20 000 × 80 000); lines are now grouped by bill once. Same for purchases and debit notes (and their stock rows). Column lists read once per table. Ported to the iPhone engine (`Backup.swift`). |
+| Excel: sales book of the year as .xlsx | ~0.19 s | ~0.17 s | `zlib.crc32` (native) instead of the JS loop when Node has it; the rest is building the sheet XML, fine as it is |
+| Backup now (VACUUM INTO + integrity check + SHA-256) | 0.21 s | 0.21 s | nothing to gain: SQLite's own copy |
+| PDF import: parse a 40-line supplier bill against 400 items | 62 ms | 62 ms | fine for one bill at a time |
+
+Merge checksum before and after the fix (3 000-bill run): `1c7550c93636db54` (identical). Answers checksum unchanged.
+The Android bundle is rebuilt from these sources (`./build.sh engine`), parity 543/543, fuzz 1647/1647.
+
 ## Not changed (yet)
 
-- The Android app's bundled engine (`android/app/src/main/assets/engine/engine.js`) is rebuilt from `backend/src` by
-  `cd android && ./build.sh engine`; npm was unreachable from the sandbox that made these changes, so the committed bundle
-  is still the previous one (same answers, older speed). CI rebuilds it for the parity check and prints a notice.
-- Excel export, backup / restore and PDF supplier-bill import were not profiled in this pass.
 - The iPhone engine (`ios/BillBoxCore`) has its own SQL; its answers are unchanged and still match.

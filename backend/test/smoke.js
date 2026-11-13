@@ -899,6 +899,31 @@ const ewbTest = async () => {
   });
 };
 
+const apiTest = async () => {
+  console.log('API errors and validation');
+  const { errorBody } = require('../src/utils/errors');
+  const V = require('../src/utils/validate');
+  ok('error replies carry message and code beside error', () => {
+    assert.deepStrictEqual(errorBody(404, { error: 'Not found' }), { error: 'Not found', message: 'Not found', code: 'NOT_FOUND' });
+    assert.strictEqual(errorBody(400, { error: 'x', code: 'HAS_STOCK' }).code, 'HAS_STOCK');
+    assert.deepStrictEqual(errorBody(200, { error: 'kept as is' }), { error: 'kept as is' });
+    assert.deepStrictEqual(errorBody(500, [1]), [1]);
+  });
+  ok('validation reports what an app sent wrong, and rejects nothing yet', () => {
+    assert.strictEqual(V.REJECT, false);
+    assert.deepStrictEqual(V.check('POST', '/invoices', { party_id: 3, date: '2026-11-13', lines: [{ item_id: 1, qty: 2, rate: 10 }] }), []);
+    const p = V.check('POST', '/invoices', { party_id: '3', date: '13/11/2026', lines: [{ qty: 'two' }] });
+    assert.deepStrictEqual(p, ['party_id is a number sent as text', 'date is not a date (yyyy-mm-dd)', 'lines[0].item_id is missing', 'lines[0].qty is not a number']);
+    assert.deepStrictEqual(V.check('PUT', '/parties/7', { phone: '9000000001' }), []);   // a PUT sends only what changed
+    assert.deepStrictEqual(V.check('POST', '/parties', {}), ['name is missing']);
+    assert.deepStrictEqual(V.check('GET', '/parties', {}), []);
+    const logged = [];
+    V.report('POST', '/items/5', ['mrp is not a number'], (m) => logged.push(m));
+    V.report('POST', '/items/6', ['mrp is not a number'], (m) => logged.push(m));
+    assert.deepStrictEqual(logged, ['[validate] POST /items/:id mrp is not a number']);   // once per kind
+  });
+};
+
 const r2n = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
 
-autoCreateTest().then(bulkTest).then(debitNoteTest).then(margTest).then(v5Test).then(boxMathTest).then(billMathTest).then(yearsTest).then(sheetTest).then(itemToolsTest).then(pricingTest).then(ewbTest).then(() => console.log(`\n${n} checks passed${process.exitCode ? ' (with failures above)' : ''}`));
+autoCreateTest().then(bulkTest).then(debitNoteTest).then(margTest).then(v5Test).then(boxMathTest).then(billMathTest).then(yearsTest).then(sheetTest).then(itemToolsTest).then(pricingTest).then(ewbTest).then(apiTest).then(() => console.log(`\n${n} checks passed${process.exitCode ? ' (with failures above)' : ''}`));

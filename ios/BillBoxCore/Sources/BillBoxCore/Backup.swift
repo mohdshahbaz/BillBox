@@ -296,7 +296,19 @@ public final class Backup {
         func add(_ k: String) { added[k] = (added[k] ?? 0) + 1 }
         func skip(_ k: String) { skipped[k] = (skipped[k] ?? 0) + 1 }
         func all(_ t: String) -> [Row] { (try? src.prepare("SELECT * FROM \(t)").all()) ?? [] }
-        func cols(_ t: String) throws -> [String] { try dst.prepare("PRAGMA table_info(\(t))").all().map { $0.str("name") }.filter { $0 != "id" } }
+        var colCache: [String: [String]] = [:]
+        func cols(_ t: String) throws -> [String] {
+            if let c = colCache[t] { return c }
+            let c = try dst.prepare("PRAGMA table_info(\(t))").all().map { $0.str("name") }.filter { $0 != "id" }
+            colCache[t] = c
+            return c
+        }
+        // rows grouped by an id column once, in their original order (was a scan of every line for every bill)
+        func groupBy(_ rows: [Row], _ k: String) -> [Int: [Row]] {
+            var g: [Int: [Row]] = [:]
+            for r in rows { g[r.i(k), default: []].append(r) }
+            return g
+        }
         func insert(_ t: String, _ rec: Row) throws -> Int {
             let cs = try cols(t).filter { rec[$0] != nil }
             var args: [String: Any] = [:]
@@ -402,7 +414,7 @@ public final class Backup {
             func document(_ table: String, _ noCol: String, _ lineTable: String, _ fk: String, _ convert: (Row) -> Row, _ lineConvert: (Row, Int) -> Row, _ label: String) throws {
                 var have: [String: Row] = [:]
                 for r in try dst.prepare("SELECT id,\(noCol) no,date,total FROM \(table)").all() { have[r.str("no")] = r }
-                let lines = all(lineTable)
+                let lines = groupBy(all(lineTable), fk)
                 for r in all(table) {
                     if let cur = have[r.str(noCol)] {
                         if cur.str("date") == r.str("date") && abs(cur.n("total") - r.n("total")) < 0.005 { skip(table) } else {
@@ -417,7 +429,7 @@ public final class Backup {
                     let id = try insert(table, rec)
                     maps[table]![r.i("id")] = id
                     add(table)
-                    for l in lines where l.i(fk) == r.i("id") {
+                    for l in lines[r.i("id")] ?? [] {
                         guard let itemId = maps["items"]![l.i("item_id")] else { continue }
                         var lr = l
                         lr[fk] = id
@@ -436,7 +448,7 @@ public final class Backup {
             do {
                 var have: [String: Row] = [:]
                 for r in try dst.prepare("SELECT id,note_no no,date,total FROM debit_notes").all() { have[r.str("no")] = r }
-                let lines = all("debit_note_lines"), stock = all("debit_note_stock")
+                let lines = groupBy(all("debit_note_lines"), "note_id"), stock = groupBy(all("debit_note_stock"), "line_id")
                 for r in all("debit_notes") {
                     if let cur = have[r.str("note_no")] {
                         if cur.str("date") == r.str("date") && abs(cur.n("total") - r.n("total")) < 0.005 { skip("debit_notes") } else {
@@ -454,14 +466,14 @@ public final class Backup {
                     let id = try insert("debit_notes", rec)
                     maps["debit_notes"]![r.i("id")] = id
                     add("debit_notes")
-                    for l in lines where l.i("note_id") == r.i("id") {
+                    for l in lines[r.i("id")] ?? [] {
                         guard let itemId = maps["items"]![l.i("item_id")] else { continue }
                         var lr = l
                         lr["note_id"] = id
                         lr["item_id"] = itemId
                         lr["batch_id"] = m("batches", l["batch_id"] ?? nil)
                         let lid = try insert("debit_note_lines", lr)
-                        for st in stock where st.i("line_id") == l.i("id") {
+                        for st in stock[l.i("id")] ?? [] {
                             let b = m("batches", st["batch_id"] ?? nil)
                             if b is NSNull { continue }
                             var sr = st

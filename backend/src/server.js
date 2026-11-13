@@ -6,10 +6,15 @@ const backup = require('./services/backup');
 
 const app = express();
 app.use(cors());
+// every error reply gets `message` and `code` beside `error` (utils/errors.js)
+const { errorBody } = require('./utils/errors');
+app.use((req, res, next) => { const json = res.json.bind(res); res.json = (b) => json(errorBody(res.statusCode, b)); next(); });
 app.use(express.json({ limit: '40mb' })); // scanned purchase-bill PDFs arrive base64-encoded
 // every answer is live data: never kept in a cache (the Mac app's web cache otherwise showed old prices and parties)
 app.set('etag', false);
 app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+// what the apps send to the main write routes is checked and logged (report-only for now; utils/validate.js)
+app.use('/api', require('./utils/validate').middleware);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
