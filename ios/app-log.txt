@@ -1,11 +1,14 @@
 Timestamp               Ty Process[PID:TID]
-2026-11-13 03:41:42.422 E  BillBox[17397:c5a9] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
-2026-11-13 03:41:52.012 E  BillBox[18025:cb81] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
-2026-11-13 03:41:52.012 E  BillBox[18025:cb81] (libCoreFSCache.dylib) Errors found! Invalidating cache...
-2026-11-13 03:41:52.449 E  BillBox[18025:cb81] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
-2026-11-13 03:41:52.449 E  BillBox[18025:cb81] (libCoreFSCache.dylib) Errors found! Invalidating cache...
-2026-11-13 03:42:00.951 E  BillBox[18140:cd4a] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
-2026-11-13 03:42:37.661 E  BillBox[20232:e0fb] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
-2026-11-13 03:42:37.719 E  BillBox[20232:e0f9] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
-2026-11-13 03:43:01.767 E  BillBox[21388:ecbc] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
-2026-11-13 03:43:01.834 E  BillBox[21388:ecba] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-13 03:57:55.317 E  BillBox[28141:13347] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-13 03:57:55.363 E  BillBox[28141:13347] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-13 03:57:56.429 E  BillBox[28141:13346] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
+2026-11-13 03:58:29.082 E  BillBox[29334:13f14] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-11-13 03:58:29.082 E  BillBox[29334:13f14] (libCoreFSCache.dylib) Errors found! Invalidating cache...
+2026-11-13 03:58:29.638 E  BillBox[29334:13f14] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-11-13 03:58:29.638 E  BillBox[29334:13f14] (libCoreFSCache.dylib) Errors found! Invalidating cache...
+2026-11-13 03:58:29.685 F  BillBox[29334:13f14] [com.apple.renderbox:error] building pipeline path_exterior-jba6la8feba4 took 0.602776 seconds
+2026-11-13 03:59:22.391 E  BillBox[30590:14cc4] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
+2026-11-13 04:00:04.449 E  BillBox[32343:15f63] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-13 04:00:04.503 E  BillBox[32343:15f6b] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-13 04:00:33.871 E  BillBox[33719:16e54] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-13 04:00:33.937 E  BillBox[33719:16e5b] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
