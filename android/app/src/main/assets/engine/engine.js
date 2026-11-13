@@ -196,7 +196,7 @@
               const r = JSON.parse(net.request(String(url), JSON.stringify({
                 method: opts.method || "GET",
                 headers: opts.headers || {},
-                timeoutMs: b ? 12e4 : 2e4,
+                timeoutMs: opts.timeoutMs || (b ? 12e4 : 2e4),
                 ...b ? { b64: b.toString("base64") } : {}
               })));
               if (r.error) return no(new TypeError(r.error));
@@ -228,7 +228,7 @@
       import_fetch = __toESM(require_fetch());
       Buffer2 = import_buffer.Buffer;
       process = {
-        env: { DATA_DIR: globalThis.AndroidHost.dataDir() },
+        env: { DATA_DIR: globalThis.AndroidHost.dataDir(), BILLBOX_EDITION: typeof globalThis.AndroidHost.edition === "function" ? globalThis.AndroidHost.edition() : "" },
         pid: 1,
         platform: "android",
         argv: [],
@@ -306,6 +306,11 @@
             const j = sql.indexOf("*/", i + 2);
             i = j < 0 ? sql.length : j + 2;
             cur += " ";
+            continue;
+          }
+          if (c === ";" && /^\s*CREATE\s+(?:TEMP\s+|TEMPORARY\s+)?TRIGGER\b/i.test(cur) && /\bBEGIN\b/i.test(cur) && !/\bEND\s*$/i.test(cur)) {
+            cur += c;
+            i++;
             continue;
           }
           if (c === ";") {
@@ -466,21 +471,60 @@
     "../../backend/src/sqlite.js"(exports, module) {
       init_globals();
       var { DatabaseSync } = require_sqlite();
-      module.exports = class Database {
+      var ID_RANGE = 1e7;
+      var INSERT = /^(\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+)(\w+)(\s*\()([^)]*)(\)\s*VALUES\s*\()/i;
+      var Database = class {
         constructor(file, opts = {}) {
           this.d = new DatabaseSync(file, { readOnly: !!opts.readonly });
           this.depth = 0;
+          this.idBase = 0;
+          this.idTables = /* @__PURE__ */ new Set();
+          this.idNext = {};
+          this.cache = /* @__PURE__ */ new Map();
+        }
+        /** Next free id of this device's range in table t. */
+        nextId(t) {
+          let n = this.idNext[t];
+          if (n == null) {
+            const r = this.d.prepare(`SELECT MAX(m) AS m FROM (SELECT MAX(id) AS m FROM ${t} WHERE id > ?1 AND id < ?2
+        UNION ALL SELECT MAX(from_id) FROM sync_alias WHERE tbl='${t}' AND from_id > ?1 AND from_id < ?2)`).get(this.idBase, this.idBase + ID_RANGE);
+            n = r && r.m != null ? Number(r.m) + 1 : this.idBase + 1;
+          }
+          this.idNext[t] = n + 1;
+          return n;
         }
         pragma(s) {
           this.d.exec("PRAGMA " + s);
         }
         exec(s) {
+          this.cache.clear();
           this.d.exec(s);
         }
+        // DDL may change what a cached statement means
         close() {
+          this.cache.clear();
           this.d.close();
         }
-        prepare(s) {
+        prepare(sql) {
+          const key = this.idBase + "|" + sql;
+          let p = this.cache.get(key);
+          if (!p) {
+            p = this._prepare(sql);
+            if (this.cache.size >= 500) this.cache.delete(this.cache.keys().next().value);
+            this.cache.set(key, p);
+          }
+          return p;
+        }
+        _prepare(s) {
+          let idTable = null, named = false;
+          if (this.idBase) {
+            const m = INSERT.exec(s);
+            if (m && this.idTables.has(m[2]) && !m[4].split(",").some((c) => c.trim().toLowerCase() === "id")) {
+              idTable = m[2];
+              named = !s.includes("?");
+              s = m[1] + m[2] + m[3] + "id," + m[4] + m[5] + (named ? "@__bbid," : "?,") + s.slice(m[0].length);
+            }
+          }
           const st = this.d.prepare(s);
           const used = new Set([...s.matchAll(/[@:$]([A-Za-z_]\w*)/g)].map((m) => m[1]));
           const norm = (a) => {
@@ -489,6 +533,15 @@
             }
             return a;
           };
+          if (idTable) {
+            const withId = (a) => {
+              const id = this.nextId(idTable);
+              if (!named) return [id, ...a];
+              const o = a.length === 1 && a[0] && typeof a[0] === "object" ? a[0] : {};
+              return [{ ...o, __bbid: id }];
+            };
+            return { run: (...a) => st.run(...norm(withId(a))), get: (...a) => st.get(...norm(withId(a))), all: (...a) => st.all(...norm(withId(a))) };
+          }
           return { run: (...a) => st.run(...norm(a)), get: (...a) => st.get(...norm(a)), all: (...a) => st.all(...norm(a)) };
         }
         transaction(fn) {
@@ -509,6 +562,8 @@
           };
         }
       };
+      Database.ID_RANGE = ID_RANGE;
+      module.exports = Database;
     }
   });
 
@@ -795,6 +850,8 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 CREATE INDEX IF NOT EXISTS idx_inv_party ON invoices(party_id);
 CREATE INDEX IF NOT EXISTS idx_invl_inv ON invoice_lines(invoice_id);
+-- profit, GST and top-items reads find every figure of a bill's lines in this index, without visiting the table
+CREATE INDEX IF NOT EXISTS idx_invl_cover ON invoice_lines(invoice_id, item_id, batch_id, qty, free_qty, taxable, gst_rate);
 CREATE INDEX IF NOT EXISTS idx_invl_item ON invoice_lines(item_id);
 CREATE INDEX IF NOT EXISTS idx_purl_pur ON purchase_lines(purchase_id);
 CREATE INDEX IF NOT EXISTS idx_purl_item ON purchase_lines(item_id);
@@ -869,6 +926,13 @@ CREATE INDEX IF NOT EXISTS idx_items_name ON items(name);
         addColumn(db2, "invoices", "printed", "INTEGER NOT NULL DEFAULT 0");
         for (const c of ["ewb_no", "ewb_date", "ewb_valid", "ewb_transport"]) addColumn(db2, "invoices", c, "TEXT");
         db2.exec(V7);
+        db2.exec(`CREATE TABLE IF NOT EXISTS party_routes (
+  id INTEGER PRIMARY KEY,
+  party_id INTEGER NOT NULL REFERENCES parties(id),
+  route_id INTEGER NOT NULL REFERENCES routes(id)
+);
+CREATE INDEX IF NOT EXISTS idx_party_routes_party ON party_routes(party_id);
+CREATE INDEX IF NOT EXISTS idx_party_routes_route ON party_routes(route_id);`);
         const ins = db2.prepare("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)");
         const up = db2.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
         for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) ins.run(k, v);
@@ -909,6 +973,1878 @@ CREATE TABLE IF NOT EXISTS debit_note_stock (
 CREATE INDEX IF NOT EXISTS idx_dns_line ON debit_note_stock(line_id);
 `;
       module.exports = { applySchema, migrateItems, DEFAULT_SETTINGS };
+    }
+  });
+
+  // ../../backend/src/utils/misc.js
+  var require_misc = __commonJS({
+    "../../backend/src/utils/misc.js"(exports, module) {
+      init_globals();
+      var db2 = require_db();
+      var today = () => (/* @__PURE__ */ new Date()).toLocaleDateString("en-CA");
+      function fy(d = /* @__PURE__ */ new Date()) {
+        const y = typeof d === "string" ? +d.slice(0, 4) : d.getFullYear();
+        const mo = typeof d === "string" ? +d.slice(5, 7) - 1 : d.getMonth();
+        const start = mo >= 3 ? y : y - 1;
+        return `${String(start).slice(2)}-${String(start + 1).slice(2)}`;
+      }
+      var SERIES = { INV: ["invoices", "invoice_no"], RCT: ["receipts", "receipt_no"], PUR: ["purchases", "purchase_no"], PAY: ["payments", "voucher_no"], DN: ["debit_notes", "note_no"] };
+      function numbering(prefix, date) {
+        const get = (k) => {
+          const r = db2.prepare("SELECT value FROM settings WHERE key=?").get(k);
+          return r && r.value !== null ? String(r.value) : "";
+        };
+        const bare = get(`num_${prefix}_bare`) === "1";
+        const label = bare ? "" : get(`num_${prefix}_prefix`).trim() || prefix;
+        const ownFy = get(`num_${prefix}_fy`);
+        const withFy = ownFy !== "" ? ownFy !== "0" : get("num_fy") !== "0";
+        const own = parseInt(get(`num_${prefix}_digits`), 10);
+        const d = parseInt(get("num_digits"), 10);
+        const digits = own >= 1 && own <= 9 ? own : d >= 3 && d <= 6 ? d : 5;
+        const year = fy(date || /* @__PURE__ */ new Date());
+        const sep = /[A-Za-z0-9]$/.test(label) ? "/" : "";
+        const head = withFy ? `${label}${sep}${year}/` : label;
+        const key = withFy ? `${prefix}/${year}` : ownFy !== "" || bare ? `${prefix}@${head}` : prefix;
+        return { prefix, label, withFy, digits, head, key };
+      }
+      function lastUsed(prefix, head) {
+        const t = SERIES[prefix];
+        let best = { n: 0, no: "" };
+        if (!t) return best;
+        for (const r of db2.prepare(`SELECT ${t[1]} AS no FROM ${t[0]} WHERE substr(${t[1]}, 1, ?) = ?`).all(head.length, head)) {
+          const rest = String(r.no).slice(head.length);
+          if (/^[0-9]+$/.test(rest) && parseInt(rest, 10) > best.n) best = { n: parseInt(rest, 10), no: String(r.no) };
+        }
+        return best;
+      }
+      function peekNo(prefix, date) {
+        const s = numbering(prefix, date);
+        const c = db2.prepare("SELECT value FROM counters WHERE key = ?").get(s.key);
+        const v = Math.max(c ? Number(c.value) : 0, lastUsed(prefix, s.head).n) + 1;
+        return { ...s, next: v, next_no: s.head + String(v).padStart(s.digits, "0"), last_no: lastUsed(prefix, s.head).no };
+      }
+      function nextNo(prefix, date) {
+        const s = numbering(prefix, date);
+        const used = lastUsed(prefix, s.head).n;
+        db2.prepare("INSERT INTO counters(key,value) VALUES(?,0) ON CONFLICT(key) DO NOTHING").run(s.key);
+        db2.prepare("UPDATE counters SET value = MAX(value, ?) + 1 WHERE key = ?").run(used, s.key);
+        const v = db2.prepare("SELECT value FROM counters WHERE key = ?").get(s.key).value;
+        return s.head + String(v).padStart(s.digits, "0");
+      }
+      function setNext(prefix, next, date) {
+        if (!SERIES[prefix]) throw new HttpError2(400, "Unknown series");
+        const n = parseInt(next, 10);
+        if (!(n >= 1) || String(n) !== String(next).trim()) throw new HttpError2(400, "Enter the next number as a whole number, 1 or more");
+        const s = numbering(prefix, date);
+        const used = lastUsed(prefix, s.head);
+        if (n <= used.n) throw new HttpError2(409, `The next number must come after ${used.no}, the last one used`);
+        db2.prepare("INSERT INTO counters(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(s.key, n - 1);
+        return peekNo(prefix, date);
+      }
+      function followLast() {
+        const set = db2.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
+        const del = db2.prepare("DELETE FROM settings WHERE key=?");
+        const split = (no) => /^(.*?)([0-9]+)$/.exec(String(no || "").trim());
+        const out = {};
+        for (const [s, [t, col]] of Object.entries(SERIES)) {
+          const row = db2.prepare(`SELECT ${col} AS no, date FROM ${t} ORDER BY date DESC, id DESC LIMIT 1`).get();
+          const last = row && split(row.no);
+          if (!last) continue;
+          const head = last[1];
+          if (numbering(s, row.date).head === head || numbering(s).head === head) continue;
+          const digits = last[2].length;
+          if (head === "") set.run(`num_${s}_bare`, "1");
+          else {
+            del.run(`num_${s}_bare`);
+            set.run(`num_${s}_prefix`, head);
+          }
+          set.run(`num_${s}_digits`, String(Math.min(9, digits)));
+          set.run(`num_${s}_fy`, "0");
+          out[s] = peekNo(s).next_no;
+        }
+        return out;
+      }
+      function numberingEdited(body) {
+        const del = db2.prepare("DELETE FROM settings WHERE key=?");
+        for (const s of Object.keys(SERIES)) {
+          if (body[`num_${s}_prefix`] !== void 0 || body[`num_${s}_digits`] !== void 0) {
+            del.run(`num_${s}_bare`);
+            del.run(`num_${s}_fy`);
+          }
+          if (body.num_fy !== void 0) del.run(`num_${s}_fy`);
+        }
+      }
+      var HttpError2 = class extends Error {
+        constructor(status, message, code) {
+          super(message);
+          this.status = status;
+          this.code = code;
+        }
+      };
+      var h = (fn) => (req, res, next) => {
+        try {
+          fn(req, res, next);
+        } catch (e) {
+          next(e);
+        }
+      };
+      var ha = (fn) => (req, res, next) => {
+        Promise.resolve().then(() => fn(req, res, next)).catch(next);
+      };
+      var blank = (v) => v === void 0 || v === null || String(v).trim() === "" ? null : v;
+      function normDays(v) {
+        if (v === void 0 || v === null || v === "") return null;
+        const a = (Array.isArray(v) ? v : String(v).split(",")).map((x) => parseInt(x)).filter((x) => x >= 0 && x <= 6);
+        const u = [...new Set(a)].sort();
+        return u.length ? u.join(",") : null;
+      }
+      module.exports = { normDays, today, fy, nextNo, peekNo, setNext, followLast, numberingEdited, SERIES, HttpError: HttpError2, h, ha, blank };
+    }
+  });
+
+  // shims/os.js
+  var require_os = __commonJS({
+    "shims/os.js"(exports, module) {
+      "use strict";
+      init_globals();
+      var host = () => globalThis.AndroidHost;
+      module.exports = {
+        homedir: () => host().home(),
+        tmpdir: () => host().tmp(),
+        platform: () => "android",
+        EOL: "\n"
+      };
+    }
+  });
+
+  // shims/crypto.js
+  var require_crypto = __commonJS({
+    "shims/crypto.js"(exports, module) {
+      "use strict";
+      init_globals();
+      var K = new Uint32Array([
+        1116352408,
+        1899447441,
+        3049323471,
+        3921009573,
+        961987163,
+        1508970993,
+        2453635748,
+        2870763221,
+        3624381080,
+        310598401,
+        607225278,
+        1426881987,
+        1925078388,
+        2162078206,
+        2614888103,
+        3248222580,
+        3835390401,
+        4022224774,
+        264347078,
+        604807628,
+        770255983,
+        1249150122,
+        1555081692,
+        1996064986,
+        2554220882,
+        2821834349,
+        2952996808,
+        3210313671,
+        3336571891,
+        3584528711,
+        113926993,
+        338241895,
+        666307205,
+        773529912,
+        1294757372,
+        1396182291,
+        1695183700,
+        1986661051,
+        2177026350,
+        2456956037,
+        2730485921,
+        2820302411,
+        3259730800,
+        3345764771,
+        3516065817,
+        3600352804,
+        4094571909,
+        275423344,
+        430227734,
+        506948616,
+        659060556,
+        883997877,
+        958139571,
+        1322822218,
+        1537002063,
+        1747873779,
+        1955562222,
+        2024104815,
+        2227730452,
+        2361852424,
+        2428436474,
+        2756734187,
+        3204031479,
+        3329325298
+      ]);
+      function sha256(bytes) {
+        const n = bytes.length, total = n + 9 + 63 >> 6 << 6;
+        const m = new Uint8Array(total);
+        m.set(bytes);
+        m[n] = 128;
+        const bits = n * 8;
+        const dv = new DataView(m.buffer);
+        dv.setUint32(total - 8, Math.floor(bits / 4294967296));
+        dv.setUint32(total - 4, bits >>> 0);
+        const H = new Uint32Array([1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225]);
+        const W = new Uint32Array(64);
+        for (let o = 0; o < total; o += 64) {
+          for (let i = 0; i < 16; i++) W[i] = dv.getUint32(o + i * 4);
+          for (let i = 16; i < 64; i++) {
+            const a2 = W[i - 15], b2 = W[i - 2];
+            const s0 = (a2 >>> 7 | a2 << 25) ^ (a2 >>> 18 | a2 << 14) ^ a2 >>> 3;
+            const s1 = (b2 >>> 17 | b2 << 15) ^ (b2 >>> 19 | b2 << 13) ^ b2 >>> 10;
+            W[i] = W[i - 16] + s0 + W[i - 7] + s1 >>> 0;
+          }
+          let [a, b, c, d, e, f, g, h] = H;
+          for (let i = 0; i < 64; i++) {
+            const S1 = (e >>> 6 | e << 26) ^ (e >>> 11 | e << 21) ^ (e >>> 25 | e << 7);
+            const t1 = h + S1 + (e & f ^ ~e & g) + K[i] + W[i] >>> 0;
+            const S0 = (a >>> 2 | a << 30) ^ (a >>> 13 | a << 19) ^ (a >>> 22 | a << 10);
+            const t2 = S0 + (a & b ^ a & c ^ b & c) >>> 0;
+            h = g;
+            g = f;
+            f = e;
+            e = d + t1 >>> 0;
+            d = c;
+            c = b;
+            b = a;
+            a = t1 + t2 >>> 0;
+          }
+          H[0] += a;
+          H[1] += b;
+          H[2] += c;
+          H[3] += d;
+          H[4] += e;
+          H[5] += f;
+          H[6] += g;
+          H[7] += h;
+        }
+        return Array.from(H, (x) => x.toString(16).padStart(8, "0")).join("");
+      }
+      function createHash(alg) {
+        if (String(alg).toLowerCase() !== "sha256") throw new Error(`Hash ${alg} is not available`);
+        const parts = [];
+        const h = {
+          update(d) {
+            parts.push(typeof d === "string" ? new TextEncoder().encode(d) : d);
+            return h;
+          },
+          digest(enc) {
+            const n = parts.reduce((a, p) => a + p.length, 0);
+            const all = new Uint8Array(n);
+            let o = 0;
+            for (const p of parts) {
+              all.set(p, o);
+              o += p.length;
+            }
+            const hex = sha256(all);
+            return enc === "hex" ? hex : Buffer2.from(hex, "hex");
+          }
+        };
+        return h;
+      }
+      function randomUUID() {
+        if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+        const b = new Uint8Array(16);
+        crypto.getRandomValues(b);
+        b[6] = b[6] & 15 | 64;
+        b[8] = b[8] & 63 | 128;
+        const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+        return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+      }
+      module.exports = { createHash, randomUUID };
+    }
+  });
+
+  // ../../backend/src/services/drive.js
+  var require_drive = __commonJS({
+    "../../backend/src/services/drive.js"(exports, module) {
+      init_globals();
+      var fs = require_fs();
+      var path = require_path();
+      var db2 = require_db();
+      var { HttpError: HttpError2 } = require_misc();
+      var B3 = require_backup();
+      var reg = db2.registry;
+      var get = (k) => {
+        const r = reg.prepare("SELECT value FROM app_settings WHERE key=?").get(k);
+        return r && r.value ? String(r.value) : "";
+      };
+      var set = (k, v) => reg.prepare("INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
+      var del = (k) => reg.prepare("DELETE FROM app_settings WHERE key=?").run(k);
+      var SCOPE = "https://www.googleapis.com/auth/drive.file";
+      var FOLDER = "BillBox Backups";
+      var FOLDER_TYPE = "application/vnd.google-apps.folder";
+      var offline = () => new HttpError2(503, "Could not reach Google. Check the internet connection and try again.", "OFFLINE");
+      var form = (o) => Object.entries(o).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+      var FORM = { "content-type": "application/x-www-form-urlencoded" };
+      async function call(url, opts) {
+        let r;
+        try {
+          r = await fetch(url, opts);
+        } catch (_) {
+          throw offline();
+        }
+        const text = await r.text();
+        let json = {};
+        try {
+          json = JSON.parse(text);
+        } catch (_) {
+        }
+        return { status: r.status, json: json && typeof json === "object" ? json : {} };
+      }
+      function status() {
+        return {
+          client_id: get("drive_client_id"),
+          has_secret: get("drive_client_secret") !== "",
+          connected: get("drive_refresh") !== "",
+          waiting: get("drive_device") !== "",
+          folder: get("drive_folder_id") ? FOLDER : "",
+          last_upload: get("drive_last_upload"),
+          last_status: get("drive_last_status")
+        };
+      }
+      function keysFromJson(text) {
+        let j;
+        try {
+          j = JSON.parse(String(text));
+        } catch (_) {
+          throw new HttpError2(400, "That file is not the JSON file downloaded from Google Cloud (client_secret_\u2026.json).");
+        }
+        if (j && j.web && !j.installed) throw new HttpError2(400, "That file is for a \u201CWeb application\u201D client. In Google Cloud make an OAuth client of type \u201CTVs and Limited Input devices\u201D and download its JSON.");
+        const k = j && (j.installed || j.web) || j || {};
+        if (!k.client_id || !k.client_secret) throw new HttpError2(400, "That file has no client ID and secret in it. Download the JSON of the OAuth client (Credentials \u203A your client \u203A Download JSON).");
+        return { client_id: k.client_id, client_secret: k.client_secret };
+      }
+      function explain(j, status2) {
+        const e = j.error || "";
+        if (e === "invalid_client") return "Google does not know this Client ID. Check it was copied in full (or import the downloaded JSON file), that the client is of type \u201CTVs and Limited Input devices\u201D, and if you made it just now wait a few minutes and try again";
+        if (e === "unauthorized_client") return "this client cannot use code sign-in: make an OAuth client of type \u201CTVs and Limited Input devices\u201D";
+        if (e === "invalid_scope") return "the Google Drive API is not allowed for this client: turn on the Google Drive API in your Google Cloud project";
+        if (e === "access_denied" || e === "org_internal") return "Google refused: add your Gmail as a test user on the consent screen (Audience \u203A Test users)";
+        return j.error_description || e || String(status2);
+      }
+      function saveClient(b = {}) {
+        if (b.json) b = keysFromJson(b.json);
+        const id = String(b.client_id || "").trim(), secret = String(b.client_secret || "").trim();
+        if (!/\.apps\.googleusercontent\.com$/.test(id)) throw new HttpError2(400, "Paste the Client ID from Google Cloud (it ends in .apps.googleusercontent.com).");
+        if (!secret) throw new HttpError2(400, "Paste the client secret too.");
+        if (id !== get("drive_client_id")) for (const k of ["drive_refresh", "drive_folder_id", "drive_device"]) del(k);
+        set("drive_client_id", id);
+        set("drive_client_secret", secret);
+        return status();
+      }
+      async function connect() {
+        const id = get("drive_client_id");
+        if (!id) throw new HttpError2(400, "Add the Google Client ID and secret first.");
+        const r = await call("https://oauth2.googleapis.com/device/code", { method: "POST", headers: FORM, body: form({ client_id: id, scope: SCOPE }) });
+        if (r.status !== 200) throw new HttpError2(r.json.error ? 400 : 502, `Google did not give a code: ${explain(r.json, r.status)}.`);
+        set("drive_device", r.json.device_code);
+        return {
+          user_code: r.json.user_code,
+          verification_url: r.json.verification_url || r.json.verification_uri || "https://www.google.com/device",
+          interval: r.json.interval || 5,
+          expires_in: r.json.expires_in || 1800
+        };
+      }
+      async function poll() {
+        const dev = get("drive_device");
+        if (!dev) throw new HttpError2(400, "Press Connect first.");
+        const r = await call("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: FORM,
+          body: form({ client_id: get("drive_client_id"), client_secret: get("drive_client_secret"), device_code: dev, grant_type: "urn:ietf:params:oauth:grant-type:device_code" })
+        });
+        if (r.json.error === "authorization_pending" || r.json.error === "slow_down") return { connected: false, waiting: true };
+        del("drive_device");
+        if (r.status !== 200 || !r.json.refresh_token) {
+          throw new HttpError2(400, r.json.error === "access_denied" ? "Google sign-in was declined." : r.json.error === "expired_token" ? "The code ran out. Press Connect again." : `Google did not connect: ${explain(r.json, r.status)}.`);
+        }
+        set("drive_refresh", r.json.refresh_token);
+        await folder(r.json.access_token);
+        return { connected: true, waiting: false, folder: FOLDER };
+      }
+      function disconnect() {
+        for (const k of ["drive_refresh", "drive_folder_id", "drive_device", "drive_last_upload", "drive_last_status"]) del(k);
+        return status();
+      }
+      async function token() {
+        if (!get("drive_refresh")) throw new HttpError2(400, "Google Drive is not connected.");
+        const r = await call("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: FORM,
+          body: form({ client_id: get("drive_client_id"), client_secret: get("drive_client_secret"), refresh_token: get("drive_refresh"), grant_type: "refresh_token" })
+        });
+        if (r.status !== 200 || !r.json.access_token) {
+          if (r.json.error === "invalid_grant") {
+            del("drive_refresh");
+            del("drive_folder_id");
+            throw new HttpError2(401, "Google Drive was disconnected (the permission was removed or ran out). Connect again.");
+          }
+          throw new HttpError2(502, `Google did not answer (${r.json.error_description || r.json.error || r.status}).`);
+        }
+        return r.json.access_token;
+      }
+      async function makeFolder(tok, name, parent) {
+        const r = await call("https://www.googleapis.com/drive/v3/files?fields=id", {
+          method: "POST",
+          headers: { authorization: `Bearer ${tok}`, "content-type": "application/json" },
+          body: JSON.stringify(parent ? { name, mimeType: FOLDER_TYPE, parents: [parent] } : { name, mimeType: FOLDER_TYPE })
+        });
+        if (r.status !== 200 || !r.json.id) throw new HttpError2(502, `Google Drive did not make the folder "${name}" (${r.json.error && r.json.error.message || r.status}).`);
+        return r.json.id;
+      }
+      async function search(tok, q, fields = "id,name,createdTime,size") {
+        const out = [];
+        let page = "";
+        do {
+          const u = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent(`nextPageToken,files(${fields})`)}&orderBy=createdTime%20desc&pageSize=200${page ? `&pageToken=${encodeURIComponent(page)}` : ""}`;
+          const r = await call(u, { headers: { authorization: `Bearer ${tok}` } });
+          if (r.status !== 200 || !Array.isArray(r.json.files)) break;
+          out.push(...r.json.files);
+          page = r.json.nextPageToken || "";
+        } while (page);
+        return out;
+      }
+      var findFolders = (tok) => search(tok, `name='${FOLDER}' and mimeType='${FOLDER_TYPE}' and trashed=false`, "id,name,createdTime");
+      async function folder(tok) {
+        const id = get("drive_folder_id");
+        if (id) {
+          const r = await call(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,trashed`, { headers: { authorization: `Bearer ${tok}` } });
+          if (r.status === 200 && !r.json.trashed) return id;
+        }
+        const found = await findFolders(tok);
+        if (found.length) {
+          set("drive_folder_id", found[found.length - 1].id);
+          return found[found.length - 1].id;
+        }
+        const made = await makeFolder(tok, FOLDER, null);
+        set("drive_folder_id", made);
+        return made;
+      }
+      async function upload(b = {}) {
+        const list2 = B3.listBackups();
+        const name = b.folder ? String(b.folder) : list2[0] && list2[0].name;
+        if (!name) throw new HttpError2(400, "There is no backup to upload yet. Press Back up now first.");
+        const dir = path.join(B3.config().dir, path.basename(name));
+        if (!fs.existsSync(dir)) throw new HttpError2(404, `Backup ${name} not found.`);
+        const tok = await token();
+        const parent = await folder(tok);
+        const sub = await makeFolder(tok, path.basename(name), parent);
+        const files = fs.readdirSync(dir).filter((f) => fs.statSync(path.join(dir, f)).isFile()).sort();
+        let bytes = 0;
+        for (const f of files) {
+          const data = fs.readFileSync(path.join(dir, f));
+          const boundary = "billbox" + Date.now().toString(36);
+          const meta = JSON.stringify({ name: f, parents: [sub] });
+          const body = Buffer2.concat([
+            Buffer2.from(`--${boundary}\r
+content-type: application/json; charset=UTF-8\r
+\r
+${meta}\r
+--${boundary}\r
+content-type: application/octet-stream\r
+\r
+`),
+            data,
+            Buffer2.from(`\r
+--${boundary}--\r
+`)
+          ]);
+          const r = await call("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+            method: "POST",
+            headers: { authorization: `Bearer ${tok}`, "content-type": `multipart/related; boundary=${boundary}` },
+            body
+          });
+          if (r.status !== 200) {
+            set("drive_last_status", `failed: ${f}`);
+            throw new HttpError2(502, `Google Drive did not take ${f} (${r.json.error && r.json.error.message || r.status}).`);
+          }
+          bytes += data.length;
+        }
+        set("drive_last_upload", `${name}`);
+        set("drive_last_status", "ok");
+        return { folder: name, files: files.length, bytes, drive_folder: FOLDER };
+      }
+      async function list() {
+        const tok = await token();
+        const parents = await findFolders(tok);
+        const own = get("drive_folder_id");
+        if (own && !parents.some((p) => p.id === own)) parents.push({ id: own });
+        const seen = /* @__PURE__ */ new Set(), out = [];
+        for (const p of parents) {
+          for (const f of await search(tok, `'${p.id}' in parents and mimeType='${FOLDER_TYPE}' and trashed=false`, "id,name,createdTime")) {
+            if (seen.has(f.name)) continue;
+            seen.add(f.name);
+            out.push({ id: f.id, name: f.name, created: f.createdTime || "" });
+          }
+        }
+        out.sort((a, b) => a.name < b.name ? 1 : a.name > b.name ? -1 : 0);
+        const local = new Set(B3.listBackups().map((b) => b.name));
+        return out.map((b) => ({ ...b, on_device: local.has(b.name) }));
+      }
+      async function download(b = {}) {
+        const id = String(b.id || ""), name = path.basename(String(b.name || ""));
+        if (!id || !/^FMCG_Backup_|^[\w .()-]+$/.test(name)) throw new HttpError2(400, "Choose a backup from Google Drive.");
+        const dir = path.join(B3.config().dir, name);
+        if (B3.listBackups().some((x) => x.name === name)) return { name, downloaded: 0, on_device: true };
+        const tok = await token();
+        const files = await search(tok, `'${id}' in parents and trashed=false and mimeType!='${FOLDER_TYPE}'`, "id,name,size");
+        if (!files.length) throw new HttpError2(404, `The backup ${name} in Google Drive is empty.`);
+        const tmp = `${dir}.part`;
+        fs.rmSync(tmp, { recursive: true, force: true });
+        fs.mkdirSync(tmp, { recursive: true });
+        let bytes = 0;
+        try {
+          for (const f of files) {
+            let r;
+            try {
+              r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}?alt=media`, { headers: { authorization: `Bearer ${tok}` } });
+            } catch (_) {
+              throw offline();
+            }
+            if (r.status !== 200) throw new HttpError2(502, `Google Drive did not give ${f.name} (${r.status}).`);
+            const data = Buffer2.from(await r.arrayBuffer());
+            fs.writeFileSync(path.join(tmp, path.basename(f.name)), data);
+            bytes += data.length;
+          }
+          fs.renameSync(tmp, dir);
+        } catch (e) {
+          fs.rmSync(tmp, { recursive: true, force: true });
+          throw e;
+        }
+        return { name, downloaded: files.length, bytes, on_device: true };
+      }
+      async function afterBackup(folderName) {
+        if (!get("drive_refresh")) return null;
+        try {
+          return await upload({ folder: folderName });
+        } catch (e) {
+          set("drive_last_status", `failed: ${e.message}`);
+          return null;
+        }
+      }
+      module.exports = { status, saveClient, connect, poll, disconnect, upload, list, download, afterBackup };
+    }
+  });
+
+  // ../../backend/src/services/backup.js
+  var require_backup = __commonJS({
+    "../../backend/src/services/backup.js"(exports, module) {
+      init_globals();
+      var fs = require_fs();
+      var os = require_os();
+      var path = require_path();
+      var crypto2 = require_crypto();
+      var Database = require_sqlite2();
+      var db2 = require_db();
+      var { HttpError: HttpError2 } = require_misc();
+      var reg = db2.registry;
+      var PREFIX = "FMCG_Backup_";
+      var FOLDER_RE = /^FMCG_Backup_\d{8}_\d{6}(_\d+)?$/;
+      var getSetting = (k, d) => {
+        const r = reg.prepare("SELECT value FROM app_settings WHERE key=?").get(k);
+        return r ? r.value : d;
+      };
+      var setSetting = (k, v) => reg.prepare("INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
+      function config() {
+        return {
+          dir: getSetting("backup_dir", process.env.BILLBOX_BACKUP_DIR || path.join(os.homedir(), "DistributorProBackups")),
+          enabled: getSetting("backup_enabled", "0") === "1",
+          time: getSetting("backup_time", "21:00"),
+          on_exit: getSetting("backup_on_exit", "0") === "1",
+          last_run: getSetting("backup_last_run", ""),
+          last_status: getSetting("backup_last_status", "")
+        };
+      }
+      function saveConfig(b) {
+        if (b.dir !== void 0) {
+          if (!path.isAbsolute(b.dir)) throw new HttpError2(400, "Enter the full path of the backup folder, e.g. /Volumes/MyDrive/Backups");
+          setSetting("backup_dir", b.dir);
+        }
+        if (b.enabled !== void 0) setSetting("backup_enabled", b.enabled ? "1" : "0");
+        if (b.on_exit !== void 0) setSetting("backup_on_exit", b.on_exit ? "1" : "0");
+        if (b.time !== void 0) {
+          if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.time)) throw new HttpError2(400, "Time must be HH:MM (24 hour)");
+          setSetting("backup_time", b.time);
+        }
+        return config();
+      }
+      var stamp = (d = /* @__PURE__ */ new Date()) => {
+        const p = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+      };
+      var slug = (s) => String(s).replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "Company";
+      var sqlPath = (p) => p.replace(/'/g, "''");
+      function sha256(file) {
+        return crypto2.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+      }
+      function copyAndVerify(rawDb, dest) {
+        rawDb.exec(`VACUUM INTO '${sqlPath(dest)}'`);
+        const chk = new Database(dest, { readonly: true });
+        try {
+          const r = chk.prepare("PRAGMA integrity_check").get();
+          const v = Object.values(r)[0];
+          if (v !== "ok") throw new HttpError2(500, `Backup verification failed for ${path.basename(dest)}: ${v}`);
+        } finally {
+          chk.close();
+        }
+        return { file: path.basename(dest), bytes: fs.statSync(dest).size, sha256: sha256(dest) };
+      }
+      function backupNow({ reason = "manual" } = {}) {
+        const { dir } = config();
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+          const probe = path.join(dir, `.write-test-${process.pid}`);
+          fs.writeFileSync(probe, "ok");
+          fs.rmSync(probe);
+        } catch (e) {
+          const msg = `Cannot write to "${dir}". Is the drive connected and the folder writable?`;
+          setSetting("backup_last_status", `FAILED ${(/* @__PURE__ */ new Date()).toISOString()}: ${msg}`);
+          throw new HttpError2(500, msg);
+        }
+        let folder = path.join(dir, PREFIX + stamp());
+        for (let n = 2; fs.existsSync(folder); n++) folder = path.join(dir, `${PREFIX}${stamp()}_${n}`);
+        fs.mkdirSync(folder);
+        try {
+          const files = [];
+          const companies = reg.prepare("SELECT * FROM companies WHERE active=1 ORDER BY id").all();
+          for (const c of companies) {
+            const raw = db2.openCompany(c.id);
+            files.push({ company_id: c.id, company: c.name, ...c.fy ? { fy: c.fy } : {}, ...copyAndVerify(raw, path.join(folder, `${slug(c.name)}${c.fy ? "_" + c.fy : ""}_${c.id}.db`)) });
+          }
+          files.push({ company: "(company list)", ...copyAndVerify(reg, path.join(folder, "registry.db")) });
+          fs.writeFileSync(path.join(folder, "manifest.json"), JSON.stringify({ created: (/* @__PURE__ */ new Date()).toISOString(), reason, files }, null, 2));
+          setSetting("backup_last_run", (/* @__PURE__ */ new Date()).toISOString());
+          setSetting("backup_last_status", `OK ${path.basename(folder)}`);
+          return { folder, files };
+        } catch (e) {
+          fs.rmSync(folder, { recursive: true, force: true });
+          setSetting("backup_last_status", `FAILED ${(/* @__PURE__ */ new Date()).toISOString()}: ${e.message}`);
+          throw e;
+        }
+      }
+      function deleteBackup(name) {
+        const { dir } = config();
+        const n = path.basename(String(name || ""));
+        if (!FOLDER_RE.test(n)) throw new HttpError2(400, "That is not a backup folder made by BillBox.");
+        const f = path.join(dir, n);
+        if (!fs.existsSync(f)) throw new HttpError2(404, "That backup is already gone.");
+        fs.rmSync(f, { recursive: true, force: true });
+        return { deleted: n };
+      }
+      function listBackups() {
+        const { dir } = config();
+        if (!fs.existsSync(dir)) return [];
+        return fs.readdirSync(dir).filter((f) => FOLDER_RE.test(f)).sort().reverse().map((f) => {
+          let files = 0, bytes = 0, created = null, companies = [];
+          try {
+            const m = JSON.parse(fs.readFileSync(path.join(dir, f, "manifest.json"), "utf8"));
+            files = m.files.length;
+            bytes = m.files.reduce((a, x) => a + x.bytes, 0);
+            created = m.created;
+            companies = m.files.filter((x) => x.company_id).map((x) => x.company);
+          } catch {
+          }
+          return { name: f, files, bytes, created, companies };
+        });
+      }
+      function tick(now = /* @__PURE__ */ new Date()) {
+        const c = config();
+        if (!c.enabled) return null;
+        const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        const today = now.toLocaleDateString("en-CA");
+        const lastDay = c.last_run ? new Date(c.last_run).toLocaleDateString("en-CA") : "";
+        if (hhmm >= c.time && lastDay !== today) {
+          try {
+            const r = backupNow({ reason: "scheduled" });
+            require_drive().afterBackup(r.folder);
+            return r;
+          } catch (e) {
+            console.error("Scheduled backup failed:", e.message);
+          }
+        }
+        return null;
+      }
+      function startScheduler() {
+        const t = setInterval(() => tick(), 60 * 1e3);
+        t.unref();
+        setTimeout(() => tick(), 5e3).unref();
+      }
+      function checkFile(file) {
+        let chk;
+        try {
+          chk = new Database(file, { readonly: true });
+          const v = Object.values(chk.prepare("PRAGMA integrity_check").get())[0];
+          if (v !== "ok") throw new HttpError2(400, `${path.basename(file)} is damaged (${v}). Nothing was restored.`);
+          if (!chk.prepare("SELECT 1 FROM sqlite_master WHERE name='invoices'").get()) throw new HttpError2(400, `${path.basename(file)} is not a BillBox company file.`);
+        } catch (e) {
+          if (e instanceof HttpError2) throw e;
+          throw new HttpError2(400, `${path.basename(file)} cannot be opened as a database. Nothing was restored.`);
+        } finally {
+          if (chk) chk.close();
+        }
+      }
+      function swapIn(src, row) {
+        const dest = path.join(db2.dataDir, row.file);
+        db2.closeCompany(row.id);
+        const tmp = dest + ".restoring";
+        fs.copyFileSync(src, tmp);
+        for (const ext of ["-wal", "-shm"]) fs.rmSync(dest + ext, { force: true });
+        fs.renameSync(tmp, dest);
+        try {
+          require_sync().afterReplace(row.id);
+        } catch (e) {
+          console.error("sync after restore:", e && e.message);
+        }
+      }
+      var norm = (n) => String(n || "").trim().replace(/\s+/g, " ").toLowerCase();
+      function rowForCompany(name, { create = true, fy = null } = {}) {
+        const wanted = norm(name);
+        const hit = reg.prepare("SELECT * FROM companies").all().find((c) => norm(c.name) === wanted && (c.fy || null) === (fy || null));
+        if (hit) {
+          if (!hit.active) reg.prepare("UPDATE companies SET active=1 WHERE id=?").run(hit.id);
+          return hit;
+        }
+        if (!create) return null;
+        const id = db2.createCompany({ name: String(name || "Restored company").trim(), fy: fy || null });
+        return reg.prepare("SELECT * FROM companies WHERE id=?").get(id);
+      }
+      function companyInFile(file) {
+        let d;
+        try {
+          d = new Database(file, { readonly: true });
+          const r = d.prepare("SELECT value FROM settings WHERE key='company_name'").get();
+          const y = d.prepare("SELECT value FROM settings WHERE key='books_fy'").get();
+          return { name: r && r.value ? String(r.value) : null, fy: y && y.value ? String(y.value) : null };
+        } catch {
+          return { name: null, fy: null };
+        } finally {
+          if (d) d.close();
+        }
+      }
+      function mergeInto(row, file) {
+        const dst = db2.openCompany(row.id);
+        const src = new Database(file, { readonly: true });
+        const stats = { added: {}, skipped: {}, conflicts: [] };
+        const add = (k) => {
+          stats.added[k] = (stats.added[k] || 0) + 1;
+        };
+        const skip = (k) => {
+          stats.skipped[k] = (stats.skipped[k] || 0) + 1;
+        };
+        const all = (t) => {
+          try {
+            return src.prepare(`SELECT * FROM ${t}`).all();
+          } catch {
+            return [];
+          }
+        };
+        const cols = (t) => dst.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name).filter((c) => c !== "id");
+        const insert = (t, rec) => {
+          const cs = cols(t).filter((c) => rec[c] !== void 0);
+          const r = dst.prepare(`INSERT INTO ${t}(${cs.join(",")}) VALUES(${cs.map(() => "?").join(",")})`).run(...cs.map((c) => rec[c]));
+          return Number(r.lastInsertRowid);
+        };
+        const key = (v) => norm(v);
+        const idx = (t, f) => new Map(dst.prepare(`SELECT id,${f} v FROM ${t}`).all().map((r) => [key(r.v), r.id]));
+        const byName = (table, mapOut) => {
+          const have = idx(table, "name");
+          for (const r of all(table)) {
+            let id = have.get(key(r.name));
+            if (id) skip(table);
+            else {
+              id = insert(table, { ...r, ...mapOut ? mapOut(r) : {} });
+              have.set(key(r.name), id);
+              add(table);
+            }
+            maps[table].set(r.id, id);
+          }
+        };
+        const maps = { categories: /* @__PURE__ */ new Map(), salesmen: /* @__PURE__ */ new Map(), routes: /* @__PURE__ */ new Map(), parties: /* @__PURE__ */ new Map(), items: /* @__PURE__ */ new Map(), batches: /* @__PURE__ */ new Map(), invoices: /* @__PURE__ */ new Map(), purchases: /* @__PURE__ */ new Map(), debit_notes: /* @__PURE__ */ new Map() };
+        const newParties = /* @__PURE__ */ new Set();
+        const m = (name, id) => id == null ? null : maps[name].get(id) ?? null;
+        try {
+          dst.transaction(() => {
+            byName("categories");
+            byName("salesmen");
+            byName("routes", (r) => ({ salesman_id: m("salesmen", r.salesman_id) }));
+            const haveP = new Map(dst.prepare("SELECT id,name,type FROM parties").all().map((r) => [key(r.name) + "|" + (r.type === "SUPPLIER" ? "S" : "C"), r.id]));
+            for (const r of all("parties")) {
+              const k = key(r.name) + "|" + (r.type === "SUPPLIER" ? "S" : "C");
+              let id = haveP.get(k);
+              if (id) skip("parties");
+              else {
+                id = insert("parties", { ...r, route_id: m("routes", r.route_id) });
+                haveP.set(k, id);
+                newParties.add(id);
+                add("parties");
+              }
+              maps.parties.set(r.id, id);
+            }
+            for (const r of all("party_routes")) {
+              const pid = m("parties", r.party_id), rid = m("routes", r.route_id);
+              if (pid && rid && newParties.has(pid)) insert("party_routes", { party_id: pid, route_id: rid });
+            }
+            const haveI = idx("items", "name");
+            for (const r of all("items")) {
+              let id = haveI.get(key(r.name));
+              if (id) skip("items");
+              else {
+                id = insert("items", { ...r, category_id: m("categories", r.category_id) });
+                haveI.set(key(r.name), id);
+                add("items");
+              }
+              maps.items.set(r.id, id);
+            }
+            const haveB = new Map(dst.prepare("SELECT id,item_id,batch_no FROM batches").all().map((r) => [r.item_id + "|" + key(r.batch_no), r.id]));
+            for (const r of all("batches")) {
+              const itemId = m("items", r.item_id);
+              if (!itemId) continue;
+              const k = itemId + "|" + key(r.batch_no);
+              let id = haveB.get(k);
+              if (id) skip("batches");
+              else {
+                id = insert("batches", { ...r, item_id: itemId });
+                haveB.set(k, id);
+                add("batches");
+              }
+              maps.batches.set(r.id, id);
+            }
+            const haveS = new Set(dst.prepare("SELECT item_id,type,buy_qty,free_qty,percent FROM schemes").all().map((r) => [r.item_id, r.type, r.buy_qty, r.free_qty, r.percent].join("|")));
+            for (const r of all("schemes")) {
+              const itemId = m("items", r.item_id);
+              const k = [itemId, r.type, r.buy_qty, r.free_qty, r.percent].join("|");
+              if (!itemId || haveS.has(k)) {
+                skip("schemes");
+                continue;
+              }
+              insert("schemes", { ...r, item_id: itemId });
+              haveS.add(k);
+              add("schemes");
+            }
+            const document = (table, noCol, lineTable, fk, convert, lineConvert, label) => {
+              const have = new Map(dst.prepare(`SELECT id,${noCol} no,date,total FROM ${table}`).all().map((r) => [r.no, r]));
+              const lines = all(lineTable);
+              for (const r of all(table)) {
+                const cur = have.get(r[noCol]);
+                if (cur) {
+                  if (cur.date === r.date && Math.abs(cur.total - r.total) < 5e-3) skip(table);
+                  else {
+                    stats.conflicts.push(`${label} ${r[noCol]} exists here with different details; left as it is`);
+                    skip(table);
+                  }
+                  maps[table].set(r.id, cur.id);
+                  continue;
+                }
+                const id = insert(table, convert(r));
+                maps[table].set(r.id, id);
+                add(table);
+                for (const l of lines.filter((x) => x[fk] === r.id)) {
+                  const itemId = m("items", l.item_id);
+                  if (itemId) insert(lineTable, { ...l, [fk]: id, ...lineConvert(l, itemId) });
+                }
+              }
+            };
+            document(
+              "invoices",
+              "invoice_no",
+              "invoice_lines",
+              "invoice_id",
+              (r) => ({ ...r, party_id: m("parties", r.party_id), salesman_id: m("salesmen", r.salesman_id) }),
+              (l, itemId) => ({ item_id: itemId, batch_id: m("batches", l.batch_id) }),
+              "Bill"
+            );
+            document(
+              "purchases",
+              "purchase_no",
+              "purchase_lines",
+              "purchase_id",
+              (r) => ({ ...r, party_id: m("parties", r.party_id) }),
+              (l, itemId) => ({ item_id: itemId, batch_id: m("batches", l.batch_id) }),
+              "Purchase"
+            );
+            {
+              const have = new Map(dst.prepare("SELECT id,note_no no,date,total FROM debit_notes").all().map((r) => [r.no, r]));
+              const lines = all("debit_note_lines"), stock = all("debit_note_stock");
+              for (const r of all("debit_notes")) {
+                const cur = have.get(r.note_no);
+                if (cur) {
+                  if (cur.date === r.date && Math.abs(cur.total - r.total) < 5e-3) skip("debit_notes");
+                  else {
+                    stats.conflicts.push(`Debit note ${r.note_no} exists here with different details; left as it is`);
+                    skip("debit_notes");
+                  }
+                  maps.debit_notes.set(r.id, cur.id);
+                  continue;
+                }
+                const pid = m("parties", r.party_id);
+                if (!pid) continue;
+                const id = insert("debit_notes", { ...r, party_id: pid, purchase_id: m("purchases", r.purchase_id) });
+                maps.debit_notes.set(r.id, id);
+                add("debit_notes");
+                for (const l of lines.filter((x) => x.note_id === r.id)) {
+                  const itemId = m("items", l.item_id);
+                  if (!itemId) continue;
+                  const lid = insert("debit_note_lines", { ...l, note_id: id, item_id: itemId, batch_id: m("batches", l.batch_id) });
+                  for (const st of stock.filter((x) => x.line_id === l.id)) {
+                    const b = m("batches", st.batch_id);
+                    if (b) insert("debit_note_stock", { ...st, line_id: lid, batch_id: b });
+                  }
+                }
+              }
+            }
+            dst.exec("DELETE FROM invoice_lines WHERE batch_id IS NULL");
+            const voucher = (table, noCol, extra) => {
+              const have = new Set(dst.prepare(`SELECT ${noCol} no FROM ${table}`).all().map((r) => r.no));
+              for (const r of all(table)) {
+                if (have.has(r[noCol])) {
+                  skip(table);
+                  continue;
+                }
+                const pid = m("parties", r.party_id);
+                if (!pid) continue;
+                insert(table, { ...r, party_id: pid, salesman_id: m("salesmen", r.salesman_id), ...extra(r) });
+                have.add(r[noCol]);
+                add(table);
+              }
+            };
+            voucher("receipts", "receipt_no", (r) => ({ invoice_id: m("invoices", r.invoice_id) }));
+            voucher("payments", "voucher_no", (r) => ({ purchase_id: m("purchases", r.purchase_id) }));
+            const haveL = new Set(dst.prepare("SELECT party_id,type,IFNULL(ref_no,'') r,date,debit,credit FROM ledger").all().map((r) => [r.party_id, r.type, r.r, r.date, r.debit, r.credit].join("|")));
+            for (const r of all("ledger")) {
+              const pid = m("parties", r.party_id);
+              if (!pid) continue;
+              const k = [pid, r.type, r.ref_no || "", r.date, r.debit, r.credit].join("|");
+              if (haveL.has(k) || !newParties.has(pid) && r.type === "OPENING") continue;
+              insert("ledger", { ...r, party_id: pid });
+              haveL.add(k);
+              add("ledger");
+            }
+            for (const c of all("counters")) {
+              dst.prepare("INSERT INTO counters(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=MAX(value,excluded.value)").run(c.key, c.value);
+            }
+          })();
+        } finally {
+          src.close();
+        }
+        return stats;
+      }
+      function restore({ name, folder, file, company_id, mode } = {}) {
+        const merge = mode === "merge";
+        const merged = [];
+        const { dir } = config();
+        let restored = [];
+        if (file) {
+          if (!path.isAbsolute(file) || !fs.existsSync(file) || !fs.statSync(file).isFile()) throw new HttpError2(400, "Choose a company backup file (.db).");
+          checkFile(file);
+          const inFile = companyInFile(file);
+          const own = inFile.name;
+          const row = own ? rowForCompany(own, { create: false, fy: inFile.fy }) || null : null;
+          const target = row || reg.prepare("SELECT * FROM companies WHERE id=?").get(Number(company_id) || db2.firstCompanyId());
+          if (!target) throw new HttpError2(404, "Company not found");
+          backupNow({ reason: "before-restore" });
+          if (merge) merged.push({ company: target.name, ...mergeInto(target, file) });
+          else swapIn(file, target);
+          restored.push(target.name);
+        } else {
+          const f = folder || name && path.join(dir, path.basename(name));
+          if (!f || !path.isAbsolute(f) || !fs.existsSync(f) || !fs.statSync(f).isDirectory()) throw new HttpError2(400, "Choose a backup folder (one that contains manifest.json).");
+          let manifest;
+          try {
+            manifest = JSON.parse(fs.readFileSync(path.join(f, "manifest.json"), "utf8"));
+          } catch {
+            throw new HttpError2(400, "That folder has no readable manifest.json, so it is not a BillBox backup.");
+          }
+          const items = manifest.files.filter((x) => x.company_id);
+          if (!items.length) throw new HttpError2(400, "That backup contains no company data.");
+          for (const x of items) {
+            const p = path.join(f, x.file);
+            if (!fs.existsSync(p)) throw new HttpError2(400, `${x.file} is missing from the backup folder. Nothing was restored.`);
+            if (x.sha256 && sha256(p) !== x.sha256) throw new HttpError2(400, `${x.file} does not match its checksum (it was changed or damaged). Nothing was restored.`);
+            checkFile(p);
+          }
+          let bReg = null;
+          const regFile = path.join(f, "registry.db");
+          if (fs.existsSync(regFile)) bReg = new Database(regFile, { readonly: true });
+          try {
+            backupNow({ reason: "before-restore" });
+            for (const x of items) {
+              const row = rowForCompany(
+                x.company || bReg && (bReg.prepare("SELECT name FROM companies WHERE id=?").get(x.company_id) || {}).name,
+                { fy: x.fy || companyInFile(path.join(f, x.file)).fy }
+              );
+              if (merge) merged.push({ company: row.name, ...mergeInto(row, path.join(f, x.file)) });
+              else swapIn(path.join(f, x.file), row);
+              restored.push(row.name);
+            }
+          } finally {
+            if (bReg) bReg.close();
+          }
+        }
+        for (const id of reg.prepare("SELECT id FROM companies").all().map((r) => r.id)) db2.openCompany(id);
+        return { restored, mode: merge ? "merge" : "replace", merged };
+      }
+      module.exports = { deleteBackup, restore, config, saveConfig, backupNow, listBackups, tick, startScheduler };
+    }
+  });
+
+  // ../../backend/src/services/sync.js
+  var require_sync = __commonJS({
+    "../../backend/src/services/sync.js"(exports, module) {
+      init_globals();
+      var db2 = require_db();
+      var { HttpError: HttpError2, nextNo } = require_misc();
+      var CONFIG = {
+        apiKey: process.env.BILLBOX_FIREBASE_KEY || "AIzaSyC0bS-ytJeaXl6PbE0cxzTa6FoOC2wTYo0",
+        databaseURL: (process.env.BILLBOX_FIREBASE_DB || "https://billbox-fd2c0-default-rtdb.asia-southeast1.firebasedatabase.app").replace(/\/$/, ""),
+        authURL: process.env.BILLBOX_FIREBASE_AUTH || "https://identitytoolkit.googleapis.com/v1",
+        tokenURL: process.env.BILLBOX_FIREBASE_TOKEN || "https://securetoken.googleapis.com/v1/token"
+      };
+      var RANGE = 1e7;
+      var MAX_SLOT = 210;
+      var LOCAL = /* @__PURE__ */ new Set(["sync_out", "sync_state", "sync_seen", "sync_alias"]);
+      var CHUNK = 400;
+      var reg = db2.registry;
+      var getApp = (k) => {
+        const r = reg.prepare("SELECT value FROM app_settings WHERE key=?").get(k);
+        return r ? r.value : null;
+      };
+      var setApp = (k, v) => {
+        if (v === null || v === void 0) reg.prepare("DELETE FROM app_settings WHERE key=?").run(k);
+        else reg.prepare("INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
+      };
+      var map = () => {
+        try {
+          return JSON.parse(getApp("sync_map") || "{}");
+        } catch {
+          return {};
+        }
+      };
+      var setMap = (m) => setApp("sync_map", JSON.stringify(m));
+      var now = () => (/* @__PURE__ */ new Date()).toISOString();
+      var randomKey = () => {
+        const A = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        let k = "b";
+        for (let i = 0; i < 15; i++) k += A[Math.floor(Math.random() * A.length)];
+        return k;
+      };
+      var state = { moved: {}, companies: 0, version: 0, lastSync: null, lastError: null, running: null, errors: 0, token: null, tokenExp: 0 };
+      var offline = () => new HttpError2(503, "No internet: BillBox could not reach the sync server. Your books are safe here and sync again when the internet is back.");
+      async function call(url, opts = {}) {
+        let r;
+        try {
+          r = await fetch(url, { ...opts, timeoutMs: 8e3 });
+        } catch (_) {
+          throw offline();
+        }
+        const text = await r.text();
+        let j = null;
+        try {
+          j = text ? JSON.parse(text) : null;
+        } catch {
+          j = null;
+        }
+        return { status: r.status, j };
+      }
+      var AUTH_ERR = {
+        EMAIL_EXISTS: "That e-mail already has a BillBox sync account: sign in instead.",
+        EMAIL_NOT_FOUND: "No sync account with that e-mail: create one first.",
+        INVALID_PASSWORD: "Wrong password.",
+        INVALID_LOGIN_CREDENTIALS: "Wrong e-mail or password.",
+        INVALID_EMAIL: "That e-mail address is not valid.",
+        WEAK_PASSWORD: "Choose a password of at least 6 characters.",
+        OPERATION_NOT_ALLOWED: "E-mail sign-in is off in Firebase: turn on Authentication \u203A Sign-in method \u203A Email/Password.",
+        TOO_MANY_ATTEMPTS_TRY_LATER: "Too many tries: wait a few minutes.",
+        CONFIGURATION_NOT_FOUND: "Firebase Authentication is not set up yet: open Authentication in the Firebase console and press Get started."
+      };
+      function authError(j) {
+        const m = String(j && j.error && j.error.message || "Sign-in failed");
+        const code = m.split(" ")[0].split(":")[0];
+        return new HttpError2(400, AUTH_ERR[code] || m);
+      }
+      async function signIn({ email, password, create } = {}) {
+        email = String(email || "").trim().toLowerCase();
+        if (!email || !password) throw new HttpError2(400, "Enter the e-mail and password of your sync account.");
+        const r = await call(`${CONFIG.authURL}/accounts:${create ? "signUp" : "signInWithPassword"}?key=${CONFIG.apiKey}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email, password, returnSecureToken: true })
+        });
+        if (r.status !== 200 || !r.j || !r.j.idToken) throw authError(r.j);
+        if (getApp("sync_uid") && getApp("sync_uid") !== r.j.localId) {
+          setApp("sync_slot", null);
+          setMap({});
+        }
+        setApp("sync_email", email);
+        setApp("sync_uid", r.j.localId);
+        setApp("sync_refresh", r.j.refreshToken);
+        state.token = r.j.idToken;
+        state.tokenExp = Date.now() + (Number(r.j.expiresIn || 3600) - 120) * 1e3;
+        await slot();
+        return status();
+      }
+      function signOut() {
+        for (const cid of Object.keys(map())) detach(Number(cid));
+        for (const k of ["sync_email", "sync_uid", "sync_refresh", "sync_slot", "sync_map"]) setApp(k, null);
+        state.token = null;
+        state.tokenExp = 0;
+        state.lastError = null;
+        return status();
+      }
+      async function token(force) {
+        if (!force && state.token && Date.now() < state.tokenExp) return state.token;
+        const rt = getApp("sync_refresh");
+        if (!rt) throw new HttpError2(401, "Sign in to sync first (Settings \u203A Sync).");
+        const r = await call(`${CONFIG.tokenURL}?key=${CONFIG.apiKey}`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(rt)}`
+        });
+        if (r.status !== 200 || !r.j || !r.j.id_token) {
+          if (r.status === 400) {
+            state.token = null;
+            throw new HttpError2(401, "Your sync sign-in has expired: sign in again (Settings \u203A Sync).");
+          }
+          throw new HttpError2(502, `The sync server answered ${r.status}.`);
+        }
+        if (r.j.refresh_token) setApp("sync_refresh", r.j.refresh_token);
+        state.token = r.j.id_token;
+        state.tokenExp = Date.now() + (Number(r.j.expires_in || 3600) - 120) * 1e3;
+        return state.token;
+      }
+      async function rtdb(method, rel, body, query = "") {
+        const uid = getApp("sync_uid");
+        if (!uid) throw new HttpError2(401, "Sign in to sync first (Settings \u203A Sync).");
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const t = await token(attempt > 0);
+          const r = await call(`${CONFIG.databaseURL}/users/${uid}/${rel}.json?auth=${encodeURIComponent(t)}${query}`, {
+            method,
+            headers: { "content-type": "application/json" },
+            ...body !== void 0 ? { body: JSON.stringify(body) } : {}
+          });
+          if (r.status === 401 && attempt === 0) continue;
+          if (r.status === 401 || r.status === 403) throw new HttpError2(403, "The sync database refused BillBox: set its rules (Firebase \u203A Realtime Database \u203A Rules) as shown in Settings \u203A Sync.");
+          if (r.status === 404) throw new HttpError2(502, "The sync database was not found: create the Realtime Database in the Firebase console.");
+          if (r.status >= 400) throw new HttpError2(502, `The sync server answered ${r.status}${r.j && r.j.error ? ": " + r.j.error : ""}.`);
+          return r.j;
+        }
+        return null;
+      }
+      function deviceName() {
+        const p = String(typeof process !== "undefined" && process.platform || "device");
+        let h = "";
+        try {
+          const os = require_os();
+          h = typeof os.hostname === "function" ? String(os.hostname() || "") : "";
+        } catch {
+          h = "";
+        }
+        return h ? `${p} \xB7 ${h}` : p;
+      }
+      async function slot() {
+        const have = Number(getApp("sync_slot") || 0);
+        if (have) return have;
+        let mine = getApp("sync_device");
+        if (!mine) {
+          const r = await rtdb("POST", "devices", { at: { ".sv": "timestamp" }, name: deviceName() });
+          mine = r.name;
+          setApp("sync_device", mine);
+        }
+        const all = Object.keys(await rtdb("GET", "devices", void 0, "&shallow=true") || {}).sort();
+        const n = all.indexOf(mine) + 1;
+        if (n <= 0) {
+          setApp("sync_device", null);
+          throw new HttpError2(502, "This device could not register for sync: try again.");
+        }
+        if (n > MAX_SLOT) throw new HttpError2(400, `This sync account already has ${MAX_SLOT} device installs: use a new sync account.`);
+        setApp("sync_slot", n);
+        return n;
+      }
+      function tables(d) {
+        const out = [];
+        for (const { name } of d.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()) {
+          if (LOCAL.has(name) || /_new$|_old$/.test(name)) continue;
+          const cols = d.prepare(`PRAGMA table_info(${name})`).all();
+          const pk = cols.filter((c) => c.pk);
+          if (pk.length !== 1) continue;
+          const uniq = d.prepare(`PRAGMA index_list(${name})`).all().filter((x) => x.unique && x.origin === "u").map((x) => d.prepare(`PRAGMA index_info(${x.name})`).all().map((c) => c.name));
+          const fks = d.prepare(`PRAGMA foreign_key_list(${name})`).all().map((f) => ({ col: f.from, ref: f.table }));
+          out.push({ name, pk: pk[0].name, intId: pk[0].name === "id" && /INT/i.test(pk[0].type), cols: cols.map((c) => c.name), uniq, fks });
+        }
+        return out;
+      }
+      function attach(cid, d) {
+        const key = map()[cid];
+        const sl = Number(getApp("sync_slot") || 0);
+        if (!key || !sl) {
+          d.idBase = 0;
+          return;
+        }
+        d.exec(`CREATE TABLE IF NOT EXISTS sync_out (seq INTEGER PRIMARY KEY, tbl TEXT NOT NULL, rid, op TEXT NOT NULL, dq REAL);
+CREATE TABLE IF NOT EXISTS sync_state (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS sync_seen (k TEXT PRIMARY KEY, at INTEGER);
+CREATE TABLE IF NOT EXISTS sync_alias (tbl TEXT NOT NULL, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, PRIMARY KEY (tbl, from_id))`);
+        const ts = tables(d);
+        for (const { name } of d.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'bbsync_%'").all()) d.exec(`DROP TRIGGER IF EXISTS ${name}`);
+        for (const t of ts) {
+          const dq = t.name === "batches" && t.cols.includes("qty") ? "NEW.qty - OLD.qty" : "NULL";
+          d.exec(`CREATE TRIGGER bbsync_${t.name}_i AFTER INSERT ON ${t.name} BEGIN INSERT INTO sync_out(tbl,rid,op) VALUES('${t.name}', NEW.${t.pk}, 'i'); END`);
+          d.exec(`CREATE TRIGGER bbsync_${t.name}_u AFTER UPDATE ON ${t.name} BEGIN INSERT INTO sync_out(tbl,rid,op,dq) VALUES('${t.name}', NEW.${t.pk}, 'u', ${dq}); INSERT INTO sync_out(tbl,rid,op) SELECT '${t.name}', OLD.${t.pk}, 'd' WHERE OLD.${t.pk} IS NOT NEW.${t.pk}; END`);
+          d.exec(`CREATE TRIGGER bbsync_${t.name}_d AFTER DELETE ON ${t.name} BEGIN INSERT INTO sync_out(tbl,rid,op) VALUES('${t.name}', OLD.${t.pk}, 'd'); END`);
+        }
+        d.idTables = new Set(ts.filter((t) => t.intId).map((t) => t.name));
+        d.idNext = {};
+        d.idBase = sl * RANGE;
+      }
+      function detach(cid) {
+        const d = db2.openCompany(cid);
+        if (!d) return;
+        for (const { name } of d.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'bbsync_%'").all()) d.exec(`DROP TRIGGER IF EXISTS ${name}`);
+        d.exec("DROP TABLE IF EXISTS sync_out; DROP TABLE IF EXISTS sync_seen; DROP TABLE IF EXISTS sync_state; DROP TABLE IF EXISTS sync_alias");
+        d.idBase = 0;
+      }
+      var getState = (d, k) => {
+        const r = d.prepare("SELECT v FROM sync_state WHERE k=?").get(k);
+        return r ? r.v : null;
+      };
+      var putState = (d, k, v) => {
+        if (d.prepare("SELECT 1 AS x FROM sync_state WHERE k=?").get(k)) d.prepare("UPDATE sync_state SET v=? WHERE k=?").run(String(v), k);
+        else d.prepare("INSERT INTO sync_state(k,v) VALUES(?,?)").run(k, String(v));
+      };
+      function pack(t, row) {
+        const r = {}, z = [];
+        for (const [c, v] of Object.entries(row)) {
+          if (v === null || v === void 0) z.push(c);
+          else if (typeof v === "bigint") r[c] = Number(v);
+          else if (v instanceof Uint8Array) continue;
+          else r[c] = v;
+        }
+        return z.length ? { r, z: z.join(",") } : { r };
+      }
+      function outgoing(d, limit = 4e3) {
+        const rows = d.prepare("SELECT seq,tbl,rid,op,dq FROM sync_out ORDER BY seq LIMIT ?").all(limit);
+        if (!rows.length) return { changes: [], upTo: 0 };
+        const info = Object.fromEntries(tables(d).map((t) => [t.name, t]));
+        const groups = /* @__PURE__ */ new Map();
+        for (const x of rows) {
+          const g = groups.get(x.tbl + "\0" + x.rid) || { tbl: x.tbl, rid: x.rid, ins: false, dq: 0, last: 0 };
+          if (x.op === "i") {
+            g.ins = true;
+            g.dq = 0;
+          } else if (x.op === "u" && x.dq != null) g.dq += Number(x.dq);
+          g.last = x.seq;
+          groups.set(x.tbl + "\0" + x.rid, g);
+        }
+        const changes = [];
+        for (const g of [...groups.values()].sort((a, b) => a.last - b.last)) {
+          const t = info[g.tbl];
+          if (!t) continue;
+          if (g.tbl === "settings" && /^sync_/.test(String(g.rid))) continue;
+          const row = d.prepare(`SELECT * FROM ${g.tbl} WHERE ${t.pk}=?`).get(g.rid);
+          if (!row) {
+            changes.push({ t: g.tbl, k: g.rid });
+            continue;
+          }
+          const c = { t: g.tbl, k: g.rid, ...pack(t, row) };
+          if (g.tbl === "batches" && !g.ins) c.q = Math.round(g.dq * 1e3) / 1e3;
+          changes.push(c);
+        }
+        return { changes, upTo: rows[rows.length - 1].seq };
+      }
+      function apply(cid, d, entries) {
+        const info = Object.fromEntries(tables(d).map((t) => [t.name, t]));
+        const ctx = { cid, slot: Number(getApp("sync_slot") || 0), resend: [] };
+        let applied = 0, failed = 0;
+        d.pragma("foreign_keys = OFF");
+        try {
+          db2.withCompany(cid, () => d.transaction(() => {
+            const before = (d.prepare("SELECT MAX(seq) AS m FROM sync_out").get() || {}).m || 0;
+            for (const e of entries) {
+              if (e.x) resetBooks(d, info);
+              for (const c of [].concat(e.c || []).filter(Boolean)) {
+                const t = info[c.t];
+                if (!t || c.t === "settings" && /^sync_/.test(String(c.k))) continue;
+                try {
+                  d.transaction(() => applyOne(d, t, c, ctx, info))();
+                  applied++;
+                } catch (err) {
+                  failed++;
+                  console.error("sync: could not apply", c.t, c.k, err && err.message);
+                }
+              }
+            }
+            d.prepare("DELETE FROM sync_out WHERE seq > ?").run(before);
+            for (const [tbl, rid] of ctx.resend) d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'u')").run(tbl, rid);
+          })());
+        } finally {
+          d.pragma("foreign_keys = ON");
+        }
+        state.errors += failed;
+        const nm = d.prepare("SELECT value FROM settings WHERE key='company_name'").get();
+        if (nm && nm.value && String(nm.value).trim()) reg.prepare("UPDATE companies SET name=? WHERE id=? AND name<>?").run(String(nm.value).trim(), cid, String(nm.value).trim());
+        return applied;
+      }
+      function resetBooks(d, info) {
+        for (const t of Object.values(info)) {
+          d.exec(`DELETE FROM ${t.name}`);
+        }
+        d.exec("DELETE FROM sync_out");
+        d.idNext = {};
+      }
+      function afterReplace(cid) {
+        const key = map()[cid];
+        if (!key) return;
+        const d = db2.openCompany(cid);
+        if (!d) return;
+        attach(cid, d);
+        d.exec("DELETE FROM sync_out; DELETE FROM sync_seen");
+        for (const t of tables(d)) d.prepare(`INSERT INTO sync_out(tbl,rid,op) SELECT '${t.name}', ${t.pk}, 'i' FROM ${t.name}`).run();
+        d.prepare("DELETE FROM sync_state WHERE k=?").run("cursor");
+        putState(d, "reset", "1");
+      }
+      var NUMBERED = { invoices: ["invoice_no", "INV"], receipts: ["receipt_no", "RCT"], purchases: ["purchase_no", "PUR"], payments: ["voucher_no", "PAY"], debit_notes: ["note_no", "DN"] };
+      function settleNumber(d, t, c, vals, ctx) {
+        const [col, series] = NUMBERED[t.name];
+        const no = vals[col];
+        if (no == null) return;
+        const other = d.prepare(`SELECT id, date FROM ${t.name} WHERE ${col}=? AND id<>?`).get(no, c.k);
+        if (!other) return;
+        const mine = (id) => ctx.slot && Math.floor(Number(id) / RANGE) === ctx.slot;
+        if (Number(other.id) < Number(c.k)) {
+          vals[col] = `${no}~${c.k}`;
+          return;
+        }
+        if (mine(other.id)) {
+          const fresh = nextNo(series, other.date);
+          d.prepare(`UPDATE ${t.name} SET ${col}=? WHERE id=?`).run(fresh, other.id);
+          ctx.resend.push([t.name, other.id]);
+          for (const k of d.prepare("SELECT key FROM counters").all()) ctx.resend.push(["counters", k.key]);
+          for (const l of d.prepare("SELECT id FROM ledger WHERE ref_no=? AND id > ? AND id < ?").all(no, ctx.slot * RANGE, (ctx.slot + 1) * RANGE)) {
+            d.prepare("UPDATE ledger SET ref_no=?, narration=REPLACE(narration, ?, ?) WHERE id=?").run(fresh, no, fresh, l.id);
+            ctx.resend.push(["ledger", l.id]);
+          }
+        } else {
+          d.prepare(`UPDATE ${t.name} SET ${col}=? WHERE id=?`).run(`${no}~${other.id}`, other.id);
+        }
+      }
+      var aliasOf = (d, tbl, id) => {
+        const r = d.prepare("SELECT to_id FROM sync_alias WHERE tbl=? AND from_id=?").get(tbl, id);
+        return r ? r.to_id : null;
+      };
+      function fold(d, t, info, loser, winner) {
+        for (const o of Object.values(info)) for (const f of o.fks) if (f.ref === t.name) d.prepare(`UPDATE ${o.name} SET ${f.col}=? WHERE ${f.col}=?`).run(winner, loser);
+        d.prepare("UPDATE sync_alias SET to_id=? WHERE tbl=? AND to_id=?").run(winner, t.name, loser);
+        d.prepare("INSERT OR REPLACE INTO sync_alias(tbl,from_id,to_id) VALUES(?,?,?)").run(t.name, loser, winner);
+      }
+      function merged(d, t, c, vals, info) {
+        for (const cols of t.uniq) {
+          const here = d.prepare(`SELECT * FROM ${t.name} WHERE ${t.pk}=?`).get(c.k);
+          const v = cols.map((col) => col in vals ? vals[col] : here ? here[col] : null);
+          if (v.some((x) => x == null)) continue;
+          const other = d.prepare(`SELECT * FROM ${t.name} WHERE ${cols.map((x) => `${x}=?`).join(" AND ")} AND ${t.pk}<>?`).get(...v, c.k);
+          if (!other) continue;
+          const stock = t.name === "batches";
+          if (Number(other[t.pk]) < Number(c.k)) {
+            const add = here ? Number(here.qty || 0) + Number(c.q || 0) : Number(vals.qty || 0);
+            if (stock && add) d.prepare("UPDATE batches SET qty = qty + ? WHERE id=?").run(add, other[t.pk]);
+            fold(d, t, info, c.k, other[t.pk]);
+            if (here) d.prepare(`DELETE FROM ${t.name} WHERE ${t.pk}=?`).run(c.k);
+            return true;
+          }
+          if (stock) vals.qty = (here && c.q != null ? Number(here.qty || 0) + Number(c.q) : Number(vals.qty || 0)) + Number(other.qty || 0);
+          d.prepare(`DELETE FROM ${t.name} WHERE ${t.pk}=?`).run(other[t.pk]);
+          fold(d, t, info, other[t.pk], c.k);
+          if (stock) c = { ...c, q: null };
+          write(d, t, c, vals);
+          return true;
+        }
+        return false;
+      }
+      function applyOne(d, t, c, ctx, info) {
+        const al = t.intId ? aliasOf(d, t.name, c.k) : null;
+        if (al != null) {
+          if (c.r && t.name === "batches" && c.q) d.prepare("UPDATE batches SET qty = qty + ? WHERE id=?").run(c.q, al);
+          return;
+        }
+        if (!c.r) {
+          d.prepare(`DELETE FROM ${t.name} WHERE ${t.pk}=?`).run(c.k);
+          return;
+        }
+        const vals = {};
+        for (const [k, v] of Object.entries(c.r)) if (t.cols.includes(k) && k !== t.pk) vals[k] = typeof v === "object" && v !== null ? JSON.stringify(v) : typeof v === "boolean" ? v ? 1 : 0 : v;
+        for (const k of String(c.z || "").split(",").filter(Boolean)) if (t.cols.includes(k) && k !== t.pk) vals[k] = null;
+        for (const f of t.fks) if (vals[f.col] != null) {
+          const a = aliasOf(d, f.ref, vals[f.col]);
+          if (a != null) vals[f.col] = a;
+        }
+        if (NUMBERED[t.name]) settleNumber(d, t, c, vals, ctx);
+        else if (t.uniq.length && merged(d, t, c, vals, info)) return;
+        write(d, t, c, vals);
+      }
+      function write(d, t, c, vals) {
+        const exists = d.prepare(`SELECT 1 AS x FROM ${t.name} WHERE ${t.pk}=?`).get(c.k);
+        if (exists) {
+          const sets = [], args = [];
+          for (const [k, v] of Object.entries(vals)) {
+            if (t.name === "batches" && k === "qty" && c.q != null) continue;
+            if (t.name === "counters" && k === "value") {
+              sets.push("value = MAX(value, ?)");
+              args.push(v);
+              continue;
+            }
+            sets.push(`${k}=?`);
+            args.push(v);
+          }
+          if (t.name === "batches" && c.q != null && c.q !== 0) {
+            sets.push("qty = qty + ?");
+            args.push(c.q);
+          }
+          if (sets.length) d.prepare(`UPDATE ${t.name} SET ${sets.join(",")} WHERE ${t.pk}=?`).run(...args, c.k);
+        } else {
+          const cols = [t.pk, ...Object.keys(vals)];
+          d.prepare(`INSERT INTO ${t.name}(${cols.join(",")}) VALUES(${cols.map(() => "?").join(",")})`).run(c.k, ...Object.values(vals));
+        }
+      }
+      var PUSH = "-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+      function pushTime(k) {
+        let t = 0;
+        for (let i = 0; i < 8; i++) t = t * 64 + PUSH.indexOf(k[i]);
+        return t;
+      }
+      function pushPrefix(ms) {
+        let s = "";
+        for (let i = 0; i < 8; i++) {
+          s = PUSH[ms % 64] + s;
+          ms = Math.floor(ms / 64);
+        }
+        return s;
+      }
+      async function push(d, key, sl) {
+        let sent = 0, last = null;
+        if (getState(d, "reset") === "1") {
+          const r = await rtdb("POST", `books/${key}/log`, { s: sl, x: 1 });
+          if (r && r.name) {
+            putState(d, "cursor", r.name);
+            putState(d, "floor", r.name);
+            d.prepare("INSERT OR IGNORE INTO sync_seen(k,at) VALUES(?,?)").run(r.name, pushTime(r.name));
+          }
+          d.prepare("DELETE FROM sync_state WHERE k=?").run("reset");
+        }
+        for (let round = 0; round < 20; round++) {
+          const { changes, upTo } = outgoing(d);
+          if (!changes.length) {
+            if (upTo) d.prepare("DELETE FROM sync_out WHERE seq <= ?").run(upTo);
+            break;
+          }
+          for (let i = 0; i < changes.length; i += CHUNK) {
+            const r = await rtdb("POST", `books/${key}/log`, { s: sl, c: changes.slice(i, i + CHUNK) });
+            if (r && r.name) {
+              d.prepare("INSERT OR IGNORE INTO sync_seen(k,at) VALUES(?,?)").run(r.name, pushTime(r.name));
+              last = r.name;
+            }
+          }
+          d.prepare("DELETE FROM sync_out WHERE seq <= ?").run(upTo);
+          sent += changes.length;
+        }
+        return { sent, last };
+      }
+      async function pull(cid, d, key, sl) {
+        let got = 0;
+        for (let round = 0; round < 40; round++) {
+          const cursor = getState(d, "cursor");
+          const from = !cursor ? null : round === 0 ? pushPrefix(Math.max(0, pushTime(cursor) - 15e3)) : cursor;
+          const limit = cursor && round === 0 ? 200 : 40;
+          const q = `&orderBy=${encodeURIComponent('"$key"')}${from ? `&startAt=${encodeURIComponent(JSON.stringify(from))}` : ""}&limitToFirst=${limit}`;
+          const page = await rtdb("GET", `books/${key}/log`, void 0, q) || {};
+          const keys = Object.keys(page).sort();
+          const seen = /* @__PURE__ */ new Set();
+          for (let i = 0; i < keys.length; i += 200) {
+            const part = keys.slice(i, i + 200);
+            for (const x of d.prepare(`SELECT k FROM sync_seen WHERE k IN (${part.map(() => "?").join(",")})`).all(...part)) seen.add(x.k);
+          }
+          const floor = getState(d, "floor");
+          const fresh = keys.filter((k) => !seen.has(k) && (!floor || k >= floor));
+          const theirs = fresh.filter((k) => page[k] && Number(page[k].s) !== sl).map((k) => page[k]);
+          if (theirs.length) got += apply(cid, d, theirs);
+          for (const k of fresh) d.prepare("INSERT OR IGNORE INTO sync_seen(k,at) VALUES(?,?)").run(k, pushTime(k));
+          const last = keys[keys.length - 1];
+          const moved2 = last && (!cursor || last > cursor);
+          if (moved2) putState(d, "cursor", last);
+          if (last) d.prepare("DELETE FROM sync_seen WHERE at < ?").run(pushTime(getState(d, "cursor")) - 12e4);
+          if (keys.length < limit || !moved2 && round > 0) break;
+        }
+        return got;
+      }
+      async function syncCompany(cid) {
+        const key = map()[cid];
+        const d = db2.openCompany(cid);
+        if (!key || !d) return 0;
+        const into = await rtdb("GET", `books/${key}/info/merged_into`);
+        if (into && into !== key) return follow(cid, key, into);
+        if (!d.idBase) attach(cid, d);
+        const sl = Number(getApp("sync_slot"));
+        await push(d, key, sl);
+        const got = await pull(cid, d, key, sl);
+        if (got) state.version++;
+        const row = db2.companyRow(cid);
+        if (row && row.name && getState(d, "info_name") !== row.name) {
+          await rtdb("PUT", `books/${key}/info/name`, row.name);
+          putState(d, "info_name", row.name);
+        }
+        return got;
+      }
+      async function tick() {
+        if (!getApp("sync_uid") || !Object.keys(map()).length) return brief();
+        if (state.running) {
+          await state.running.catch(() => {
+          });
+          return brief();
+        }
+        state.running = (async () => {
+          for (const cid of Object.keys(map())) await syncCompany(Number(cid));
+        })();
+        try {
+          await state.running;
+          state.lastSync = now();
+          state.lastError = null;
+        } catch (e) {
+          state.lastError = e.message || String(e);
+        } finally {
+          state.running = null;
+        }
+        return brief();
+      }
+      var brief = () => ({ on: !!getApp("sync_uid") && Object.keys(map()).length > 0, version: state.version, companies: state.companies, moved: state.moved, last_sync: state.lastSync, last_error: state.lastError });
+      async function turnOn(cid) {
+        const row = db2.companyRow(cid);
+        if (!row) throw new HttpError2(404, "Company not found");
+        await slot();
+        const m = map();
+        if (m[cid]) return status(cid);
+        const same = (await remote(cid)).books.find((b) => b.same_name && !b.on_this_device);
+        if (same) {
+          throw new HttpError2(409, `${row.name} is already in your sync account from another device. Use "Bring here" under Companies in your sync account to use that copy on this device (back up first if this copy has bills the other one does not).`);
+        }
+        const key = randomKey();
+        await rtdb("PUT", `books/${key}/info`, { name: row.name, fy: row.fy || null, at: { ".sv": "timestamp" }, by: getApp("sync_slot") });
+        m[cid] = key;
+        setMap(m);
+        const d = db2.openCompany(cid);
+        try {
+          attach(cid, d);
+          d.exec("DELETE FROM sync_out");
+          for (const t of tables(d)) {
+            d.prepare(`INSERT INTO sync_out(tbl,rid,op) SELECT '${t.name}', ${t.pk}, 'i' FROM ${t.name}`).run();
+          }
+          const { last } = await push(d, key, Number(getApp("sync_slot")));
+          if (last) await rtdb("PUT", `books/${key}/info/snap`, last);
+        } catch (e) {
+          state.lastError = e.message;
+        }
+        return status(cid);
+      }
+      function turnOff(cid) {
+        const m = map();
+        if (!m[cid]) return status(cid);
+        delete m[cid];
+        setMap(m);
+        detach(cid);
+        return status(cid);
+      }
+      async function remote(cid) {
+        const books = await rtdb("GET", "books", void 0, "&shallow=true") || {};
+        const m = map();
+        const here = new Set(Object.values(m));
+        const row = cid ? db2.companyRow(cid) : null;
+        const norm2 = (x) => String(x || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const out = [];
+        const dev = await rtdb("GET", "devices") || {};
+        const slots = Object.keys(dev).sort();
+        const mine = await mySlots();
+        const kind = (n) => /^darwin/.test(n) ? "Mac" : /^iphone/i.test(n) ? "iPhone" : /^android/.test(n) ? "Android" : /^win32/.test(n) ? "Windows" : /^linux/.test(n) ? "Linux" : "Device";
+        for (const key of Object.keys(books)) {
+          const info = await rtdb("GET", `books/${key}/info`) || {};
+          if (info.merged_into) continue;
+          const last = await rtdb("GET", `books/${key}/log`, void 0, `&orderBy=${encodeURIComponent('"$key"')}&limitToLast=300`) || {};
+          const used = /* @__PURE__ */ new Set();
+          for (const e of Object.values(last)) if (e && e.s) {
+            const d = dev[slots[Number(e.s) - 1]];
+            used.add(mine.has(Number(e.s)) ? "this device" : kind(String(d && d.name || "")));
+          }
+          out.push({
+            key,
+            name: info.name || "Company",
+            fy: info.fy || null,
+            on_this_device: here.has(key),
+            open: !!cid && m[cid] === key,
+            used_by: [...used].sort(),
+            // the open company has the same name but syncs into another book (or none): it can be merged into this one;
+            // a copy with no year (set up before years were kept, or imported) still matches
+            same_name: !!row && norm2(info.name) === norm2(row.name) && (!info.fy || !row.fy || info.fy === row.fy) && m[cid] !== key
+          });
+        }
+        return { books: out, can_merge: !!(cid && m[cid]) };
+      }
+      function snapshotEnd(keys, log, info) {
+        if (info && info.snap && keys.includes(info.snap)) return info.snap;
+        if (!keys.length) return null;
+        let end = keys[0];
+        for (let i = 1; i < keys.length; i++) {
+          const a = log[keys[i - 1]], b = log[keys[i]];
+          if (!b || b.x || Number(b.s) !== Number(log[keys[0]].s) || pushTime(keys[i]) - pushTime(keys[i - 1]) > 1e4) break;
+          end = keys[i];
+          if (a && a.x) break;
+        }
+        return end;
+      }
+      async function mySlots() {
+        const dev = await rtdb("GET", "devices") || {};
+        const me = getApp("sync_device");
+        const name = me && dev[me] ? dev[me].name : null;
+        const out = /* @__PURE__ */ new Set([Number(getApp("sync_slot"))]);
+        Object.keys(dev).sort().forEach((k, i) => {
+          if (name && dev[k] && dev[k].name === name) out.add(i + 1);
+        });
+        return out;
+      }
+      async function merge(cid, key) {
+        if (state.merging) throw new HttpError2(409, "The merge is still running. Wait a minute, then tap Look again.");
+        state.merging = true;
+        try {
+          return await mergeNow(cid, key);
+        } finally {
+          state.merging = false;
+        }
+      }
+      async function mergeNow(cid, key) {
+        const m = map();
+        const tKey = m[cid];
+        if (!tKey) throw new HttpError2(400, "Turn on sync for this company first, or use Bring here.");
+        if (!key || key === tKey) throw new HttpError2(400, "Choose the other copy of this company.");
+        const row = db2.companyRow(cid);
+        const srcInfo = await rtdb("GET", `books/${key}/info`);
+        if (!srcInfo) throw new HttpError2(404, "That company is no longer in the sync account.");
+        if (srcInfo.merged_into) throw new HttpError2(409, "That copy is already merged. Tap Look again.");
+        const srcCid = Number((Object.entries(m).find(([, v]) => v === key) || [])[0]) || null;
+        if (srcCid) await syncCompany(srcCid);
+        await syncCompany(cid);
+        const log = await rtdb("GET", `books/${key}/log`) || {};
+        const keys = Object.keys(log).sort();
+        const end = snapshotEnd(keys, log, srcInfo);
+        const after = end ? keys.filter((k) => k > end) : [];
+        if (after.some((k) => log[k] && log[k].x)) throw new HttpError2(409, "A backup was restored on that copy after sync was turned on, so it cannot be merged.");
+        const entries = after.map((k) => log[k]).filter((e) => e && e.c);
+        const snap = keys.filter((k) => !end || k <= end).map((k) => log[k]).filter((e) => e && e.c);
+        const d = db2.openCompany(cid);
+        const probe = [];
+        for (const e of snap) for (const c of [].concat(e.c || [])) if (c && c.r && (c.t === "items" || c.t === "parties")) probe.push(c);
+        const same = probe.filter((c) => {
+          const x = d.prepare(`SELECT name FROM ${c.t} WHERE id=?`).get(c.k);
+          return x && x.name === c.r.name;
+        }).length;
+        let replay = entries;
+        if (probe.length && same / probe.length < 0.8) replay = db2.withCompany(cid, () => d.transaction(() => crossTranslate(d, snap, entries))());
+        require_backup().backupNow({ reason: "before-merge" });
+        replayInto(cid, d, replay);
+        await rtdb("PUT", `books/${key}/info/merged_at`, keys[keys.length - 1] || "");
+        await rtdb("PUT", `books/${key}/info/merged_into`, tKey);
+        if (srcCid) moved(srcCid, cid);
+        syncCompany(cid).catch((e) => {
+          state.lastError = e.message;
+        });
+        state.version++;
+        return { company_id: cid, merged: entries.length, ...status(cid) };
+      }
+      var NATURAL = { items: ["name"], parties: ["name"], categories: ["name"], salesmen: ["name"], routes: ["name"], batches: ["item_id", "batch_no"] };
+      var norm = (v) => String(v == null ? "" : v).trim().toLowerCase().replace(/\s+/g, " ");
+      function crossTranslate(d, snap, entries) {
+        const info = Object.fromEntries(tables(d).map((t) => [t.name, t]));
+        const base = {};
+        for (const e of snap) for (const c of [].concat(e.c || []).filter(Boolean)) {
+          if (!c.r) continue;
+          const row = { ...c.r };
+          for (const z of String(c.z || "").split(",").filter(Boolean)) row[z] = null;
+          (base[c.t] = base[c.t] || {})[c.k] = row;
+        }
+        const map2 = {};
+        const tr = (tbl, id) => {
+          if (id == null || !info[tbl] || !info[tbl].intId || Number(id) >= RANGE) return id;
+          const m = map2[tbl] = map2[tbl] || {};
+          if (m[id] != null) return m[id];
+          const row = base[tbl] && base[tbl][id];
+          const t = info[tbl];
+          const vals = {};
+          if (row) {
+            for (const [k, v] of Object.entries(row)) if (t.cols.includes(k) && k !== t.pk) vals[k] = typeof v === "object" && v !== null ? JSON.stringify(v) : v;
+          }
+          for (const f of t.fks) if (vals[f.col] != null) vals[f.col] = tr(f.ref, vals[f.col]);
+          const keys = NATURAL[tbl];
+          if (row && keys && keys.every((k) => vals[k] != null)) {
+            const hit = d.prepare(`SELECT ${t.pk} AS id FROM ${tbl} WHERE ${keys.map((k) => k === "name" || k === "batch_no" ? `lower(trim(${k}))=?` : `${k}=?`).join(" AND ")}`).get(...keys.map((k) => k === "name" || k === "batch_no" ? norm(vals[k]) : vals[k]));
+            if (hit) {
+              m[id] = hit.id;
+              return hit.id;
+            }
+          }
+          const nid = d.nextId(tbl);
+          m[id] = nid;
+          if (row) {
+            const cols = Object.keys(vals);
+            d.prepare(`INSERT INTO ${tbl}(${[t.pk, ...cols].join(",")}) VALUES(${[t.pk, ...cols].map(() => "?").join(",")})`).run(nid, ...cols.map((k) => vals[k]));
+          }
+          return nid;
+        };
+        const out = [];
+        for (const e of entries) {
+          const list = [];
+          for (const c of [].concat(e.c || []).filter(Boolean)) {
+            const t = info[c.t];
+            if (!t || c.t === "settings" || c.t === "counters") continue;
+            if (!t.intId) {
+              list.push(c);
+              continue;
+            }
+            const own = Number(c.k) >= RANGE;
+            if (!c.r) {
+              if (own) list.push(c);
+              continue;
+            }
+            const r = { ...c.r };
+            for (const f of t.fks) if (r[f.col] != null) r[f.col] = tr(f.ref, r[f.col]);
+            let k = c.k;
+            const keys = NATURAL[c.t];
+            if (own && keys && !t.uniq.length && keys.every((x) => r[x] != null)) {
+              const hit = d.prepare(`SELECT ${t.pk} AS id FROM ${c.t} WHERE ${keys.map((x) => x === "name" || x === "batch_no" ? `lower(trim(${x}))=?` : `${x}=?`).join(" AND ")} AND ${t.pk}<>?`).get(...keys.map((x) => x === "name" || x === "batch_no" ? norm(r[x]) : r[x]), c.k);
+              if (hit) {
+                (map2[c.t] = map2[c.t] || {})[c.k] = hit.id;
+                k = hit.id;
+              }
+            } else if (!own) k = tr(c.t, c.k);
+            if (own && map2[c.t] && map2[c.t][c.k] != null) k = map2[c.t][c.k];
+            list.push({ ...c, k, r });
+          }
+          if (list.length) out.push({ ...e, c: list });
+        }
+        return out;
+      }
+      function replayInto(tid, d, entries) {
+        apply(tid, d, entries);
+        db2.withCompany(tid, () => d.transaction(() => {
+          for (const [tbl, [col, series]] of Object.entries(NUMBERED)) {
+            for (const r of d.prepare(`SELECT id, date, ${col} AS no FROM ${tbl} WHERE ${col} LIKE '%~%'`).all()) {
+              const old = String(r.no).split("~")[0];
+              const fresh = nextNo(series, r.date);
+              const lo = Math.floor(Number(r.id) / RANGE) * RANGE, hi = lo + RANGE;
+              d.prepare(`UPDATE ${tbl} SET ${col}=? WHERE id=?`).run(fresh, r.id);
+              d.prepare("UPDATE ledger SET ref_no=?, narration=REPLACE(narration, ?, ?) WHERE ref_no=? AND id > ? AND id < ?").run(fresh, old, fresh, old, lo, hi);
+              d.prepare("INSERT INTO sync_out(tbl,rid,op) SELECT 'ledger', id, 'u' FROM ledger WHERE ref_no=? AND id > ? AND id < ?").run(fresh, lo, hi);
+              d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'u')").run(tbl, r.id);
+            }
+          }
+          for (const e of entries) {
+            for (const c of [].concat(e.c || []).filter(Boolean)) {
+              if (!c.r) d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'d')").run(c.t, c.k);
+              else if (c.t === "batches" && c.q != null) d.prepare("INSERT INTO sync_out(tbl,rid,op,dq) VALUES(?,?,'u',?)").run(c.t, c.k, c.q);
+              else d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES(?,?,'i')").run(c.t, c.k);
+            }
+          }
+          for (const k of d.prepare("SELECT key FROM counters").all()) d.prepare("INSERT INTO sync_out(tbl,rid,op) VALUES('counters',?,'u')").run(k.key);
+        })());
+      }
+      function moved(from, to) {
+        const row = db2.companyRow(from);
+        if (row) db2.registry.prepare("UPDATE companies SET name=? WHERE id=?").run(row.name, to);
+        db2.registry.prepare("UPDATE companies SET active=0 WHERE id=?").run(from);
+        const mm = map();
+        delete mm[from];
+        setMap(mm);
+        state.moved[from] = to;
+        state.companies++;
+      }
+      async function follow(cid, key, into) {
+        const d = db2.openCompany(cid);
+        const sl = Number(getApp("sync_slot"));
+        await push(d, key, sl);
+        const at = await rtdb("GET", `books/${key}/info/merged_at`);
+        let tid = Number((Object.entries(map()).find(([, v]) => v === into) || [])[0]) || null;
+        if (!tid) tid = (await join(into)).company_id;
+        else await syncCompany(tid);
+        if (at) {
+          const mine = await mySlots();
+          const page = await rtdb("GET", `books/${key}/log`, void 0, `&orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeURIComponent(JSON.stringify(at))}`) || {};
+          const late = Object.keys(page).sort().filter((k) => k > at && page[k] && page[k].c && mine.has(Number(page[k].s))).map((k) => page[k]);
+          if (late.length) replayInto(tid, db2.openCompany(tid), late);
+        }
+        moved(cid, tid);
+        state.version++;
+        return 0;
+      }
+      async function join(key) {
+        if (!key) throw new HttpError2(400, "Choose the company to bring here.");
+        if (Object.values(map()).includes(key)) throw new HttpError2(400, "That company is already synced on this device.");
+        await slot();
+        const info = await rtdb("GET", `books/${key}/info`);
+        if (!info) throw new HttpError2(404, "That company is no longer in the sync account.");
+        const cid = db2.createCompany({ name: info.name || "Company", fy: info.fy || null });
+        const d = db2.openCompany(cid);
+        for (const t of tables(d)) d.exec(`DELETE FROM ${t.name}`);
+        const m = map();
+        m[cid] = key;
+        setMap(m);
+        attach(cid, d);
+        d.exec("DELETE FROM sync_out");
+        try {
+          await syncCompany(cid);
+          state.lastError = null;
+        } catch (e) {
+          state.lastError = e.message;
+        }
+        const nm = d.prepare("SELECT value FROM settings WHERE key='company_name'").get();
+        if (nm && nm.value) reg.prepare("UPDATE companies SET name=? WHERE id=?").run(nm.value, cid);
+        state.version++;
+        return { company_id: cid, ...status(cid) };
+      }
+      function status(cid) {
+        const m = map();
+        const companies = reg.prepare("SELECT id,name,fy FROM companies WHERE active=1 ORDER BY id").all().map((c) => ({ id: c.id, name: c.name, fy: c.fy, synced: !!m[c.id] }));
+        let pending = 0;
+        if (cid && m[cid]) {
+          try {
+            pending = (db2.openCompany(cid).prepare("SELECT COUNT(*) AS n FROM sync_out").get() || {}).n || 0;
+          } catch {
+            pending = 0;
+          }
+        }
+        return {
+          signed_in: !!getApp("sync_uid"),
+          email: getApp("sync_email") || "",
+          slot: Number(getApp("sync_slot") || 0),
+          on: !!(cid && m[cid]),
+          companies,
+          pending,
+          errors: state.errors,
+          version: state.version,
+          last_sync: state.lastSync,
+          last_error: state.lastError,
+          database: CONFIG.databaseURL,
+          rules: '{ "rules": { "users": { "$uid": { ".read": "auth != null && auth.uid === $uid", ".write": "auth != null && auth.uid === $uid" } } } }'
+        };
+      }
+      for (const [id, d] of db2.openHandles()) attach(id, d);
+      module.exports = { signIn, signOut, status, tick, turnOn, turnOff, remote, join, merge, attach, afterReplace, CONFIG, _state: state, pushTime, pushPrefix };
     }
   });
 
@@ -1599,6 +3535,16 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
 `);
       if (!registry.prepare("PRAGMA table_info(companies)").all().some((c) => c.name === "fy")) registry.exec("ALTER TABLE companies ADD COLUMN fy TEXT");
       var als = new AsyncLocalStorage();
+      var syncReady = false;
+      function syncAttach(id, d) {
+        if (!syncReady) return;
+        try {
+          const S = require_sync();
+          if (typeof S.attach === "function") S.attach(id, d);
+        } catch (e) {
+          console.error("sync attach:", e && e.message);
+        }
+      }
       var open = /* @__PURE__ */ new Map();
       function companyRow(id) {
         return registry.prepare("SELECT * FROM companies WHERE id=? AND active=1").get(id);
@@ -1612,6 +3558,17 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
         }
         d.exec("UPDATE items SET unit='PCS' WHERE unit IS NOT 'PCS'");
       }
+      function followMargOnce(d, file) {
+        const mark = `num_follow_checked:${file}`;
+        try {
+          if (registry.prepare("SELECT 1 AS x FROM app_settings WHERE key=?").get(mark)) return;
+          const marg = d.prepare("SELECT 1 AS x FROM batches WHERE batch_no='MARG' LIMIT 1").get() || d.prepare("SELECT 1 AS x FROM purchases WHERE source='MARG' LIMIT 1").get();
+          if (marg) als.run(d, () => require_misc().followLast());
+          registry.prepare("INSERT INTO app_settings(key,value) VALUES(?,'1') ON CONFLICT(key) DO NOTHING").run(mark);
+        } catch (e) {
+          console.error("numbering:", e && e.message);
+        }
+      }
       function openCompany(id) {
         if (open.has(id)) return open.get(id);
         const row = companyRow(id);
@@ -1619,7 +3576,9 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
         const d = new Database(path.join(dataDir, row.file));
         applySchema(d);
         tidyItems(d);
+        followMargOnce(d, row.file);
         open.set(id, d);
+        syncAttach(id, d);
         return d;
       }
       function closeCompany(id) {
@@ -1674,6 +3633,7 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
         // multi-company helpers
         registry,
         dataDir,
+        openHandles: () => [...open],
         openCompany,
         closeCompany,
         createCompany,
@@ -1688,910 +3648,8 @@ CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);
         }
       };
       module.exports = db2;
-    }
-  });
-
-  // shims/os.js
-  var require_os = __commonJS({
-    "shims/os.js"(exports, module) {
-      "use strict";
-      init_globals();
-      var host = () => globalThis.AndroidHost;
-      module.exports = {
-        homedir: () => host().home(),
-        tmpdir: () => host().tmp(),
-        platform: () => "android",
-        EOL: "\n"
-      };
-    }
-  });
-
-  // shims/crypto.js
-  var require_crypto = __commonJS({
-    "shims/crypto.js"(exports, module) {
-      "use strict";
-      init_globals();
-      var K = new Uint32Array([
-        1116352408,
-        1899447441,
-        3049323471,
-        3921009573,
-        961987163,
-        1508970993,
-        2453635748,
-        2870763221,
-        3624381080,
-        310598401,
-        607225278,
-        1426881987,
-        1925078388,
-        2162078206,
-        2614888103,
-        3248222580,
-        3835390401,
-        4022224774,
-        264347078,
-        604807628,
-        770255983,
-        1249150122,
-        1555081692,
-        1996064986,
-        2554220882,
-        2821834349,
-        2952996808,
-        3210313671,
-        3336571891,
-        3584528711,
-        113926993,
-        338241895,
-        666307205,
-        773529912,
-        1294757372,
-        1396182291,
-        1695183700,
-        1986661051,
-        2177026350,
-        2456956037,
-        2730485921,
-        2820302411,
-        3259730800,
-        3345764771,
-        3516065817,
-        3600352804,
-        4094571909,
-        275423344,
-        430227734,
-        506948616,
-        659060556,
-        883997877,
-        958139571,
-        1322822218,
-        1537002063,
-        1747873779,
-        1955562222,
-        2024104815,
-        2227730452,
-        2361852424,
-        2428436474,
-        2756734187,
-        3204031479,
-        3329325298
-      ]);
-      function sha256(bytes) {
-        const n = bytes.length, total = n + 9 + 63 >> 6 << 6;
-        const m = new Uint8Array(total);
-        m.set(bytes);
-        m[n] = 128;
-        const bits = n * 8;
-        const dv = new DataView(m.buffer);
-        dv.setUint32(total - 8, Math.floor(bits / 4294967296));
-        dv.setUint32(total - 4, bits >>> 0);
-        const H = new Uint32Array([1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225]);
-        const W = new Uint32Array(64);
-        for (let o = 0; o < total; o += 64) {
-          for (let i = 0; i < 16; i++) W[i] = dv.getUint32(o + i * 4);
-          for (let i = 16; i < 64; i++) {
-            const a2 = W[i - 15], b2 = W[i - 2];
-            const s0 = (a2 >>> 7 | a2 << 25) ^ (a2 >>> 18 | a2 << 14) ^ a2 >>> 3;
-            const s1 = (b2 >>> 17 | b2 << 15) ^ (b2 >>> 19 | b2 << 13) ^ b2 >>> 10;
-            W[i] = W[i - 16] + s0 + W[i - 7] + s1 >>> 0;
-          }
-          let [a, b, c, d, e, f, g, h] = H;
-          for (let i = 0; i < 64; i++) {
-            const S1 = (e >>> 6 | e << 26) ^ (e >>> 11 | e << 21) ^ (e >>> 25 | e << 7);
-            const t1 = h + S1 + (e & f ^ ~e & g) + K[i] + W[i] >>> 0;
-            const S0 = (a >>> 2 | a << 30) ^ (a >>> 13 | a << 19) ^ (a >>> 22 | a << 10);
-            const t2 = S0 + (a & b ^ a & c ^ b & c) >>> 0;
-            h = g;
-            g = f;
-            f = e;
-            e = d + t1 >>> 0;
-            d = c;
-            c = b;
-            b = a;
-            a = t1 + t2 >>> 0;
-          }
-          H[0] += a;
-          H[1] += b;
-          H[2] += c;
-          H[3] += d;
-          H[4] += e;
-          H[5] += f;
-          H[6] += g;
-          H[7] += h;
-        }
-        return Array.from(H, (x) => x.toString(16).padStart(8, "0")).join("");
-      }
-      function createHash(alg) {
-        if (String(alg).toLowerCase() !== "sha256") throw new Error(`Hash ${alg} is not available`);
-        const parts = [];
-        const h = {
-          update(d) {
-            parts.push(typeof d === "string" ? new TextEncoder().encode(d) : d);
-            return h;
-          },
-          digest(enc) {
-            const n = parts.reduce((a, p) => a + p.length, 0);
-            const all = new Uint8Array(n);
-            let o = 0;
-            for (const p of parts) {
-              all.set(p, o);
-              o += p.length;
-            }
-            const hex = sha256(all);
-            return enc === "hex" ? hex : Buffer2.from(hex, "hex");
-          }
-        };
-        return h;
-      }
-      module.exports = { createHash, randomUUID: () => crypto.randomUUID() };
-    }
-  });
-
-  // ../../backend/src/utils/misc.js
-  var require_misc = __commonJS({
-    "../../backend/src/utils/misc.js"(exports, module) {
-      init_globals();
-      var db2 = require_db();
-      var today = () => (/* @__PURE__ */ new Date()).toLocaleDateString("en-CA");
-      function fy(d = /* @__PURE__ */ new Date()) {
-        const y = typeof d === "string" ? +d.slice(0, 4) : d.getFullYear();
-        const mo = typeof d === "string" ? +d.slice(5, 7) - 1 : d.getMonth();
-        const start = mo >= 3 ? y : y - 1;
-        return `${String(start).slice(2)}-${String(start + 1).slice(2)}`;
-      }
-      var SERIES = { INV: ["invoices", "invoice_no"], RCT: ["receipts", "receipt_no"], PUR: ["purchases", "purchase_no"], PAY: ["payments", "voucher_no"], DN: ["debit_notes", "note_no"] };
-      function numbering(prefix, date) {
-        const get = (k) => {
-          const r = db2.prepare("SELECT value FROM settings WHERE key=?").get(k);
-          return r && r.value !== null ? String(r.value) : "";
-        };
-        const label = get(`num_${prefix}_prefix`).trim() || prefix;
-        const withFy = get("num_fy") !== "0";
-        const own = parseInt(get(`num_${prefix}_digits`), 10);
-        const d = parseInt(get("num_digits"), 10);
-        const digits = own >= 1 && own <= 9 ? own : d >= 3 && d <= 6 ? d : 5;
-        const year = fy(date || /* @__PURE__ */ new Date());
-        const sep = /[A-Za-z0-9]$/.test(label) ? "/" : "";
-        const head = withFy ? `${label}${sep}${year}/` : label;
-        return { prefix, label, withFy, digits, head, key: withFy ? `${prefix}/${year}` : prefix };
-      }
-      function lastUsed(prefix, head) {
-        const t = SERIES[prefix];
-        let best = { n: 0, no: "" };
-        if (!t) return best;
-        for (const r of db2.prepare(`SELECT ${t[1]} AS no FROM ${t[0]} WHERE substr(${t[1]}, 1, ?) = ?`).all(head.length, head)) {
-          const rest = String(r.no).slice(head.length);
-          if (/^[0-9]+$/.test(rest) && parseInt(rest, 10) > best.n) best = { n: parseInt(rest, 10), no: String(r.no) };
-        }
-        return best;
-      }
-      function peekNo(prefix, date) {
-        const s = numbering(prefix, date);
-        const c = db2.prepare("SELECT value FROM counters WHERE key = ?").get(s.key);
-        const v = Math.max(c ? Number(c.value) : 0, lastUsed(prefix, s.head).n) + 1;
-        return { ...s, next: v, next_no: s.head + String(v).padStart(s.digits, "0"), last_no: lastUsed(prefix, s.head).no };
-      }
-      function nextNo(prefix, date) {
-        const s = numbering(prefix, date);
-        const used = lastUsed(prefix, s.head).n;
-        db2.prepare("INSERT INTO counters(key,value) VALUES(?,0) ON CONFLICT(key) DO NOTHING").run(s.key);
-        db2.prepare("UPDATE counters SET value = MAX(value, ?) + 1 WHERE key = ?").run(used, s.key);
-        const v = db2.prepare("SELECT value FROM counters WHERE key = ?").get(s.key).value;
-        return s.head + String(v).padStart(s.digits, "0");
-      }
-      function setNext(prefix, next, date) {
-        if (!SERIES[prefix]) throw new HttpError2(400, "Unknown series");
-        const n = parseInt(next, 10);
-        if (!(n >= 1) || String(n) !== String(next).trim()) throw new HttpError2(400, "Enter the next number as a whole number, 1 or more");
-        const s = numbering(prefix, date);
-        const used = lastUsed(prefix, s.head);
-        if (n <= used.n) throw new HttpError2(409, `The next number must come after ${used.no}, the last one used`);
-        db2.prepare("INSERT INTO counters(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(s.key, n - 1);
-        return peekNo(prefix, date);
-      }
-      var HttpError2 = class extends Error {
-        constructor(status, message, code) {
-          super(message);
-          this.status = status;
-          this.code = code;
-        }
-      };
-      var h = (fn) => (req, res, next) => {
-        try {
-          fn(req, res, next);
-        } catch (e) {
-          next(e);
-        }
-      };
-      var ha = (fn) => (req, res, next) => {
-        Promise.resolve().then(() => fn(req, res, next)).catch(next);
-      };
-      var blank = (v) => v === void 0 || v === null || String(v).trim() === "" ? null : v;
-      function normDays(v) {
-        if (v === void 0 || v === null || v === "") return null;
-        const a = (Array.isArray(v) ? v : String(v).split(",")).map((x) => parseInt(x)).filter((x) => x >= 0 && x <= 6);
-        const u = [...new Set(a)].sort();
-        return u.length ? u.join(",") : null;
-      }
-      module.exports = { normDays, today, fy, nextNo, peekNo, setNext, SERIES, HttpError: HttpError2, h, ha, blank };
-    }
-  });
-
-  // ../../backend/src/services/drive.js
-  var require_drive = __commonJS({
-    "../../backend/src/services/drive.js"(exports, module) {
-      init_globals();
-      var fs = require_fs();
-      var path = require_path();
-      var db2 = require_db();
-      var { HttpError: HttpError2 } = require_misc();
-      var B3 = require_backup();
-      var reg = db2.registry;
-      var get = (k) => {
-        const r = reg.prepare("SELECT value FROM app_settings WHERE key=?").get(k);
-        return r && r.value ? String(r.value) : "";
-      };
-      var set = (k, v) => reg.prepare("INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
-      var del = (k) => reg.prepare("DELETE FROM app_settings WHERE key=?").run(k);
-      var SCOPE = "https://www.googleapis.com/auth/drive.file";
-      var FOLDER = "BillBox Backups";
-      var FOLDER_TYPE = "application/vnd.google-apps.folder";
-      var offline = () => new HttpError2(503, "Could not reach Google. Check the internet connection and try again.", "OFFLINE");
-      var form = (o) => Object.entries(o).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
-      var FORM = { "content-type": "application/x-www-form-urlencoded" };
-      async function call(url, opts) {
-        let r;
-        try {
-          r = await fetch(url, opts);
-        } catch (_) {
-          throw offline();
-        }
-        const text = await r.text();
-        let json = {};
-        try {
-          json = JSON.parse(text);
-        } catch (_) {
-        }
-        return { status: r.status, json: json && typeof json === "object" ? json : {} };
-      }
-      function status() {
-        return {
-          client_id: get("drive_client_id"),
-          has_secret: get("drive_client_secret") !== "",
-          connected: get("drive_refresh") !== "",
-          waiting: get("drive_device") !== "",
-          folder: get("drive_folder_id") ? FOLDER : "",
-          last_upload: get("drive_last_upload"),
-          last_status: get("drive_last_status")
-        };
-      }
-      function keysFromJson(text) {
-        let j;
-        try {
-          j = JSON.parse(String(text));
-        } catch (_) {
-          throw new HttpError2(400, "That file is not the JSON file downloaded from Google Cloud (client_secret_\u2026.json).");
-        }
-        if (j && j.web && !j.installed) throw new HttpError2(400, "That file is for a \u201CWeb application\u201D client. In Google Cloud make an OAuth client of type \u201CTVs and Limited Input devices\u201D and download its JSON.");
-        const k = j && (j.installed || j.web) || j || {};
-        if (!k.client_id || !k.client_secret) throw new HttpError2(400, "That file has no client ID and secret in it. Download the JSON of the OAuth client (Credentials \u203A your client \u203A Download JSON).");
-        return { client_id: k.client_id, client_secret: k.client_secret };
-      }
-      function explain(j, status2) {
-        const e = j.error || "";
-        if (e === "invalid_client") return "Google does not know this Client ID. Check it was copied in full (or import the downloaded JSON file), that the client is of type \u201CTVs and Limited Input devices\u201D, and if you made it just now wait a few minutes and try again";
-        if (e === "unauthorized_client") return "this client cannot use code sign-in: make an OAuth client of type \u201CTVs and Limited Input devices\u201D";
-        if (e === "invalid_scope") return "the Google Drive API is not allowed for this client: turn on the Google Drive API in your Google Cloud project";
-        if (e === "access_denied" || e === "org_internal") return "Google refused: add your Gmail as a test user on the consent screen (Audience \u203A Test users)";
-        return j.error_description || e || String(status2);
-      }
-      function saveClient(b = {}) {
-        if (b.json) b = keysFromJson(b.json);
-        const id = String(b.client_id || "").trim(), secret = String(b.client_secret || "").trim();
-        if (!/\.apps\.googleusercontent\.com$/.test(id)) throw new HttpError2(400, "Paste the Client ID from Google Cloud (it ends in .apps.googleusercontent.com).");
-        if (!secret) throw new HttpError2(400, "Paste the client secret too.");
-        if (id !== get("drive_client_id")) for (const k of ["drive_refresh", "drive_folder_id", "drive_device"]) del(k);
-        set("drive_client_id", id);
-        set("drive_client_secret", secret);
-        return status();
-      }
-      async function connect() {
-        const id = get("drive_client_id");
-        if (!id) throw new HttpError2(400, "Add the Google Client ID and secret first.");
-        const r = await call("https://oauth2.googleapis.com/device/code", { method: "POST", headers: FORM, body: form({ client_id: id, scope: SCOPE }) });
-        if (r.status !== 200) throw new HttpError2(r.json.error ? 400 : 502, `Google did not give a code: ${explain(r.json, r.status)}.`);
-        set("drive_device", r.json.device_code);
-        return {
-          user_code: r.json.user_code,
-          verification_url: r.json.verification_url || r.json.verification_uri || "https://www.google.com/device",
-          interval: r.json.interval || 5,
-          expires_in: r.json.expires_in || 1800
-        };
-      }
-      async function poll() {
-        const dev = get("drive_device");
-        if (!dev) throw new HttpError2(400, "Press Connect first.");
-        const r = await call("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: FORM,
-          body: form({ client_id: get("drive_client_id"), client_secret: get("drive_client_secret"), device_code: dev, grant_type: "urn:ietf:params:oauth:grant-type:device_code" })
-        });
-        if (r.json.error === "authorization_pending" || r.json.error === "slow_down") return { connected: false, waiting: true };
-        del("drive_device");
-        if (r.status !== 200 || !r.json.refresh_token) {
-          throw new HttpError2(400, r.json.error === "access_denied" ? "Google sign-in was declined." : r.json.error === "expired_token" ? "The code ran out. Press Connect again." : `Google did not connect: ${explain(r.json, r.status)}.`);
-        }
-        set("drive_refresh", r.json.refresh_token);
-        await folder(r.json.access_token);
-        return { connected: true, waiting: false, folder: FOLDER };
-      }
-      function disconnect() {
-        for (const k of ["drive_refresh", "drive_folder_id", "drive_device", "drive_last_upload", "drive_last_status"]) del(k);
-        return status();
-      }
-      async function token() {
-        if (!get("drive_refresh")) throw new HttpError2(400, "Google Drive is not connected.");
-        const r = await call("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: FORM,
-          body: form({ client_id: get("drive_client_id"), client_secret: get("drive_client_secret"), refresh_token: get("drive_refresh"), grant_type: "refresh_token" })
-        });
-        if (r.status !== 200 || !r.json.access_token) {
-          if (r.json.error === "invalid_grant") {
-            del("drive_refresh");
-            del("drive_folder_id");
-            throw new HttpError2(401, "Google Drive was disconnected (the permission was removed or ran out). Connect again.");
-          }
-          throw new HttpError2(502, `Google did not answer (${r.json.error_description || r.json.error || r.status}).`);
-        }
-        return r.json.access_token;
-      }
-      async function makeFolder(tok, name, parent) {
-        const r = await call("https://www.googleapis.com/drive/v3/files?fields=id", {
-          method: "POST",
-          headers: { authorization: `Bearer ${tok}`, "content-type": "application/json" },
-          body: JSON.stringify(parent ? { name, mimeType: FOLDER_TYPE, parents: [parent] } : { name, mimeType: FOLDER_TYPE })
-        });
-        if (r.status !== 200 || !r.json.id) throw new HttpError2(502, `Google Drive did not make the folder "${name}" (${r.json.error && r.json.error.message || r.status}).`);
-        return r.json.id;
-      }
-      async function folder(tok) {
-        const id = get("drive_folder_id");
-        if (id) {
-          const r = await call(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,trashed`, { headers: { authorization: `Bearer ${tok}` } });
-          if (r.status === 200 && !r.json.trashed) return id;
-        }
-        const made = await makeFolder(tok, FOLDER, null);
-        set("drive_folder_id", made);
-        return made;
-      }
-      async function upload(b = {}) {
-        const list = B3.listBackups();
-        const name = b.folder ? String(b.folder) : list[0] && list[0].name;
-        if (!name) throw new HttpError2(400, "There is no backup to upload yet. Press Back up now first.");
-        const dir = path.join(B3.config().dir, path.basename(name));
-        if (!fs.existsSync(dir)) throw new HttpError2(404, `Backup ${name} not found.`);
-        const tok = await token();
-        const parent = await folder(tok);
-        const sub = await makeFolder(tok, path.basename(name), parent);
-        const files = fs.readdirSync(dir).filter((f) => fs.statSync(path.join(dir, f)).isFile()).sort();
-        let bytes = 0;
-        for (const f of files) {
-          const data = fs.readFileSync(path.join(dir, f));
-          const boundary = "billbox" + Date.now().toString(36);
-          const meta = JSON.stringify({ name: f, parents: [sub] });
-          const body = Buffer2.concat([
-            Buffer2.from(`--${boundary}\r
-content-type: application/json; charset=UTF-8\r
-\r
-${meta}\r
---${boundary}\r
-content-type: application/octet-stream\r
-\r
-`),
-            data,
-            Buffer2.from(`\r
---${boundary}--\r
-`)
-          ]);
-          const r = await call("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
-            method: "POST",
-            headers: { authorization: `Bearer ${tok}`, "content-type": `multipart/related; boundary=${boundary}` },
-            body
-          });
-          if (r.status !== 200) {
-            set("drive_last_status", `failed: ${f}`);
-            throw new HttpError2(502, `Google Drive did not take ${f} (${r.json.error && r.json.error.message || r.status}).`);
-          }
-          bytes += data.length;
-        }
-        set("drive_last_upload", `${name}`);
-        set("drive_last_status", "ok");
-        return { folder: name, files: files.length, bytes, drive_folder: FOLDER };
-      }
-      async function afterBackup(folderName) {
-        if (!get("drive_refresh")) return null;
-        try {
-          return await upload({ folder: folderName });
-        } catch (e) {
-          set("drive_last_status", `failed: ${e.message}`);
-          return null;
-        }
-      }
-      module.exports = { status, saveClient, connect, poll, disconnect, upload, afterBackup };
-    }
-  });
-
-  // ../../backend/src/services/backup.js
-  var require_backup = __commonJS({
-    "../../backend/src/services/backup.js"(exports, module) {
-      init_globals();
-      var fs = require_fs();
-      var os = require_os();
-      var path = require_path();
-      var crypto2 = require_crypto();
-      var Database = require_sqlite2();
-      var db2 = require_db();
-      var { HttpError: HttpError2 } = require_misc();
-      var reg = db2.registry;
-      var PREFIX = "FMCG_Backup_";
-      var FOLDER_RE = /^FMCG_Backup_\d{8}_\d{6}(_\d+)?$/;
-      var getSetting = (k, d) => {
-        const r = reg.prepare("SELECT value FROM app_settings WHERE key=?").get(k);
-        return r ? r.value : d;
-      };
-      var setSetting = (k, v) => reg.prepare("INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
-      function config() {
-        return {
-          dir: getSetting("backup_dir", path.join(os.homedir(), "DistributorProBackups")),
-          enabled: getSetting("backup_enabled", "0") === "1",
-          time: getSetting("backup_time", "21:00"),
-          on_exit: getSetting("backup_on_exit", "0") === "1",
-          last_run: getSetting("backup_last_run", ""),
-          last_status: getSetting("backup_last_status", "")
-        };
-      }
-      function saveConfig(b) {
-        if (b.dir !== void 0) {
-          if (!path.isAbsolute(b.dir)) throw new HttpError2(400, "Enter the full path of the backup folder, e.g. /Volumes/MyDrive/Backups");
-          setSetting("backup_dir", b.dir);
-        }
-        if (b.enabled !== void 0) setSetting("backup_enabled", b.enabled ? "1" : "0");
-        if (b.on_exit !== void 0) setSetting("backup_on_exit", b.on_exit ? "1" : "0");
-        if (b.time !== void 0) {
-          if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.time)) throw new HttpError2(400, "Time must be HH:MM (24 hour)");
-          setSetting("backup_time", b.time);
-        }
-        return config();
-      }
-      var stamp = (d = /* @__PURE__ */ new Date()) => {
-        const p = (n) => String(n).padStart(2, "0");
-        return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-      };
-      var slug = (s) => String(s).replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "Company";
-      var sqlPath = (p) => p.replace(/'/g, "''");
-      function sha256(file) {
-        return crypto2.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
-      }
-      function copyAndVerify(rawDb, dest) {
-        rawDb.exec(`VACUUM INTO '${sqlPath(dest)}'`);
-        const chk = new Database(dest, { readonly: true });
-        try {
-          const r = chk.prepare("PRAGMA integrity_check").get();
-          const v = Object.values(r)[0];
-          if (v !== "ok") throw new HttpError2(500, `Backup verification failed for ${path.basename(dest)}: ${v}`);
-        } finally {
-          chk.close();
-        }
-        return { file: path.basename(dest), bytes: fs.statSync(dest).size, sha256: sha256(dest) };
-      }
-      function backupNow({ reason = "manual" } = {}) {
-        const { dir } = config();
-        try {
-          fs.mkdirSync(dir, { recursive: true });
-          const probe = path.join(dir, `.write-test-${process.pid}`);
-          fs.writeFileSync(probe, "ok");
-          fs.rmSync(probe);
-        } catch (e) {
-          const msg = `Cannot write to "${dir}". Is the drive connected and the folder writable?`;
-          setSetting("backup_last_status", `FAILED ${(/* @__PURE__ */ new Date()).toISOString()}: ${msg}`);
-          throw new HttpError2(500, msg);
-        }
-        let folder = path.join(dir, PREFIX + stamp());
-        for (let n = 2; fs.existsSync(folder); n++) folder = path.join(dir, `${PREFIX}${stamp()}_${n}`);
-        fs.mkdirSync(folder);
-        try {
-          const files = [];
-          const companies = reg.prepare("SELECT * FROM companies WHERE active=1 ORDER BY id").all();
-          for (const c of companies) {
-            const raw = db2.openCompany(c.id);
-            files.push({ company_id: c.id, company: c.name, ...c.fy ? { fy: c.fy } : {}, ...copyAndVerify(raw, path.join(folder, `${slug(c.name)}${c.fy ? "_" + c.fy : ""}_${c.id}.db`)) });
-          }
-          files.push({ company: "(company list)", ...copyAndVerify(reg, path.join(folder, "registry.db")) });
-          fs.writeFileSync(path.join(folder, "manifest.json"), JSON.stringify({ created: (/* @__PURE__ */ new Date()).toISOString(), reason, files }, null, 2));
-          setSetting("backup_last_run", (/* @__PURE__ */ new Date()).toISOString());
-          setSetting("backup_last_status", `OK ${path.basename(folder)}`);
-          return { folder, files };
-        } catch (e) {
-          fs.rmSync(folder, { recursive: true, force: true });
-          setSetting("backup_last_status", `FAILED ${(/* @__PURE__ */ new Date()).toISOString()}: ${e.message}`);
-          throw e;
-        }
-      }
-      function deleteBackup(name) {
-        const { dir } = config();
-        const n = path.basename(String(name || ""));
-        if (!FOLDER_RE.test(n)) throw new HttpError2(400, "That is not a backup folder made by BillBox.");
-        const f = path.join(dir, n);
-        if (!fs.existsSync(f)) throw new HttpError2(404, "That backup is already gone.");
-        fs.rmSync(f, { recursive: true, force: true });
-        return { deleted: n };
-      }
-      function listBackups() {
-        const { dir } = config();
-        if (!fs.existsSync(dir)) return [];
-        return fs.readdirSync(dir).filter((f) => FOLDER_RE.test(f)).sort().reverse().map((f) => {
-          let files = 0, bytes = 0, created = null, companies = [];
-          try {
-            const m = JSON.parse(fs.readFileSync(path.join(dir, f, "manifest.json"), "utf8"));
-            files = m.files.length;
-            bytes = m.files.reduce((a, x) => a + x.bytes, 0);
-            created = m.created;
-            companies = m.files.filter((x) => x.company_id).map((x) => x.company);
-          } catch {
-          }
-          return { name: f, files, bytes, created, companies };
-        });
-      }
-      function tick(now = /* @__PURE__ */ new Date()) {
-        const c = config();
-        if (!c.enabled) return null;
-        const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-        const today = now.toLocaleDateString("en-CA");
-        const lastDay = c.last_run ? new Date(c.last_run).toLocaleDateString("en-CA") : "";
-        if (hhmm >= c.time && lastDay !== today) {
-          try {
-            const r = backupNow({ reason: "scheduled" });
-            require_drive().afterBackup(r.folder);
-            return r;
-          } catch (e) {
-            console.error("Scheduled backup failed:", e.message);
-          }
-        }
-        return null;
-      }
-      function startScheduler() {
-        const t = setInterval(() => tick(), 60 * 1e3);
-        t.unref();
-        setTimeout(() => tick(), 5e3).unref();
-      }
-      function checkFile(file) {
-        let chk;
-        try {
-          chk = new Database(file, { readonly: true });
-          const v = Object.values(chk.prepare("PRAGMA integrity_check").get())[0];
-          if (v !== "ok") throw new HttpError2(400, `${path.basename(file)} is damaged (${v}). Nothing was restored.`);
-          if (!chk.prepare("SELECT 1 FROM sqlite_master WHERE name='invoices'").get()) throw new HttpError2(400, `${path.basename(file)} is not a BillBox company file.`);
-        } catch (e) {
-          if (e instanceof HttpError2) throw e;
-          throw new HttpError2(400, `${path.basename(file)} cannot be opened as a database. Nothing was restored.`);
-        } finally {
-          if (chk) chk.close();
-        }
-      }
-      function swapIn(src, row) {
-        const dest = path.join(db2.dataDir, row.file);
-        db2.closeCompany(row.id);
-        const tmp = dest + ".restoring";
-        fs.copyFileSync(src, tmp);
-        for (const ext of ["-wal", "-shm"]) fs.rmSync(dest + ext, { force: true });
-        fs.renameSync(tmp, dest);
-      }
-      var norm = (n) => String(n || "").trim().replace(/\s+/g, " ").toLowerCase();
-      function rowForCompany(name, { create = true, fy = null } = {}) {
-        const wanted = norm(name);
-        const hit = reg.prepare("SELECT * FROM companies").all().find((c) => norm(c.name) === wanted && (c.fy || null) === (fy || null));
-        if (hit) {
-          if (!hit.active) reg.prepare("UPDATE companies SET active=1 WHERE id=?").run(hit.id);
-          return hit;
-        }
-        if (!create) return null;
-        const id = db2.createCompany({ name: String(name || "Restored company").trim(), fy: fy || null });
-        return reg.prepare("SELECT * FROM companies WHERE id=?").get(id);
-      }
-      function companyInFile(file) {
-        let d;
-        try {
-          d = new Database(file, { readonly: true });
-          const r = d.prepare("SELECT value FROM settings WHERE key='company_name'").get();
-          const y = d.prepare("SELECT value FROM settings WHERE key='books_fy'").get();
-          return { name: r && r.value ? String(r.value) : null, fy: y && y.value ? String(y.value) : null };
-        } catch {
-          return { name: null, fy: null };
-        } finally {
-          if (d) d.close();
-        }
-      }
-      function mergeInto(row, file) {
-        const dst = db2.openCompany(row.id);
-        const src = new Database(file, { readonly: true });
-        const stats = { added: {}, skipped: {}, conflicts: [] };
-        const add = (k) => {
-          stats.added[k] = (stats.added[k] || 0) + 1;
-        };
-        const skip = (k) => {
-          stats.skipped[k] = (stats.skipped[k] || 0) + 1;
-        };
-        const all = (t) => {
-          try {
-            return src.prepare(`SELECT * FROM ${t}`).all();
-          } catch {
-            return [];
-          }
-        };
-        const cols = (t) => dst.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name).filter((c) => c !== "id");
-        const insert = (t, rec) => {
-          const cs = cols(t).filter((c) => rec[c] !== void 0);
-          const r = dst.prepare(`INSERT INTO ${t}(${cs.join(",")}) VALUES(${cs.map(() => "?").join(",")})`).run(...cs.map((c) => rec[c]));
-          return Number(r.lastInsertRowid);
-        };
-        const key = (v) => norm(v);
-        const idx = (t, f) => new Map(dst.prepare(`SELECT id,${f} v FROM ${t}`).all().map((r) => [key(r.v), r.id]));
-        const byName = (table, mapOut) => {
-          const have = idx(table, "name");
-          for (const r of all(table)) {
-            let id = have.get(key(r.name));
-            if (id) skip(table);
-            else {
-              id = insert(table, { ...r, ...mapOut ? mapOut(r) : {} });
-              have.set(key(r.name), id);
-              add(table);
-            }
-            maps[table].set(r.id, id);
-          }
-        };
-        const maps = { categories: /* @__PURE__ */ new Map(), salesmen: /* @__PURE__ */ new Map(), routes: /* @__PURE__ */ new Map(), parties: /* @__PURE__ */ new Map(), items: /* @__PURE__ */ new Map(), batches: /* @__PURE__ */ new Map(), invoices: /* @__PURE__ */ new Map(), purchases: /* @__PURE__ */ new Map(), debit_notes: /* @__PURE__ */ new Map() };
-        const newParties = /* @__PURE__ */ new Set();
-        const m = (name, id) => id == null ? null : maps[name].get(id) ?? null;
-        try {
-          dst.transaction(() => {
-            byName("categories");
-            byName("salesmen");
-            byName("routes", (r) => ({ salesman_id: m("salesmen", r.salesman_id) }));
-            const haveP = new Map(dst.prepare("SELECT id,name,type FROM parties").all().map((r) => [key(r.name) + "|" + (r.type === "SUPPLIER" ? "S" : "C"), r.id]));
-            for (const r of all("parties")) {
-              const k = key(r.name) + "|" + (r.type === "SUPPLIER" ? "S" : "C");
-              let id = haveP.get(k);
-              if (id) skip("parties");
-              else {
-                id = insert("parties", { ...r, route_id: m("routes", r.route_id) });
-                haveP.set(k, id);
-                newParties.add(id);
-                add("parties");
-              }
-              maps.parties.set(r.id, id);
-            }
-            const haveI = idx("items", "name");
-            for (const r of all("items")) {
-              let id = haveI.get(key(r.name));
-              if (id) skip("items");
-              else {
-                id = insert("items", { ...r, category_id: m("categories", r.category_id) });
-                haveI.set(key(r.name), id);
-                add("items");
-              }
-              maps.items.set(r.id, id);
-            }
-            const haveB = new Map(dst.prepare("SELECT id,item_id,batch_no FROM batches").all().map((r) => [r.item_id + "|" + key(r.batch_no), r.id]));
-            for (const r of all("batches")) {
-              const itemId = m("items", r.item_id);
-              if (!itemId) continue;
-              const k = itemId + "|" + key(r.batch_no);
-              let id = haveB.get(k);
-              if (id) skip("batches");
-              else {
-                id = insert("batches", { ...r, item_id: itemId });
-                haveB.set(k, id);
-                add("batches");
-              }
-              maps.batches.set(r.id, id);
-            }
-            const haveS = new Set(dst.prepare("SELECT item_id,type,buy_qty,free_qty,percent FROM schemes").all().map((r) => [r.item_id, r.type, r.buy_qty, r.free_qty, r.percent].join("|")));
-            for (const r of all("schemes")) {
-              const itemId = m("items", r.item_id);
-              const k = [itemId, r.type, r.buy_qty, r.free_qty, r.percent].join("|");
-              if (!itemId || haveS.has(k)) {
-                skip("schemes");
-                continue;
-              }
-              insert("schemes", { ...r, item_id: itemId });
-              haveS.add(k);
-              add("schemes");
-            }
-            const document = (table, noCol, lineTable, fk, convert, lineConvert, label) => {
-              const have = new Map(dst.prepare(`SELECT id,${noCol} no,date,total FROM ${table}`).all().map((r) => [r.no, r]));
-              const lines = all(lineTable);
-              for (const r of all(table)) {
-                const cur = have.get(r[noCol]);
-                if (cur) {
-                  if (cur.date === r.date && Math.abs(cur.total - r.total) < 5e-3) skip(table);
-                  else {
-                    stats.conflicts.push(`${label} ${r[noCol]} exists here with different details; left as it is`);
-                    skip(table);
-                  }
-                  maps[table].set(r.id, cur.id);
-                  continue;
-                }
-                const id = insert(table, convert(r));
-                maps[table].set(r.id, id);
-                add(table);
-                for (const l of lines.filter((x) => x[fk] === r.id)) {
-                  const itemId = m("items", l.item_id);
-                  if (itemId) insert(lineTable, { ...l, [fk]: id, ...lineConvert(l, itemId) });
-                }
-              }
-            };
-            document(
-              "invoices",
-              "invoice_no",
-              "invoice_lines",
-              "invoice_id",
-              (r) => ({ ...r, party_id: m("parties", r.party_id), salesman_id: m("salesmen", r.salesman_id) }),
-              (l, itemId) => ({ item_id: itemId, batch_id: m("batches", l.batch_id) }),
-              "Bill"
-            );
-            document(
-              "purchases",
-              "purchase_no",
-              "purchase_lines",
-              "purchase_id",
-              (r) => ({ ...r, party_id: m("parties", r.party_id) }),
-              (l, itemId) => ({ item_id: itemId, batch_id: m("batches", l.batch_id) }),
-              "Purchase"
-            );
-            {
-              const have = new Map(dst.prepare("SELECT id,note_no no,date,total FROM debit_notes").all().map((r) => [r.no, r]));
-              const lines = all("debit_note_lines"), stock = all("debit_note_stock");
-              for (const r of all("debit_notes")) {
-                const cur = have.get(r.note_no);
-                if (cur) {
-                  if (cur.date === r.date && Math.abs(cur.total - r.total) < 5e-3) skip("debit_notes");
-                  else {
-                    stats.conflicts.push(`Debit note ${r.note_no} exists here with different details; left as it is`);
-                    skip("debit_notes");
-                  }
-                  maps.debit_notes.set(r.id, cur.id);
-                  continue;
-                }
-                const pid = m("parties", r.party_id);
-                if (!pid) continue;
-                const id = insert("debit_notes", { ...r, party_id: pid, purchase_id: m("purchases", r.purchase_id) });
-                maps.debit_notes.set(r.id, id);
-                add("debit_notes");
-                for (const l of lines.filter((x) => x.note_id === r.id)) {
-                  const itemId = m("items", l.item_id);
-                  if (!itemId) continue;
-                  const lid = insert("debit_note_lines", { ...l, note_id: id, item_id: itemId, batch_id: m("batches", l.batch_id) });
-                  for (const st of stock.filter((x) => x.line_id === l.id)) {
-                    const b = m("batches", st.batch_id);
-                    if (b) insert("debit_note_stock", { ...st, line_id: lid, batch_id: b });
-                  }
-                }
-              }
-            }
-            dst.exec("DELETE FROM invoice_lines WHERE batch_id IS NULL");
-            const voucher = (table, noCol, extra) => {
-              const have = new Set(dst.prepare(`SELECT ${noCol} no FROM ${table}`).all().map((r) => r.no));
-              for (const r of all(table)) {
-                if (have.has(r[noCol])) {
-                  skip(table);
-                  continue;
-                }
-                const pid = m("parties", r.party_id);
-                if (!pid) continue;
-                insert(table, { ...r, party_id: pid, salesman_id: m("salesmen", r.salesman_id), ...extra(r) });
-                have.add(r[noCol]);
-                add(table);
-              }
-            };
-            voucher("receipts", "receipt_no", (r) => ({ invoice_id: m("invoices", r.invoice_id) }));
-            voucher("payments", "voucher_no", (r) => ({ purchase_id: m("purchases", r.purchase_id) }));
-            const haveL = new Set(dst.prepare("SELECT party_id,type,IFNULL(ref_no,'') r,date,debit,credit FROM ledger").all().map((r) => [r.party_id, r.type, r.r, r.date, r.debit, r.credit].join("|")));
-            for (const r of all("ledger")) {
-              const pid = m("parties", r.party_id);
-              if (!pid) continue;
-              const k = [pid, r.type, r.ref_no || "", r.date, r.debit, r.credit].join("|");
-              if (haveL.has(k) || !newParties.has(pid) && r.type === "OPENING") continue;
-              insert("ledger", { ...r, party_id: pid });
-              haveL.add(k);
-              add("ledger");
-            }
-            for (const c of all("counters")) {
-              dst.prepare("INSERT INTO counters(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=MAX(value,excluded.value)").run(c.key, c.value);
-            }
-          })();
-        } finally {
-          src.close();
-        }
-        return stats;
-      }
-      function restore({ name, folder, file, company_id, mode } = {}) {
-        const merge = mode === "merge";
-        const merged = [];
-        const { dir } = config();
-        let restored = [];
-        if (file) {
-          if (!path.isAbsolute(file) || !fs.existsSync(file) || !fs.statSync(file).isFile()) throw new HttpError2(400, "Choose a company backup file (.db).");
-          checkFile(file);
-          const inFile = companyInFile(file);
-          const own = inFile.name;
-          const row = own ? rowForCompany(own, { create: false, fy: inFile.fy }) || null : null;
-          const target = row || reg.prepare("SELECT * FROM companies WHERE id=?").get(Number(company_id) || db2.firstCompanyId());
-          if (!target) throw new HttpError2(404, "Company not found");
-          backupNow({ reason: "before-restore" });
-          if (merge) merged.push({ company: target.name, ...mergeInto(target, file) });
-          else swapIn(file, target);
-          restored.push(target.name);
-        } else {
-          const f = folder || name && path.join(dir, path.basename(name));
-          if (!f || !path.isAbsolute(f) || !fs.existsSync(f) || !fs.statSync(f).isDirectory()) throw new HttpError2(400, "Choose a backup folder (one that contains manifest.json).");
-          let manifest;
-          try {
-            manifest = JSON.parse(fs.readFileSync(path.join(f, "manifest.json"), "utf8"));
-          } catch {
-            throw new HttpError2(400, "That folder has no readable manifest.json, so it is not a BillBox backup.");
-          }
-          const items = manifest.files.filter((x) => x.company_id);
-          if (!items.length) throw new HttpError2(400, "That backup contains no company data.");
-          for (const x of items) {
-            const p = path.join(f, x.file);
-            if (!fs.existsSync(p)) throw new HttpError2(400, `${x.file} is missing from the backup folder. Nothing was restored.`);
-            if (x.sha256 && sha256(p) !== x.sha256) throw new HttpError2(400, `${x.file} does not match its checksum (it was changed or damaged). Nothing was restored.`);
-            checkFile(p);
-          }
-          let bReg = null;
-          const regFile = path.join(f, "registry.db");
-          if (fs.existsSync(regFile)) bReg = new Database(regFile, { readonly: true });
-          try {
-            backupNow({ reason: "before-restore" });
-            for (const x of items) {
-              const row = rowForCompany(
-                x.company || bReg && (bReg.prepare("SELECT name FROM companies WHERE id=?").get(x.company_id) || {}).name,
-                { fy: x.fy || companyInFile(path.join(f, x.file)).fy }
-              );
-              if (merge) merged.push({ company: row.name, ...mergeInto(row, path.join(f, x.file)) });
-              else swapIn(path.join(f, x.file), row);
-              restored.push(row.name);
-            }
-          } finally {
-            if (bReg) bReg.close();
-          }
-        }
-        for (const id of reg.prepare("SELECT id FROM companies").all().map((r) => r.id)) db2.openCompany(id);
-        return { restored, mode: merge ? "merge" : "replace", merged };
-      }
-      module.exports = { deleteBackup, restore, config, saveConfig, backupNow, listBackups, tick, startScheduler };
+      syncReady = true;
+      for (const [id, d] of open) syncAttach(id, d);
     }
   });
 
@@ -3323,6 +4381,418 @@ content-type: application/octet-stream\r
     }
   });
 
+  // ../../backend/src/services/ed25519.js
+  var require_ed25519 = __commonJS({
+    "../../backend/src/services/ed25519.js"(exports, module) {
+      "use strict";
+      init_globals();
+      var K512 = [
+        "428a2f98d728ae22",
+        "7137449123ef65cd",
+        "b5c0fbcfec4d3b2f",
+        "e9b5dba58189dbbc",
+        "3956c25bf348b538",
+        "59f111f1b605d019",
+        "923f82a4af194f9b",
+        "ab1c5ed5da6d8118",
+        "d807aa98a3030242",
+        "12835b0145706fbe",
+        "243185be4ee4b28c",
+        "550c7dc3d5ffb4e2",
+        "72be5d74f27b896f",
+        "80deb1fe3b1696b1",
+        "9bdc06a725c71235",
+        "c19bf174cf692694",
+        "e49b69c19ef14ad2",
+        "efbe4786384f25e3",
+        "0fc19dc68b8cd5b5",
+        "240ca1cc77ac9c65",
+        "2de92c6f592b0275",
+        "4a7484aa6ea6e483",
+        "5cb0a9dcbd41fbd4",
+        "76f988da831153b5",
+        "983e5152ee66dfab",
+        "a831c66d2db43210",
+        "b00327c898fb213f",
+        "bf597fc7beef0ee4",
+        "c6e00bf33da88fc2",
+        "d5a79147930aa725",
+        "06ca6351e003826f",
+        "142929670a0e6e70",
+        "27b70a8546d22ffc",
+        "2e1b21385c26c926",
+        "4d2c6dfc5ac42aed",
+        "53380d139d95b3df",
+        "650a73548baf63de",
+        "766a0abb3c77b2a8",
+        "81c2c92e47edaee6",
+        "92722c851482353b",
+        "a2bfe8a14cf10364",
+        "a81a664bbc423001",
+        "c24b8b70d0f89791",
+        "c76c51a30654be30",
+        "d192e819d6ef5218",
+        "d69906245565a910",
+        "f40e35855771202a",
+        "106aa07032bbd1b8",
+        "19a4c116b8d2d0c8",
+        "1e376c085141ab53",
+        "2748774cdf8eeb99",
+        "34b0bcb5e19b48a8",
+        "391c0cb3c5c95a63",
+        "4ed8aa4ae3418acb",
+        "5b9cca4f7763e373",
+        "682e6ff3d6b2b8a3",
+        "748f82ee5defb2fc",
+        "78a5636f43172f60",
+        "84c87814a1f0ab72",
+        "8cc702081a6439ec",
+        "90befffa23631e28",
+        "a4506cebde82bde9",
+        "bef9a3f7b2c67915",
+        "c67178f2e372532b",
+        "ca273eceea26619c",
+        "d186b8c721c0c207",
+        "eada7dd6cde0eb1e",
+        "f57d4f7fee6ed178",
+        "06f067aa72176fba",
+        "0a637dc5a2c898a6",
+        "113f9804bef90dae",
+        "1b710b35131c471b",
+        "28db77f523047d84",
+        "32caab7b40c72493",
+        "3c9ebe0a15c9bebc",
+        "431d67c49c100d4c",
+        "4cc5d4becb3e42b6",
+        "597f299cfc657e2a",
+        "5fcb6fab3ad6faec",
+        "6c44198c4a475817"
+      ].map((h) => BigInt("0x" + h));
+      var M64 = (1n << 64n) - 1n;
+      var rotr = (x, n) => (x >> n | x << 64n - n) & M64;
+      function sha512(bytes) {
+        const n = bytes.length, total = Math.ceil((n + 17) / 128) * 128;
+        const m = new Uint8Array(total);
+        m.set(bytes);
+        m[n] = 128;
+        let bits = BigInt(n) * 8n;
+        for (let i = total - 1; i >= total - 16; i--) {
+          m[i] = Number(bits & 255n);
+          bits >>= 8n;
+        }
+        const H = ["6a09e667f3bcc908", "bb67ae8584caa73b", "3c6ef372fe94f82b", "a54ff53a5f1d36f1", "510e527fade682d1", "9b05688c2b3e6c1f", "1f83d9abfb41bd6b", "5be0cd19137e2179"].map((h) => BigInt("0x" + h));
+        const W = new Array(80);
+        for (let o = 0; o < total; o += 128) {
+          for (let i = 0; i < 16; i++) {
+            let w = 0n;
+            for (let j = 0; j < 8; j++) w = w << 8n | BigInt(m[o + i * 8 + j]);
+            W[i] = w;
+          }
+          for (let i = 16; i < 80; i++) {
+            const s0 = rotr(W[i - 15], 1n) ^ rotr(W[i - 15], 8n) ^ W[i - 15] >> 7n;
+            const s1 = rotr(W[i - 2], 19n) ^ rotr(W[i - 2], 61n) ^ W[i - 2] >> 6n;
+            W[i] = W[i - 16] + s0 + W[i - 7] + s1 & M64;
+          }
+          let [a, b, c, d, e, f, g, h] = H;
+          for (let i = 0; i < 80; i++) {
+            const S1 = rotr(e, 14n) ^ rotr(e, 18n) ^ rotr(e, 41n);
+            const ch = e & f ^ ~e & M64 & g;
+            const t1 = h + S1 + ch + K512[i] + W[i] & M64;
+            const S0 = rotr(a, 28n) ^ rotr(a, 34n) ^ rotr(a, 39n);
+            const mj = a & b ^ a & c ^ b & c;
+            const t2 = S0 + mj & M64;
+            h = g;
+            g = f;
+            f = e;
+            e = d + t1 & M64;
+            d = c;
+            c = b;
+            b = a;
+            a = t1 + t2 & M64;
+          }
+          H[0] = H[0] + a & M64;
+          H[1] = H[1] + b & M64;
+          H[2] = H[2] + c & M64;
+          H[3] = H[3] + d & M64;
+          H[4] = H[4] + e & M64;
+          H[5] = H[5] + f & M64;
+          H[6] = H[6] + g & M64;
+          H[7] = H[7] + h & M64;
+        }
+        const out = new Uint8Array(64);
+        H.forEach((v, i) => {
+          for (let j = 7; j >= 0; j--) {
+            out[i * 8 + j] = Number(v & 255n);
+            v >>= 8n;
+          }
+        });
+        return out;
+      }
+      var P = (1n << 255n) - 19n;
+      var L = (1n << 252n) + 27742317777372353535851937790883648493n;
+      var mod = (a, m = P) => {
+        const r = a % m;
+        return r >= 0n ? r : r + m;
+      };
+      function pow(b, e, m = P) {
+        let r = 1n;
+        b = mod(b, m);
+        while (e > 0n) {
+          if (e & 1n) r = r * b % m;
+          b = b * b % m;
+          e >>= 1n;
+        }
+        return r;
+      }
+      var inv = (a) => pow(a, P - 2n);
+      var D = mod(-121665n * inv(121666n));
+      var I = pow(2n, (P - 1n) / 4n);
+      var Gy = mod(4n * inv(5n));
+      function recoverX(y, sign) {
+        const y2 = y * y % P;
+        const x2 = mod((y2 - 1n) * inv(D * y2 + 1n));
+        if (x2 === 0n) return sign ? null : 0n;
+        let x = pow(x2, (P + 3n) / 8n);
+        if (mod(x * x - x2) !== 0n) x = x * I % P;
+        if (mod(x * x - x2) !== 0n) return null;
+        if ((x & 1n) !== BigInt(sign)) x = P - x;
+        return x;
+      }
+      var Gx = recoverX(Gy, 0);
+      var G = [Gx, Gy, 1n, Gx * Gy % P];
+      var ZERO = [0n, 1n, 1n, 0n];
+      function add(p, q) {
+        const A = (p[1] - p[0]) * (q[1] - q[0]) % P, B3 = (p[1] + p[0]) * (q[1] + q[0]) % P;
+        const C = 2n * p[3] * q[3] * D % P, Dd = 2n * p[2] * q[2] % P;
+        const E = B3 - A, F = Dd - C, Gg = Dd + C, H = B3 + A;
+        return [mod(E * F), mod(Gg * H), mod(F * Gg), mod(E * H)];
+      }
+      function mul(p, s) {
+        let q = ZERO;
+        while (s > 0n) {
+          if (s & 1n) q = add(q, p);
+          p = add(p, p);
+          s >>= 1n;
+        }
+        return q;
+      }
+      function equal(p, q) {
+        return mod(p[0] * q[2] - q[0] * p[2]) === 0n && mod(p[1] * q[2] - q[1] * p[2]) === 0n;
+      }
+      var le = (b) => {
+        let n = 0n;
+        for (let i = b.length - 1; i >= 0; i--) n = n << 8n | BigInt(b[i]);
+        return n;
+      };
+      function decodePoint(b) {
+        if (b.length !== 32) return null;
+        const c = Uint8Array.from(b), sign = c[31] >> 7;
+        c[31] &= 127;
+        const y = le(c);
+        if (y >= P) return null;
+        const x = recoverX(y, sign);
+        return x === null ? null : [x, y, 1n, x * y % P];
+      }
+      function verify(sig, message, publicKey) {
+        try {
+          if (!sig || sig.length !== 64 || !publicKey || publicKey.length !== 32) return false;
+          const A = decodePoint(publicKey), R = decodePoint(sig.subarray(0, 32));
+          if (!A || !R) return false;
+          const S = le(sig.subarray(32));
+          if (S >= L) return false;
+          const h = new Uint8Array(64 + message.length);
+          h.set(sig.subarray(0, 32), 0);
+          h.set(publicKey, 32);
+          h.set(message, 64);
+          const k = mod(le(sha512(h)), L);
+          return equal(mul(G, S), add(R, mul(A, k)));
+        } catch (_) {
+          return false;
+        }
+      }
+      module.exports = { verify, sha512 };
+    }
+  });
+
+  // ../../backend/src/services/license.js
+  var require_license = __commonJS({
+    "../../backend/src/services/license.js"(exports, module) {
+      "use strict";
+      init_globals();
+      var db2 = require_db();
+      var { HttpError: HttpError2 } = require_misc();
+      var ed = require_ed25519();
+      var SITE = "https://billbox-app.pages.dev";
+      var KEYS = {
+        live: "n5iJULtiUQmzWASMw96LVf9kQ6y5z77934tbchjqhpE",
+        test: "pL2sd4UksOSqnzAlNDcYtgcquKYTxZYu9fR0c0vbHVY"
+      };
+      var TRIAL_DAYS = 15;
+      var DAY = 864e5;
+      var RENEW_BEFORE = 20 * DAY;
+      var reg = db2.registry;
+      var get = (k) => {
+        const r = reg.prepare("SELECT value FROM app_settings WHERE key=?").get(k);
+        return r && r.value ? String(r.value) : "";
+      };
+      var set = (k, v) => reg.prepare("INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
+      var del = (k) => reg.prepare("DELETE FROM app_settings WHERE key=?").run(k);
+      var editionOverride = "";
+      function edition() {
+        const e = String(typeof process !== "undefined" && process.env && process.env.BILLBOX_EDITION || editionOverride || "").toLowerCase();
+        return e === "public" || e === "admin" ? e : "";
+      }
+      function setEdition(e) {
+        if (!editionOverride && (e === "public" || e === "admin")) editionOverride = e;
+      }
+      var env = () => edition() === "public" ? "live" : "test";
+      var server = () => `${SITE}/api/${env()}`;
+      function b64urlToBytes(s) {
+        const b = String(s).replace(/-/g, "+").replace(/_/g, "/");
+        const bin = typeof atob === "function" ? atob(b + "=".repeat((4 - b.length % 4) % 4)) : Buffer2.from(b, "base64").toString("binary");
+        const out = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+        return out;
+      }
+      var utf8 = (s) => new TextEncoder().encode(s);
+      var fromUtf8 = (b) => new TextDecoder().decode(b);
+      function readToken(token, keyEnv = env()) {
+        const t = String(token || "").trim().replace(/\s+/g, "");
+        const parts = t.split(".");
+        if (parts.length !== 3 || parts[0] !== "BB1") return null;
+        let payload;
+        try {
+          payload = JSON.parse(fromUtf8(b64urlToBytes(parts[1])));
+        } catch (_) {
+          return null;
+        }
+        if (!payload || typeof payload !== "object" || payload.env !== keyEnv) return null;
+        if (!ed.verify(b64urlToBytes(parts[2]), utf8(`${parts[0]}.${parts[1]}`), b64urlToBytes(KEYS[keyEnv]))) return null;
+        return payload;
+      }
+      function device() {
+        let d = get("license_device");
+        if (!d) {
+          const rnd = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : require_crypto().randomUUID();
+          d = rnd.replace(/-/g, "").slice(0, 20).toUpperCase();
+          set("license_device", d);
+        }
+        return d;
+      }
+      function trialStart() {
+        let t = Number(get("license_trial_start") || 0);
+        if (!t) {
+          t = Date.now();
+          set("license_trial_start", t);
+        }
+        return t;
+      }
+      function activation() {
+        const a = readToken(get("license_activation"));
+        return a && a.t === "act" && a.dev === device() ? a : null;
+      }
+      function status() {
+        const ed_ = edition();
+        if (!ed_) return { edition: "", state: "unlimited", writable: true };
+        const now = Date.now();
+        const a = activation();
+        const base = { edition: ed_, env: env(), device: device(), site: SITE, buy_url: `${SITE}/buy.html?device=${device()}${ed_ === "admin" ? "&test=1" : ""}` };
+        if (a && (a.lexp == null || a.lexp > now) && a.exp > now) {
+          return {
+            ...base,
+            state: "licensed",
+            writable: true,
+            plan: a.plan,
+            email: a.email || "",
+            name: a.name || "",
+            licence_id: a.lic,
+            expires: a.lexp ? new Date(a.lexp).toISOString().slice(0, 10) : null,
+            renew_by: new Date(a.exp).toISOString().slice(0, 10),
+            needs_renewal: a.exp - now < RENEW_BEFORE,
+            last_check: get("license_checked")
+          };
+        }
+        const left = Math.min(TRIAL_DAYS, Math.max(0, Math.ceil((trialStart() + TRIAL_DAYS * DAY - now) / DAY)));
+        const why = a ? a.lexp != null && a.lexp <= now ? "The licence ran out" : "The licence needs to be checked online" : "";
+        return {
+          ...base,
+          state: left > 0 ? "trial" : "expired",
+          writable: left > 0,
+          trial_days: TRIAL_DAYS,
+          trial_days_left: left,
+          reason: why,
+          has_key: get("license_key") !== ""
+        };
+      }
+      async function call(path, body) {
+        let r;
+        try {
+          r = await fetch(`${server()}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+        } catch (_) {
+          throw new HttpError2(503, "Could not reach the BillBox licence server. Check the internet connection and try again.", "OFFLINE");
+        }
+        let j = {};
+        try {
+          j = JSON.parse(await r.text());
+        } catch (_) {
+        }
+        if (r.status !== 200) throw new HttpError2(r.status === 404 ? 400 : r.status >= 500 ? 502 : r.status, j.error || `The licence server said no (${r.status}).`, j.code);
+        return j;
+      }
+      async function activate(b = {}) {
+        if (!edition()) return status();
+        const key = String(b.key || get("license_key")).trim().replace(/\s+/g, "");
+        const lic = readToken(key);
+        if (!lic || lic.t !== "lic") {
+          const other = readToken(key, env() === "live" ? "test" : "live");
+          throw new HttpError2(400, other ? env() === "live" ? "That is a test licence key: it works only in the admin (test) BillBox." : "That is a live licence key: it works only in the BillBox from the website." : "That is not a BillBox licence key. Copy the whole key from the e-mail or the website (it starts with BB1.).");
+        }
+        if (lic.exp != null && lic.exp <= Date.now()) throw new HttpError2(400, `This licence ran out on ${new Date(lic.exp).toISOString().slice(0, 10)}. Renew it on ${SITE}.`);
+        const r = await call("/activate", { key, device: device(), name: String(b.device_name || "").slice(0, 60) });
+        const a = readToken(r.activation);
+        if (!a || a.t !== "act" || a.dev !== device()) throw new HttpError2(502, "The licence server gave an activation that does not check out. Try again.");
+        set("license_key", key);
+        set("license_activation", r.activation);
+        set("license_checked", (/* @__PURE__ */ new Date()).toISOString());
+        return status();
+      }
+      async function renew() {
+        const s = status();
+        if (!edition() || !get("license_key") || s.state === "licensed" && !s.needs_renewal) return s;
+        try {
+          return await activate({});
+        } catch (e) {
+          return { ...status(), renew_error: e.message };
+        }
+      }
+      async function deactivate() {
+        const key = get("license_key");
+        if (key) {
+          try {
+            await call("/deactivate", { key, device: device() });
+          } catch (_) {
+          }
+        }
+        for (const k of ["license_key", "license_activation", "license_checked"]) del(k);
+        return status();
+      }
+      function resetTrial() {
+        if (edition() !== "admin") throw new HttpError2(403, "Only the admin (test) BillBox can reset the trial.");
+        for (const k of ["license_key", "license_activation", "license_checked", "license_trial_start"]) del(k);
+        return status();
+      }
+      var ALWAYS = /^\/(license|backup|sync|update|companies\/\d+\/activate)(\/|$)/;
+      function allows(method, path) {
+        if (method === "GET" || method === "HEAD" || method === "OPTIONS") return true;
+        const p = String(path).replace(/^\/api/, "");
+        if (ALWAYS.test(p) || /^\/invoices\/[^/]+\/printed$/.test(p) || /\/preview$/.test(p)) return true;
+        return status().writable;
+      }
+      var blocked = () => new HttpError2(402, `Your ${TRIAL_DAYS}-day BillBox trial has ended. Your books are safe and can still be seen, printed and backed up; to add or change anything, buy a licence (Settings \u203A Licence) or enter your licence key.`, "LICENSE");
+      module.exports = { status, activate, renew, deactivate, resetTrial, allows, blocked, edition, setEdition, readToken, device, KEYS, SITE };
+    }
+  });
+
   // ../../ios/tests/parity/express-shim.js
   var require_express_shim = __commonJS({
     "../../ios/tests/parity/express-shim.js"(exports, module) {
@@ -3338,6 +4808,26 @@ content-type: application/octet-stream\r
         return r;
       }
       module.exports = Object.assign(() => ({}), { Router, json: () => (q, s, n) => n() });
+    }
+  });
+
+  // ../../backend/src/routes/license.js
+  var require_license2 = __commonJS({
+    "../../backend/src/routes/license.js"(exports, module) {
+      init_globals();
+      var router = require_express_shim().Router();
+      var { h, ha } = require_misc();
+      var L = require_license();
+      router.get("/license", h((req, res) => res.json(L.status())));
+      router.post("/license/activate", ha(async (req, res) => res.json(await L.activate(req.body || {}))));
+      router.post("/license/renew", ha(async (req, res) => res.json(await L.renew())));
+      router.post("/license/deactivate", ha(async (req, res) => res.json(await L.deactivate())));
+      router.post("/license/reset-trial", h((req, res) => res.json(L.resetTrial())));
+      router.post("/license/edition", h((req, res) => {
+        L.setEdition(String((req.body || {}).edition || ""));
+        res.json(L.status());
+      }));
+      module.exports = router;
     }
   });
 
@@ -3402,7 +4892,7 @@ content-type: application/octet-stream\r
       var { fyRange } = require_fy();
       var reg = db2.registry;
       var norm = (n) => String(n || "").trim().replace(/\s+/g, " ").toLowerCase();
-      var MASTERS = ["categories", "salesmen", "routes", "parties", "items", "schemes"];
+      var MASTERS = ["categories", "salesmen", "routes", "parties", "party_routes", "items", "schemes"];
       function copyRows(src, dst, table, where = "") {
         const have = new Set(dst.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name));
         const cols = src.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name).filter((c) => have.has(c));
@@ -3550,12 +5040,113 @@ content-type: application/octet-stream\r
       router.post("/backup/drive/connect", ha(async (req, res) => res.json(await D.connect())));
       router.post("/backup/drive/poll", ha(async (req, res) => res.json(await D.poll())));
       router.post("/backup/drive/disconnect", h((req, res) => res.json(D.disconnect())));
+      router.get("/backup/drive/list", ha(async (req, res) => res.json(await D.list())));
+      router.post("/backup/drive/download", ha(async (req, res) => res.json(await D.download(req.body || {}))));
       router.post("/backup/drive/upload", ha(async (req, res) => res.json(await D.upload(req.body || {}))));
       router.delete("/backup/:name", h((req, res) => {
         const r = B3.deleteBackup(req.params.name);
         res.json({ ...r, backups: B3.listBackups() });
       }));
       router.post("/backup/restore", h((req, res) => res.json(B3.restore(req.body || {}))));
+      module.exports = router;
+    }
+  });
+
+  // ../../backend/src/routes/sync.js
+  var require_sync2 = __commonJS({
+    "../../backend/src/routes/sync.js"(exports, module) {
+      init_globals();
+      var router = require_express_shim().Router();
+      var { h, ha } = require_misc();
+      var S = require_sync();
+      var db2 = require_db();
+      var cid = (req) => Number(req.get("x-company-id")) || db2.firstCompanyId();
+      router.get("/sync", h((req, res) => res.json(S.status(cid(req)))));
+      router.get("/sync/tick", ha(async (req, res) => res.json(await S.tick())));
+      router.post("/sync/signin", ha(async (req, res) => {
+        await S.signIn(req.body || {});
+        res.json(S.status(cid(req)));
+      }));
+      router.post("/sync/signout", h((req, res) => {
+        S.signOut();
+        res.json(S.status(cid(req)));
+      }));
+      router.post("/sync/on", ha(async (req, res) => res.json(await S.turnOn(cid(req)))));
+      router.post("/sync/off", h((req, res) => res.json(S.turnOff(cid(req)))));
+      router.post("/sync/now", ha(async (req, res) => {
+        await S.tick();
+        res.json(S.status(cid(req)));
+      }));
+      router.get("/sync/remote", ha(async (req, res) => res.json(await S.remote(cid(req)))));
+      router.post("/sync/merge", ha(async (req, res) => res.json(await S.merge(cid(req), String((req.body || {}).key || "")))));
+      router.post("/sync/join", ha(async (req, res) => res.json(await S.join(String((req.body || {}).key || "")))));
+      module.exports = router;
+    }
+  });
+
+  // ../../backend/src/services/update.js
+  var require_update = __commonJS({
+    "../../backend/src/services/update.js"(exports, module) {
+      init_globals();
+      var { HttpError: HttpError2 } = require_misc();
+      var REPO = process.env.BILLBOX_REPO || "mohdshahbaz/BillBox";
+      var API = process.env.BILLBOX_RELEASES_API || `https://api.github.com/repos/${REPO}/releases?per_page=30`;
+      var FILES = {
+        // Mac: each kind gets its own zip; "mac" (BillBox before the split) takes the plain zip, never an Apple silicon one
+        android: /^BillBox-android-.*\.apk$/,
+        mac: /^BillBox-mac-(?!.*-(arm64|intel)\.zip$).*\.zip$/,
+        "mac-arm64": /^BillBox-mac-.*-arm64\.zip$/,
+        "mac-intel": /^BillBox-mac-.*-intel\.zip$/,
+        windows: /^BillBox-windows-.*-setup\.exe$/,
+        linux: /^BillBox-linux-.*\.deb$/,
+        "linux-tar": /^BillBox-linux-.*\.tar\.gz$/,
+        iphone: /^BillBox-iphone-.*\.ipa$/
+      };
+      var parts = (v) => String(v || "").replace(/^v/, "").split("-")[0].split(".").map((x) => parseInt(x, 10) || 0);
+      function newer(a, b) {
+        const x = parts(a), y = parts(b);
+        for (let i = 0; i < Math.max(x.length, y.length); i++) {
+          if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+        }
+        return false;
+      }
+      async function check({ version, edition, platform } = {}) {
+        const admin = String(edition || "") === "admin";
+        let r;
+        try {
+          r = await fetch(API, { headers: { accept: "application/vnd.github+json", "user-agent": "BillBox" }, timeoutMs: 1e4 });
+        } catch (_) {
+          throw new HttpError2(503, "No internet: could not look for a new version.");
+        }
+        if (!r.ok) throw new HttpError2(502, `GitHub answered ${r.status} while looking for a new version.`);
+        const list = await r.json() || [];
+        const rel = list.filter((x) => !x.draft && /-admin$/.test(x.tag_name) === admin && (admin || !x.prerelease)).sort((a, b) => newer(a.tag_name, b.tag_name) ? -1 : newer(b.tag_name, a.tag_name) ? 1 : 0)[0];
+        if (!rel) return { available: false, current: version || "", latest: null };
+        const want = FILES[platform] || null;
+        const asset = want ? (rel.assets || []).find((a) => want.test(a.name)) || (String(platform).startsWith("mac-") ? (rel.assets || []).find((a) => FILES.mac.test(a.name)) : null) : null;
+        const latest = rel.tag_name.replace(/^v/, "");
+        return {
+          available: !!version && newer(latest, version),
+          current: version || "",
+          latest,
+          page: rel.html_url,
+          published: rel.published_at,
+          notes: String(rel.body || "").split("\n## Install")[0].trim().slice(0, 1500),
+          file: asset ? { name: asset.name, url: asset.browser_download_url, size: asset.size } : null
+        };
+      }
+      module.exports = { check, newer };
+    }
+  });
+
+  // ../../backend/src/routes/update.js
+  var require_update2 = __commonJS({
+    "../../backend/src/routes/update.js"(exports, module) {
+      init_globals();
+      var router = require_express_shim().Router();
+      var { ha } = require_misc();
+      var U = require_update();
+      router.get("/update", ha(async (req, res) => res.json(await U.check(req.query || {}))));
       module.exports = router;
     }
   });
@@ -4403,6 +5994,25 @@ content-type: application/octet-stream\r
         const info = db2.prepare("INSERT INTO categories(name) VALUES(?)").run(req.body.name.trim());
         res.status(201).json({ id: Number(info.lastInsertRowid), name: req.body.name.trim() });
       }));
+      router.put("/categories/:id", h((req, res) => {
+        const cur = db2.prepare("SELECT * FROM categories WHERE id=?").get(req.params.id);
+        if (!cur) throw new HttpError2(404, "Category not found");
+        if (!blank(req.body.name)) throw new HttpError2(400, "Category name is required");
+        const name = req.body.name.trim();
+        if (db2.prepare("SELECT id FROM categories WHERE lower(name)=lower(?) AND id<>?").get(name, cur.id)) throw new HttpError2(409, "A category with that name already exists");
+        db2.prepare("UPDATE categories SET name=? WHERE id=?").run(name, cur.id);
+        res.json({ id: cur.id, name });
+      }));
+      router.delete("/categories/:id", h((req, res) => {
+        const cur = db2.prepare("SELECT * FROM categories WHERE id=?").get(req.params.id);
+        if (!cur) throw new HttpError2(404, "Category not found");
+        let moved = 0;
+        db2.transaction(() => {
+          moved = db2.prepare("UPDATE items SET category_id=NULL WHERE category_id=?").run(cur.id).changes;
+          db2.prepare("DELETE FROM categories WHERE id=?").run(cur.id);
+        })();
+        res.json({ ok: true, uncategorised: moved });
+      }));
       var withMargins = (it) => {
         const wholesaleInclGst = it.wholesale_price * (1 + it.gst_rate / 100);
         return {
@@ -4708,7 +6318,6 @@ content-type: application/octet-stream\r
         ).run(b.item_id, String(b.batch_no).trim(), blank(b.mfg_date), b.exp_date, qty, blank(b.purchase_price), blank(b.mrp));
         res.status(201).json({ ok: true });
       }));
-// ---------- set stock (stocktake correction: total pieces, may be zero or negative) ----------
       router.post("/items/:id/set-stock", h((req, res) => {
         const it = db2.prepare("SELECT id FROM items WHERE id=?").get(req.params.id);
         if (!it) throw new HttpError2(404, "Item not found");
@@ -4718,7 +6327,7 @@ content-type: application/octet-stream\r
         const diff = target - cur;
         if (diff !== 0) db2.prepare(
           `INSERT INTO batches(item_id,batch_no,exp_date,qty) VALUES(?,?,?,?)
-           ON CONFLICT(item_id,batch_no) DO UPDATE SET qty = qty + excluded.qty`
+     ON CONFLICT(item_id,batch_no) DO UPDATE SET qty = qty + excluded.qty`
         ).run(it.id, "ADJUST", "2099-12-31", diff);
         res.json({ ok: true, previous: cur, stock: target });
       }));
@@ -4735,8 +6344,75 @@ content-type: application/octet-stream\r
         db2.prepare("UPDATE schemes SET active=0 WHERE id=?").run(req.params.id);
         res.json({ ok: true });
       }));
+      var MIX_DEFAULTS = [
+        { name: "\u20B910 Namkeen mix box", match: "-CHIPS -PAPAD", mrp: 10, box: 300, each: 12 },
+        { name: "\u20B95 Namkeen mix box", match: "-CHIPS -PAPAD", mrp: 5, box: 432, each: 12 },
+        { name: "\u20B95 Chips mix box", match: "CHIPS", mrp: 5, box: 192, each: 12 },
+        { name: "Chatpat papad mix box", match: "CHATPAT", mrp: 0, box: 300, each: 12 },
+        { name: "\u20B920 Namkeen mix box", match: "-CHIPS -PAPAD", mrp: 20, box: 120, each: 10 },
+        { name: "All namkeen in stock (12 pc each)", match: "-CHIPS -PAPAD", mrp: 0, box: 0, each: 12 },
+        { name: "Makhana mix box", match: "MAKHANA MAKANNA", mrp: 0, box: 120, each: 10 }
+      ];
+      function mixPresets() {
+        const r = db2.prepare("SELECT value FROM settings WHERE key='mix_boxes'").get();
+        try {
+          const v = r && JSON.parse(r.value);
+          if (Array.isArray(v) && v.length) return v;
+        } catch (_) {
+        }
+        return MIX_DEFAULTS;
+      }
+      function mixMatch(name, match2) {
+        const n = String(name || "").toUpperCase();
+        const words = String(match2 || "").toUpperCase().split(/[\s,]+/).filter(Boolean);
+        const want = words.filter((w) => !w.startsWith("-")), not = words.filter((w) => w.startsWith("-")).map((w) => w.slice(1)).filter(Boolean);
+        return (!want.length || want.some((w) => n.includes(w))) && !not.some((w) => n.includes(w));
+      }
+      function catMatch(cat, want) {
+        const w = String(want || "").trim().toUpperCase();
+        return !w || String(cat || "").toUpperCase().includes(w);
+      }
+      function planMix(p) {
+        const each = Math.max(1, Math.floor(Number(p.each) || 12));
+        const box = Math.max(0, Math.floor(Number(p.box) || 0));
+        const mrp = Number(p.mrp) || 0;
+        const rows = db2.prepare(
+          `SELECT i.*, c.name category, COALESCE(s.stock,0) stock, s.next_expiry
+     FROM items i LEFT JOIN categories c ON c.id=i.category_id
+     LEFT JOIN (SELECT item_id, SUM(qty) stock, MIN(CASE WHEN qty>0 AND exp_date < '2099-01-01' THEN exp_date END) next_expiry
+                FROM batches GROUP BY item_id) s ON s.item_id=i.id
+     WHERE i.active=1 AND COALESCE(s.stock,0) > 0 ORDER BY i.name`
+        ).all().filter((it) => mixMatch(it.name, p.match) && catMatch(it.category, p.category) && (!mrp || Math.abs((Number(it.mrp) || mrpFromName(it.name) || 0) - mrp) < 0.01));
+        const pcs = /* @__PURE__ */ new Map();
+        let left = box || rows.length * each;
+        for (let more = true; left > 0 && more; ) {
+          more = false;
+          for (const it of rows) {
+            if (left <= 0) break;
+            const have = pcs.get(it.id) || 0;
+            const take = Math.min(each, left, Math.floor(it.stock) - have);
+            if (take <= 0) continue;
+            pcs.set(it.id, have + take);
+            left -= take;
+            more = true;
+          }
+          if (!box) break;
+        }
+        const lines = rows.filter((it) => pcs.has(it.id)).map((it) => ({ ...withMargins(it), pcs: pcs.get(it.id) }));
+        const filled = lines.reduce((a, l) => a + l.pcs, 0);
+        return { name: p.name || "", box, each, filled, short: box ? Math.max(0, box - filled) : 0, items: lines.length, lines };
+      }
+      router.get("/mixboxes", h((req, res) => res.json(mixPresets())));
+      router.post("/mixboxes/plan", h((req, res) => {
+        const b = req.body || {};
+        const p = b.index !== void 0 ? mixPresets()[Number(b.index)] : b;
+        if (!p) throw new HttpError2(404, "Mix box not found");
+        res.json(planMix(p));
+      }));
       module.exports = router;
       module.exports.fixPacks = fixPacks;
+      module.exports.planMix = planMix;
+      module.exports.mixMatch = mixMatch;
     }
   });
 
@@ -5045,6 +6721,54 @@ content-type: application/octet-stream\r
     }
   });
 
+  // ../../backend/src/utils/partyroutes.js
+  var require_partyroutes = __commonJS({
+    "../../backend/src/utils/partyroutes.js"(exports, module) {
+      init_globals();
+      var ON_ROUTE = `(r.id=p.route_id OR r.id IN (SELECT x.route_id FROM party_routes x WHERE x.party_id=p.id))`;
+      var ROUTE_NAMES = `(SELECT group_concat(name, '; ') FROM (SELECT r.name FROM routes r WHERE ${ON_ROUTE} ORDER BY r.name, r.id))`;
+      var ROUTE_IDS = `(SELECT group_concat(id) FROM (SELECT r.id FROM routes r WHERE ${ON_ROUTE} ORDER BY r.name, r.id))`;
+      function idList(v) {
+        const list = Array.isArray(v) ? v : String(v ?? "").split(",");
+        return [...new Set(list.map((x) => Number(String(x).trim())).filter((n) => Number.isInteger(n) && n > 0))];
+      }
+      function setPartyRoutes(d, pid, ids) {
+        const have = new Set(d.prepare("SELECT id FROM routes").all().map((r) => Number(r.id)));
+        ids = idList(ids).filter((id) => have.has(id));
+        const cur = d.prepare("SELECT route_id FROM parties WHERE id=?").get(pid);
+        if (!cur) return [];
+        const first = ids.includes(Number(cur.route_id)) ? Number(cur.route_id) : ids.length ? ids[0] : null;
+        if ((cur.route_id == null ? null : Number(cur.route_id)) !== first) d.prepare("UPDATE parties SET route_id=? WHERE id=?").run(first, pid);
+        const rest = new Set(ids.filter((id) => id !== first)), kept = /* @__PURE__ */ new Set();
+        for (const x of d.prepare("SELECT id, route_id FROM party_routes WHERE party_id=? ORDER BY id").all(pid)) {
+          const rid = Number(x.route_id);
+          if (rest.has(rid) && !kept.has(rid)) kept.add(rid);
+          else d.prepare("DELETE FROM party_routes WHERE id=?").run(x.id);
+        }
+        for (const rid of rest) if (!kept.has(rid)) d.prepare("INSERT INTO party_routes(party_id,route_id) VALUES(?,?)").run(pid, rid);
+        return ids;
+      }
+      function addPartyRoute(d, pid, rid) {
+        const p = d.prepare("SELECT route_id FROM parties WHERE id=?").get(pid);
+        if (!p) return false;
+        if (p.route_id == null) {
+          d.prepare("UPDATE parties SET route_id=? WHERE id=?").run(rid, pid);
+          return true;
+        }
+        if (Number(p.route_id) === Number(rid) || d.prepare("SELECT 1 x FROM party_routes WHERE party_id=? AND route_id=?").get(pid, rid)) return false;
+        d.prepare("INSERT INTO party_routes(party_id,route_id) VALUES(?,?)").run(pid, rid);
+        return true;
+      }
+      function partyRoutes(d, pid) {
+        const p = d.prepare("SELECT route_id FROM parties WHERE id=?").get(pid);
+        const ids = p && p.route_id != null ? [Number(p.route_id)] : [];
+        for (const x of d.prepare("SELECT route_id FROM party_routes WHERE party_id=? ORDER BY id").all(pid)) if (!ids.includes(Number(x.route_id))) ids.push(Number(x.route_id));
+        return ids;
+      }
+      module.exports = { ON_ROUTE, ROUTE_NAMES, ROUTE_IDS, idList, setPartyRoutes, addPartyRoute, partyRoutes };
+    }
+  });
+
   // ../../backend/src/routes/parties.js
   var require_parties = __commonJS({
     "../../backend/src/routes/parties.js"(exports, module) {
@@ -5056,12 +6780,13 @@ content-type: application/octet-stream\r
       var { recordVoucher, getVoucher, deleteLedgerEntry } = require_vouchers();
       var Sheet = require_paymentSheet();
       var { fyRange } = require_fy();
+      var { ROUTE_NAMES, ROUTE_IDS, idList, setPartyRoutes, partyRoutes } = require_partyroutes();
       var BAL_AT = `COALESCE((SELECT SUM(debit)-SUM(credit) FROM ledger l WHERE l.party_id=p.id AND l.date <= @to),0)`;
       router.get("/parties", h((req, res) => {
         const q = `%${(req.query.q || "").trim()}%`;
         const kind = req.query.kind === "SUPPLIER" ? `AND p.type = 'SUPPLIER'` : req.query.kind === "CUSTOMER" ? `AND p.type <> 'SUPPLIER'` : "";
         res.json(db2.prepare(
-          `SELECT p.*, ${BAL_AT} balance, r.name route_name FROM parties p LEFT JOIN routes r ON r.id=p.route_id
+          `SELECT p.*, ${BAL_AT} balance, ${ROUTE_NAMES} route_name, ${ROUTE_IDS} route_ids FROM parties p
      WHERE p.active=1 ${kind} AND (p.name LIKE @q OR p.phone LIKE @q OR p.gstin LIKE @q OR COALESCE(p.mobiles,'') LIKE @q OR COALESCE(p.tel,'') LIKE @q) ORDER BY p.name`
         ).all({ q, to: fyRange(req.query.fy).to }));
       }));
@@ -5073,6 +6798,20 @@ content-type: application/octet-stream\r
           return Number(info.lastInsertRowid);
         }
         return blank(b.route_id);
+      }
+      function wantedRoutes(b, pid) {
+        const made = b.new_route && blank(b.new_route.name) ? resolveRoute({ new_route: b.new_route }) : null;
+        let ids;
+        if (b.route_ids !== void 0) ids = idList(b.route_ids);
+        else {
+          const now = pid ? partyRoutes(db2, pid) : [];
+          if (!("route_id" in b) || made) ids = now;
+          else {
+            const one = idList(b.route_id);
+            ids = one.length ? [...one, ...now.slice(1)] : [];
+          }
+        }
+        return made ? [...ids, made] : ids;
       }
       var GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
       function cleanParty(b, cur) {
@@ -5114,12 +6853,13 @@ content-type: application/octet-stream\r
         const b = req.body || {};
         const o = cleanParty(b, null);
         const id = db2.transaction(() => {
-          o.route_id = resolveRoute(b);
+          const routes = wantedRoutes(b, null);
           const info = db2.prepare(
-            `INSERT INTO parties(name,gstin,state_code,phone,tel,mobiles,address,fssai,pan,email,type,price_tier,credit_limit,credit_days,route_id)
-       VALUES(@name,@gstin,@state_code,@phone,@tel,@mobiles,@address,@fssai,@pan,@email,@type,@price_tier,@credit_limit,@credit_days,@route_id)`
+            `INSERT INTO parties(name,gstin,state_code,phone,tel,mobiles,address,fssai,pan,email,type,price_tier,credit_limit,credit_days)
+       VALUES(@name,@gstin,@state_code,@phone,@tel,@mobiles,@address,@fssai,@pan,@email,@type,@price_tier,@credit_limit,@credit_days)`
           ).run(o);
           const pid = Number(info.lastInsertRowid);
+          setPartyRoutes(db2, pid, routes);
           const opening = Number(b.opening_balance) || 0;
           if (opening !== 0) {
             db2.prepare("INSERT INTO ledger(party_id,date,type,ref_no,debit,credit,narration) VALUES(?,?,?,?,?,?,?)").run(pid, today(), "OPENING", "OPENING", opening > 0 ? opening : 0, opening < 0 ? -opening : 0, "Opening balance");
@@ -5134,11 +6874,12 @@ content-type: application/octet-stream\r
         const b = req.body || {};
         const o = cleanParty(b, cur);
         db2.transaction(() => {
-          o.route_id = resolveRoute({ ...b, route_id: "route_id" in b ? b.route_id : cur.route_id });
+          const routes = wantedRoutes(b, cur.id);
           db2.prepare(
             `UPDATE parties SET name=@name,gstin=@gstin,state_code=@state_code,phone=@phone,tel=@tel,mobiles=@mobiles,address=@address,
-         fssai=@fssai,pan=@pan,email=@email,type=@type,price_tier=@price_tier,credit_limit=@credit_limit,credit_days=@credit_days,route_id=@route_id WHERE id=@id`
+         fssai=@fssai,pan=@pan,email=@email,type=@type,price_tier=@price_tier,credit_limit=@credit_limit,credit_days=@credit_days WHERE id=@id`
           ).run({ ...o, id: cur.id });
+          setPartyRoutes(db2, cur.id, routes);
         })();
         res.json({ ok: true });
       }));
@@ -5152,7 +6893,10 @@ content-type: application/octet-stream\r
           db2.prepare("UPDATE parties SET active=0 WHERE id=?").run(p.id);
           return res.json({ result: "archived" });
         }
-        db2.prepare("DELETE FROM parties WHERE id=?").run(p.id);
+        db2.transaction(() => {
+          db2.prepare("DELETE FROM party_routes WHERE party_id=?").run(p.id);
+          db2.prepare("DELETE FROM parties WHERE id=?").run(p.id);
+        })();
         res.json({ result: "deleted" });
       }));
       router.get("/parties/:id/ledger", h((req, res) => {
@@ -5180,6 +6924,109 @@ content-type: application/octet-stream\r
     }
   });
 
+  // ../../backend/src/utils/routematch.js
+  var require_routematch = __commonJS({
+    "../../backend/src/utils/routematch.js"(exports, module) {
+      init_globals();
+      var { addPartyRoute } = require_partyroutes();
+      var FILLER = /* @__PURE__ */ new Set([
+        "ROUTE",
+        "ROUTES",
+        "BEAT",
+        "MON",
+        "TUE",
+        "TUES",
+        "WED",
+        "THU",
+        "THUR",
+        "THURS",
+        "FRI",
+        "SAT",
+        "SUN",
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY",
+        "SUNDAY"
+      ]);
+      var GENERIC = /* @__PURE__ */ new Set([
+        "ROAD",
+        "NAGAR",
+        "MARG",
+        "CHOWK",
+        "CHAURAHA",
+        "BAZAR",
+        "BAZAAR",
+        "MARKET",
+        "COLONY",
+        "STREET",
+        "NEAR",
+        "MAIN",
+        "GALI",
+        "LANE",
+        "SECTOR",
+        "AREA",
+        "SIDE",
+        "THE",
+        "AND",
+        "OPP",
+        "OPPOSITE",
+        "BEHIND",
+        "SHOP",
+        "STORE",
+        "STORES"
+      ]);
+      var words = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+      function routeKey(name) {
+        const all = words(name);
+        const kept = all.filter((w) => !FILLER.has(w));
+        const list = kept.length ? kept : all;
+        const k = list.join(" ");
+        if (k.length < 3 || list.length === 1 && GENERIC.has(list[0])) return null;
+        return ` ${k} `;
+      }
+      var routeKeys = (name) => [...new Set(String(name || "").split(/[,;/&+|]+/).map(routeKey).filter(Boolean))];
+      function autoAssignRoutes(db2, { apply = false, party_ids, assignments } = {}) {
+        const routes = db2.prepare("SELECT id, name FROM routes ORDER BY name, id").all().map((r) => ({ id: Number(r.id), name: r.name, keys: routeKeys(r.name) })).filter((r) => r.keys.length);
+        const parties = db2.prepare("SELECT id, name, address, route_id FROM parties WHERE active=1 AND type <> 'SUPPLIER' ORDER BY name, id").all();
+        const on = /* @__PURE__ */ new Map();
+        for (const x of db2.prepare("SELECT party_id, route_id FROM party_routes").all()) {
+          if (!on.has(Number(x.party_id))) on.set(Number(x.party_id), /* @__PURE__ */ new Set());
+          on.get(Number(x.party_id)).add(Number(x.route_id));
+        }
+        const only = Array.isArray(party_ids) ? new Set(party_ids.map(Number)) : null;
+        const matches = [];
+        let unmatched = 0;
+        for (const p of parties) {
+          if (only && !only.has(Number(p.id))) continue;
+          const has = on.get(Number(p.id)) || /* @__PURE__ */ new Set();
+          if (p.route_id != null) has.add(Number(p.route_id));
+          const text = ` ${words(p.name).join(" ")} | ${words(p.address).join(" ")} `;
+          let n = 0;
+          for (const r of routes) {
+            if (has.has(r.id) || !r.keys.some((k) => text.includes(k))) continue;
+            matches.push({ party_id: p.id, party_name: p.name, address: p.address || "", route_id: r.id, route_name: r.name });
+            n++;
+          }
+          if (!n && !has.size) unmatched++;
+        }
+        let assigned = 0;
+        if (apply) {
+          const ok = new Set(db2.prepare("SELECT id FROM routes").all().map((r) => Number(r.id)));
+          const pairs = Array.isArray(assignments) ? assignments.map((a) => ({ party_id: Number(a && a.party_id), route_id: Number(a && a.route_id) })).filter((a) => a.party_id > 0 && ok.has(a.route_id)) : matches;
+          const live = db2.prepare("SELECT 1 x FROM parties WHERE id=? AND active=1 AND type <> 'SUPPLIER'");
+          db2.transaction(() => {
+            for (const m of pairs) if (live.get(m.party_id) && addPartyRoute(db2, m.party_id, m.route_id)) assigned++;
+          })();
+        }
+        return { matches, choices: [], unclear: 0, unmatched, assigned };
+      }
+      module.exports = { autoAssignRoutes, routeKey, routeKeys };
+    }
+  });
+
   // ../../backend/src/routes/salesmen.js
   var require_salesmen = __commonJS({
     "../../backend/src/routes/salesmen.js"(exports, module) {
@@ -5188,6 +7035,7 @@ content-type: application/octet-stream\r
       var db2 = require_db();
       var { h, HttpError: HttpError2, blank, today, normDays } = require_misc();
       var { r2 } = require_gst();
+      var { ON_ROUTE } = require_partyroutes();
       router.get("/salesmen", h((req, res) => {
         res.json(db2.prepare("SELECT * FROM salesmen WHERE active=1 ORDER BY name").all());
       }));
@@ -5203,9 +7051,33 @@ content-type: application/octet-stream\r
         db2.prepare("UPDATE salesmen SET name=?,phone=?,monthly_target=?,active=? WHERE id=?").run(b.name, blank(b.phone), Number(b.monthly_target) || 0, b.active ? 1 : 0, cur.id);
         res.json({ ok: true });
       }));
+      router.delete("/salesmen/:id", h((req, res) => {
+        const cur = db2.prepare("SELECT * FROM salesmen WHERE id=?").get(req.params.id);
+        if (!cur) throw new HttpError2(404, "Salesman not found");
+        db2.transaction(() => {
+          db2.prepare("UPDATE routes SET salesman_id=NULL WHERE salesman_id=?").run(cur.id);
+          db2.prepare("UPDATE salesmen SET active=0 WHERE id=?").run(cur.id);
+        })();
+        res.json({ ok: true });
+      }));
+      router.post("/salesmen/:id/merge", h((req, res) => {
+        const from = db2.prepare("SELECT * FROM salesmen WHERE id=?").get(req.params.id);
+        const into = db2.prepare("SELECT * FROM salesmen WHERE id=?").get(req.body && req.body.into);
+        if (!from || !into) throw new HttpError2(404, "Salesman not found");
+        if (from.id === into.id) throw new HttpError2(400, "Choose another salesman to merge into");
+        const moved = {};
+        db2.transaction(() => {
+          for (const t of ["invoices", "receipts", "routes"]) {
+            moved[t] = db2.prepare(`UPDATE ${t} SET salesman_id=? WHERE salesman_id=?`).run(into.id, from.id).changes;
+          }
+          if (!into.monthly_target && from.monthly_target) db2.prepare("UPDATE salesmen SET monthly_target=? WHERE id=?").run(from.monthly_target, into.id);
+          db2.prepare("UPDATE salesmen SET active=0 WHERE id=?").run(from.id);
+        })();
+        res.json({ ok: true, into: into.id, moved });
+      }));
       router.get("/routes", h((req, res) => {
         res.json(db2.prepare(
-          `SELECT r.*, s.name salesman_name, (SELECT COUNT(*) FROM parties p WHERE p.route_id=r.id AND p.active=1) outlets
+          `SELECT r.*, s.name salesman_name, (SELECT COUNT(*) FROM parties p WHERE p.active=1 AND ${ON_ROUTE}) outlets
      FROM routes r LEFT JOIN salesmen s ON s.id=r.salesman_id ORDER BY r.days, r.name`
         ).all());
       }));
@@ -5216,29 +7088,39 @@ content-type: application/octet-stream\r
         const info = db2.prepare("INSERT INTO routes(name,salesman_id,day_of_week,days) VALUES(?,?,?,?)").run(b.name.trim(), blank(b.salesman_id), days ? parseInt(days) : null, days);
         res.status(201).json({ id: Number(info.lastInsertRowid) });
       }));
+      router.post("/routes/auto-assign", h((req, res) => {
+        const b = req.body || {};
+        res.json(require_routematch().autoAssignRoutes(db2, { apply: !!b.apply, party_ids: b.party_ids, assignments: b.assignments }));
+      }));
       router.put("/routes/:id", h((req, res) => {
         const cur = db2.prepare("SELECT * FROM routes WHERE id=?").get(req.params.id);
         if (!cur) throw new HttpError2(404, "Route not found");
         const b = { ...cur, ...req.body };
+        if (!blank(b.name)) throw new HttpError2(400, "Route name is required");
+        b.name = String(b.name).trim();
         const days = normDays(req.body.days !== void 0 ? req.body.days : req.body.day_of_week !== void 0 ? req.body.day_of_week : cur.days);
         db2.prepare("UPDATE routes SET name=?,salesman_id=?,day_of_week=?,days=? WHERE id=?").run(b.name, blank(b.salesman_id), days ? parseInt(days) : null, days, cur.id);
         res.json({ ok: true });
       }));
       router.delete("/routes/:id", h((req, res) => {
         db2.transaction(() => {
-          db2.prepare("UPDATE parties SET route_id=NULL WHERE route_id=?").run(req.params.id);
+          db2.prepare("DELETE FROM party_routes WHERE route_id=?").run(req.params.id);
+          db2.prepare("UPDATE parties SET route_id=(SELECT x.route_id FROM party_routes x WHERE x.party_id=parties.id ORDER BY x.id LIMIT 1) WHERE route_id=?").run(req.params.id);
+          db2.prepare("DELETE FROM party_routes WHERE route_id=(SELECT p.route_id FROM parties p WHERE p.id=party_routes.party_id)").run();
           db2.prepare("DELETE FROM routes WHERE id=?").run(req.params.id);
         })();
         res.json({ ok: true });
       }));
       router.get("/salesmen/:id/beat", h((req, res) => {
         const day = req.query.day !== void 0 ? parseInt(req.query.day) : (/* @__PURE__ */ new Date()).getDay();
+        const due = `r.salesman_id=@sm AND (',' || COALESCE(r.days, CAST(r.day_of_week AS TEXT), '') || ',') LIKE '%,' || @day || ',%' AND ${ON_ROUTE}`;
         const rows = db2.prepare(
-          `SELECT p.id, p.name, p.phone, p.address, p.credit_limit, r.name route_name,
+          `SELECT p.id, p.name, p.phone, p.address, p.credit_limit,
+       (SELECT group_concat(name, '; ') FROM (SELECT r.name FROM routes r WHERE ${due} ORDER BY r.name, r.id)) route_name,
        COALESCE((SELECT SUM(debit)-SUM(credit) FROM ledger l WHERE l.party_id=p.id AND l.date <= @to),0) outstanding,
        (SELECT MAX(date) FROM invoices i WHERE i.party_id=p.id AND i.date <= @to) last_order
-     FROM parties p JOIN routes r ON r.id=p.route_id
-     WHERE r.salesman_id=@sm AND (',' || COALESCE(r.days, CAST(r.day_of_week AS TEXT), '') || ',') LIKE '%,' || @day || ',%' AND p.active=1 ORDER BY r.name, p.name`
+     FROM parties p
+     WHERE p.active=1 AND EXISTS (SELECT 1 FROM routes r WHERE ${due}) ORDER BY route_name, p.name`
         ).all({ sm: req.params.id, day: String(day), to: require_fy().fyRange(req.query.fy).to });
         res.json({ day, outlets: rows, total_outstanding: r2(rows.reduce((a, r) => a + r.outstanding, 0)) });
       }));
@@ -5566,7 +7448,7 @@ ${intra ? "<br><small>Intra-state supply: CGST + SGST</small>" : "<br><small>Int
 <table style="flex:1" class="tot"><tr><td>Items total</td><td class="r">${money(inv.subtotal)}</td></tr>
 <tr><td>Discount</td><td class="r">- ${money(inv.discount)}</td></tr><tr><td>Taxable value</td><td class="r">${money(inv.taxable)}</td></tr>
 ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SGST</td><td class="r">${money(inv.sgst)}</td></tr>` : `<tr><td>IGST</td><td class="r">${money(inv.igst)}</td></tr>`}
-<tr><td>Round off</td><td class="r">${money(inv.round_off)}</td></tr><tr><td>Invoice total</td><td class="r">\u20B9 ${money(inv.total)}</td></tr>
+<tr><td>Invoice total</td><td class="r">\u20B9 ${money(inv.total)}</td></tr>
 <tr><td>Paid</td><td class="r">${money(inv.paid)}</td></tr><tr><td>Balance due on this bill</td><td class="r">${money(due)}</td></tr></table></div>
 <p><b>Amount in words:</b> Rupees ${words(Math.round(inv.total))} Only</p>
 <p><small>${esc(co.invoice_terms)}</small></p>
@@ -5585,7 +7467,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
       var router = require_express_shim().Router();
       var EWB = require_ewayBill();
       var db2 = require_db();
-      var { h, HttpError: HttpError2, today, peekNo, setNext, SERIES } = require_misc();
+      var { h, HttpError: HttpError2, today, peekNo, setNext, SERIES, numberingEdited } = require_misc();
       var { buildInvoice, createInvoice, updateInvoice, deleteInvoice, getInvoice, settings: settings2 } = require_billing();
       var { invoiceHtml } = require_invoiceHtml();
       router.post("/invoices/preview", h((req, res) => {
@@ -5660,6 +7542,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         const b = req.body || {};
         if (b.low_stock_qty !== void 0 && !(Number(b.low_stock_qty) >= 0)) throw new HttpError2(400, "Low-stock level must be 0 or more");
         db2.transaction(() => {
+          numberingEdited(b);
           for (const [k, v] of Object.entries(b)) up.run(k, String(v));
         })();
         res.json(settings2());
@@ -5901,12 +7784,13 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         ).get(id);
         if (!p) return null;
         p.lines = db2.prepare(
-          `SELECT l.*, it.name item_name, COALESCE(it.hsn,'') hsn FROM purchase_lines l JOIN items it ON it.id=l.item_id WHERE l.purchase_id=? ORDER BY l.id`
+          `SELECT l.*, it.name item_name, COALESCE(it.hsn,'') hsn, MAX(1, COALESCE(it.pcs_per_box,1)) pcs_per_box FROM purchase_lines l JOIN items it ON it.id=l.item_id WHERE l.purchase_id=? ORDER BY l.id`
         ).all(id);
         p.lines.forEach((l, i) => {
           l.sno = i + 1;
           if (l.exp_date >= "2099-01-01") l.exp_date = null;
           if (!l.unit) l.unit = "PCS";
+          if (l.pcs_qty == null) l.pcs_qty = BOX_UNIT.test(l.unit) ? l.qty * l.pcs_per_box : l.qty;
         });
         return p;
       }
@@ -10521,7 +12405,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
       var zlib = require_zlib();
       var db2 = require_db();
       var { r2 } = require_gst();
-      var { HttpError: HttpError2, peekNo } = require_misc();
+      var { HttpError: HttpError2, peekNo, followLast } = require_misc();
       var { fyRange } = require_fy();
       var { mrpFromName, packFromName } = require_pdfParser();
       var { pinned, byRules, cleanQuery } = require_category();
@@ -11084,38 +12968,13 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         }
         return { ...m.summary, would_add: out.added, already_here: out.existing };
       }
-      function followMarg(m) {
-        const get = (k) => {
-          const r = db2.prepare("SELECT value FROM settings WHERE key=?").get(k);
-          return r && r.value !== null ? String(r.value) : "";
-        };
-        const set = db2.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
-        const out = {};
-        if (get("num_fy") !== "") return out;
-        for (const [kind, s] of [["SALE", "INV"], ["PURCHASE", "PUR"], ["DEBIT_NOTE", "DN"]]) {
-          if (get(`num_${s}_prefix`) !== "") continue;
-          let best = null;
-          for (const d of m.docs) {
-            if (d.kind !== kind) continue;
-            const x = /^(.*?[^0-9])([0-9]+)$/.exec(d.no);
-            if (x && (!best || parseInt(x[2], 10) > parseInt(best[2], 10))) best = x;
-          }
-          if (!best || !best[1].trim()) continue;
-          set.run(`num_${s}_prefix`, best[1]);
-          set.run(`num_${s}_digits`, String(Math.min(9, best[2].length)));
-          out[s] = best[1];
-        }
-        if (Object.keys(out).length) set.run("num_fy", "0");
-        for (const s of Object.keys(out)) out[s] = peekNo(s).next_no;
-        return out;
-      }
       function importMarg(p) {
         const m = model(readSource(p));
         checkYear(m);
         let numbering = {};
         const out = db2.transaction(() => {
           const w = write(m);
-          numbering = followMarg(m);
+          numbering = followLast();
           return w;
         })();
         return { ...m.summary, added: out.added, already_here: out.existing, numbering };
@@ -11251,21 +13110,22 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
       };
       var one = (sql, ...a) => db2.prepare(sql).get(...a);
       var monthOf = (d) => d.slice(0, 7);
+      var monthSpan = (m) => [m + "-01", m + "-31"];
       var { fyRange } = require_fy();
       var clamp = (d, r) => d < r.from ? r.from : d > r.to ? r.to : d;
-      function profit(from, to) {
-        const r = one(
-          `SELECT COALESCE(SUM(l.taxable),0) revenue,
+      var PROFIT_COLS = `COALESCE(SUM(l.taxable),0) revenue,
             COALESCE(SUM((l.qty+l.free_qty) * COALESCE(NULLIF(b.purchase_price,0), NULLIF(it.purchase_price,0), 0)),0) cost,
             COALESCE(SUM(CASE WHEN COALESCE(NULLIF(b.purchase_price,0), NULLIF(it.purchase_price,0), 0)=0 THEN 1 ELSE 0 END),0) unknown_cost_lines
      FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id JOIN items it ON it.id=l.item_id LEFT JOIN batches b ON b.id=l.batch_id
-     WHERE i.date BETWEEN ? AND ?`,
-          from,
-          to
-        );
+     WHERE i.date BETWEEN ? AND ?`;
+      var profitOf = (r) => {
         const p = r2(r.revenue - r.cost);
         return { revenue: r2(r.revenue), cost: r2(r.cost), profit: p, margin_pct: r.revenue > 0 ? r2(p / r.revenue * 100) : 0, unknown_cost_lines: r.unknown_cost_lines };
+      };
+      function profit(from, to) {
+        return profitOf(one(`SELECT ${PROFIT_COLS}`, from, to));
       }
+      var sumsBy = (table, col, key, from, to) => new Map(db2.prepare(`SELECT ${key} k, COALESCE(SUM(${col}),0) v FROM ${table} WHERE date BETWEEN ? AND ? GROUP BY k`).all(from, to).map((r) => [r.k, r2(r.v)]));
       var sumBetween = (table, col, from, to) => r2(one(`SELECT COALESCE(SUM(${col}),0) v FROM ${table} WHERE date BETWEEN ? AND ?`, from, to).v);
       function expiryDays() {
         const r = db2.prepare("SELECT value FROM settings WHERE key='expiry_days'").get();
@@ -11280,17 +13140,21 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         const taxIn = (f, to) => one(`SELECT COALESCE(SUM(cgst+sgst+igst),0) v FROM purchases WHERE date BETWEEN ? AND ?`, f, to).v - one(`SELECT COALESCE(SUM(cgst+sgst+igst),0) v FROM debit_notes WHERE date BETWEEN ? AND ?`, f, to).v;
         const bal = one(`SELECT COALESCE(SUM(CASE WHEN b>0 THEN b ELSE 0 END),0) rec, COALESCE(-SUM(CASE WHEN b<0 THEN b ELSE 0 END),0) pay
                    FROM (SELECT SUM(debit)-SUM(credit) b FROM ledger WHERE date <= ? GROUP BY party_id)`, fy.to);
+        const s0 = addDays(-13, /* @__PURE__ */ new Date(t + "T12:00:00"));
+        const daySales = sumsBy("invoices", "total", "date", s0, t), dayBuys = sumsBy("purchases", "total", "date", s0, t);
         const series = [];
         for (let i = 13; i >= 0; i--) {
           const d = addDays(-i, /* @__PURE__ */ new Date(t + "T12:00:00"));
           if (d < fy.from) continue;
-          series.push({ date: d, sales: sumBetween("invoices", "total", d, d), purchases: sumBetween("purchases", "total", d, d) });
+          series.push({ date: d, sales: daySales.get(d) || 0, purchases: dayBuys.get(d) || 0 });
         }
+        const ym = (k) => `${fy.start_year + (k + 3 >= 12 ? 1 : 0)}-${String((k + 3) % 12 + 1).padStart(2, "0")}`;
+        const mFirst = ym(0) + "-01", mLast = ym(11) + "-31";
+        const mSales = sumsBy("invoices", "total", "substr(date,1,7)", mFirst, mLast), mBuys = sumsBy("purchases", "total", "substr(date,1,7)", mFirst, mLast);
         const monthly = [];
         for (let k = 0; k < 12; k++) {
-          const y = fy.start_year + (k + 3 >= 12 ? 1 : 0), mo = (k + 3) % 12 + 1;
-          const from = `${y}-${String(mo).padStart(2, "0")}-01`, to = `${y}-${String(mo).padStart(2, "0")}-31`;
-          monthly.push({ month: from.slice(0, 7), sales: sumBetween("invoices", "total", from, to), purchases: sumBetween("purchases", "total", from, to), profit: profit(from, to).profit });
+          const m2 = ym(k);
+          monthly.push({ month: m2, sales: mSales.get(m2) || 0, purchases: mBuys.get(m2) || 0, profit: profit(m2 + "-01", m2 + "-31").profit });
         }
         const low = lowStock(8);
         const fyProfit = profit(fy.from, fy.to), monthProfit = profit(mFrom, t), dayProfit = profit(t, t);
@@ -11366,8 +13230,8 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         if (!/^\d{4}-\d{2}$/.test(m)) throw Object.assign(new Error("Month must be YYYY-MM"), { status: 400 });
         const rows = db2.prepare(
           `SELECT l.gst_rate rate, SUM(l.taxable) taxable, SUM(l.cgst) cgst, SUM(l.sgst) sgst, SUM(l.igst) igst, COUNT(DISTINCT l.invoice_id) invoices
-     FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id WHERE substr(i.date,1,7)=? GROUP BY l.gst_rate`
-        ).all(m);
+     FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id WHERE i.date BETWEEN ? AND ? GROUP BY l.gst_rate`
+        ).all(...monthSpan(m));
         const byRate = new Map(rows.map((r) => [r.rate, r]));
         const rates = [.../* @__PURE__ */ new Set([...STD_RATES, ...rows.map((r) => r.rate)])].sort((a, b) => a - b);
         const out = rates.map((rate) => {
@@ -11378,13 +13242,13 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         const tot = (k) => r2(out.reduce((a, r) => a + r[k], 0));
         const split = (cond) => one(
           `SELECT COALESCE(SUM(l.taxable),0) taxable, COALESCE(SUM(l.cgst+l.sgst+l.igst),0) tax FROM invoice_lines l
-     JOIN invoices i ON i.id=l.invoice_id LEFT JOIN parties p ON p.id=i.party_id WHERE substr(i.date,1,7)=? AND ${cond}`,
-          m
+     JOIN invoices i ON i.id=l.invoice_id LEFT JOIN parties p ON p.id=i.party_id WHERE i.date BETWEEN ? AND ? AND ${cond}`,
+          ...monthSpan(m)
         );
         const b2b = split(`COALESCE(p.gstin,'') <> ''`), b2c = split(`COALESCE(p.gstin,'') = ''`);
-        const inv = one("SELECT COUNT(*) n, COALESCE(SUM(round_off),0) ro FROM invoices WHERE substr(date,1,7)=?", m);
-        const bought = one(`SELECT COALESCE(SUM(cgst),0) c, COALESCE(SUM(sgst),0) s, COALESCE(SUM(igst),0) i FROM purchases WHERE substr(date,1,7)=?`, m);
-        const returned = one(`SELECT COALESCE(SUM(cgst),0) c, COALESCE(SUM(sgst),0) s, COALESCE(SUM(igst),0) i FROM debit_notes WHERE substr(date,1,7)=?`, m);
+        const inv = one("SELECT COUNT(*) n, COALESCE(SUM(round_off),0) ro FROM invoices WHERE date BETWEEN ? AND ?", ...monthSpan(m));
+        const bought = one(`SELECT COALESCE(SUM(cgst),0) c, COALESCE(SUM(sgst),0) s, COALESCE(SUM(igst),0) i FROM purchases WHERE date BETWEEN ? AND ?`, ...monthSpan(m));
+        const returned = one(`SELECT COALESCE(SUM(cgst),0) c, COALESCE(SUM(sgst),0) s, COALESCE(SUM(igst),0) i FROM debit_notes WHERE date BETWEEN ? AND ?`, ...monthSpan(m));
         const input = { c: bought.c - returned.c, s: bought.s - returned.s, i: bought.i - returned.i };
         return {
           month: m,
@@ -11403,12 +13267,13 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         const bills2 = db2.prepare(
           `SELECT i.id, i.invoice_no, i.date, COALESCE(p.name,'Cash customer') party, COALESCE(p.gstin,'') gstin, COALESCE(p.state_code,'') state_code,
             i.taxable, i.cgst, i.sgst, i.igst, i.round_off, i.total
-     FROM invoices i LEFT JOIN parties p ON p.id=i.party_id WHERE substr(i.date,1,7)=? ORDER BY i.date, i.id`
-        ).all(base.month);
+     FROM invoices i LEFT JOIN parties p ON p.id=i.party_id WHERE i.date BETWEEN ? AND ? ORDER BY i.date, i.id`
+        ).all(...monthSpan(base.month));
         const rates = db2.prepare(
-          `SELECT l.invoice_id, GROUP_CONCAT(DISTINCT l.gst_rate) rates FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id
-     WHERE substr(i.date,1,7)=? GROUP BY l.invoice_id`
-        ).all(base.month);
+          // INDEXED BY: rates listed in line order (as the iPhone engine does), not in the order of the covering index
+          `SELECT l.invoice_id, GROUP_CONCAT(DISTINCT l.gst_rate) rates FROM invoice_lines l INDEXED BY idx_invl_inv JOIN invoices i ON i.id=l.invoice_id
+     WHERE i.date BETWEEN ? AND ? GROUP BY l.invoice_id`
+        ).all(...monthSpan(base.month));
         const rm = new Map(rates.map((r) => [r.invoice_id, r.rates]));
         const rows = bills2.map((b) => ({ ...b, rates: (rm.get(b.id) || "").split(",").filter(Boolean).map((x) => x + "%").join(", "), tax: r2(b.cgst + b.sgst + b.igst) }));
         return { ...base, b2b_bills: rows.filter((b) => b.gstin), b2c_bills: rows.filter((b) => !b.gstin) };
@@ -11589,6 +13454,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
       var db2 = require_db();
       var { h, today } = require_misc();
       var { r2 } = require_gst();
+      var { ROUTE_NAMES } = require_partyroutes();
       var R = require_reports();
       var { buildXlsx } = require_xlsx();
       var { fyRange, fyList } = require_fy();
@@ -11666,8 +13532,8 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
       router.get("/reports/low-stock", h((req, res) => res.json(R.lowStock().rows)));
       router.get("/reports/outstanding", h((req, res) => {
         res.json(db2.prepare(
-          `SELECT p.id, p.name, p.phone, p.type, p.credit_limit, r.name route_name, SUM(l.debit)-SUM(l.credit) balance
-     FROM parties p JOIN ledger l ON l.party_id=p.id AND l.date <= ? LEFT JOIN routes r ON r.id=p.route_id
+          `SELECT p.id, p.name, p.phone, p.type, p.credit_limit, ${ROUTE_NAMES} route_name, SUM(l.debit)-SUM(l.credit) balance
+     FROM parties p JOIN ledger l ON l.party_id=p.id AND l.date <= ?
      GROUP BY p.id HAVING ABS(balance) > 0.5 ORDER BY balance DESC`
         ).all(fyRange(req.query.fy).to));
       }));
@@ -11691,7 +13557,14 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
   var { createMissing } = require_autoCreate();
   var { settings } = require_billing();
   var { pageTextFromItems } = require_pdfExtract();
-  var pre = [require_companies(), require_backup2()];
+  var license = require_license();
+  var pre = [
+    require_license2(),
+    require_companies(),
+    require_backup2(),
+    require_sync2(),
+    require_update2()
+  ];
   var post = ["items", "parties", "salesmen", "invoices", "purchases", "debitNotes", "import", "reports"].map((n) => ({
     items: require_items(),
     parties: require_parties(),
@@ -11765,7 +13638,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         }
         const st = err.status || 500;
         if (st === 500) console.error(err && err.stack || err);
-        res.status(st).json({ error: st === 500 ? "Server error" : err.message, code: err.code, detail: st === 500 && err instanceof HttpError ? err.message : void 0 });
+        res.status(st).json({ error: st === 500 ? "Server error" : err.message, code: err.code, detail: st === 500 ? String(err && err.message || err) : void 0 });
       };
       const run = (m) => {
         req.params = m.params;
@@ -11776,6 +13649,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         }
       };
       try {
+        if (!license.allows(method, "/" + segs.join("/"))) return onError(license.blocked());
         for (const r of pre) {
           const m = match(r, method, segs);
           if (m) return run(m);
@@ -11803,7 +13677,7 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
       delete x.file;
       return x;
     });
-    out.app_settings = db.registry.prepare("SELECT key,value FROM app_settings WHERE key NOT LIKE 'backup_last%' ORDER BY key").all();
+    out.app_settings = db.registry.prepare("SELECT key,value FROM app_settings WHERE key NOT LIKE 'backup_last%' AND key NOT LIKE 'num_follow_checked%' ORDER BY key").all();
     out.companies = {};
     for (const { id } of db.registry.prepare("SELECT id FROM companies ORDER BY id").all()) {
       const d = db.openCompany(id);
