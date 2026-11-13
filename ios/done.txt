@@ -1,12 +1,12 @@
-bill_1.pdf A000050  64179 bytes
+bill_1.pdf A000050  64160 bytes
 marg_1.pdf 40485 bytes
 busy_1.pdf 33632 bytes
 bizom_1.pdf 32383 bytes
-layout_classic_halfSheets.pdf 57352 bytes
-layout_classic_a4TwoUp.pdf 55527 bytes
-layout_classic_single.pdf 48423 bytes
-layout_classic_a4Full.pdf 64179 bytes
-layout_classic_a4FullOriginal.pdf 55116 bytes
+layout_classic_halfSheets.pdf 57379 bytes
+layout_classic_a4TwoUp.pdf 55540 bytes
+layout_classic_single.pdf 48439 bytes
+layout_classic_a4Full.pdf 64160 bytes
+layout_classic_a4FullOriginal.pdf 55106 bytes
 layout_marg_halfSheets.pdf 45384 bytes
 layout_marg_a4TwoUp.pdf 42956 bytes
 layout_marg_single.pdf 40485 bytes
@@ -23,17 +23,19 @@ layout_bizom_single.pdf 32383 bytes
 layout_bizom_a4Full.pdf 36891 bytes
 layout_bizom_a4FullOriginal.pdf 32431 bytes
 marg_a4.pdf 33696 bytes
-bill_2.pdf A000002  64008 bytes
+bill_2.pdf A000002  63990 bytes
 marg_2.pdf 40489 bytes
 busy_2.pdf 33628 bytes
 bizom_2.pdf 32378 bytes
-bill_3.pdf INV/26-27/00011  64129 bytes
+bill_3.pdf INV/26-27/00011  64111 bytes
 marg_3.pdf 40656 bytes
 busy_3.pdf 33704 bytes
 bizom_3.pdf 32442 bytes
-bill_4.pdf A0001  64018 bytes
+bill_4.pdf A0001  63998 bytes
 marg_4.pdf 40482 bytes
 busy_4.pdf 33556 bytes
 bizom_4.pdf 32373 bytes
+band_bank_half.pdf INV/26-27/00004 3 lines
+band_bank_a4.pdf INV/26-27/00004 3 lines
 busy_classic.pdf INV/26-27/00004 3 lines
 busy_marg.pdf INV/26-27/00004 3 lines
