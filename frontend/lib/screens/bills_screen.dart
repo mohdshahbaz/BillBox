@@ -166,20 +166,26 @@ class _BillsState extends State<BillsScreen> {
                       for (final r in rows)
                         [
                           t(dmy(r['date'])),
-                          StatusPill(r['type'] == 'SALE' ? 'Sale' : 'Purchase', tint: r['type'] == 'SALE' ? Palette.teal : Palette.turmeric),
+                          r['type'] == 'DEBIT_NOTE'
+                              ? StatusPill('Debit note', tint: Palette.info)
+                              : StatusPill(r['type'] == 'SALE' ? 'Sale' : 'Purchase', tint: r['type'] == 'SALE' ? Palette.teal : Palette.turmeric),
                           t('${r['no']}'),
                           t('${r['ref'] ?? ''}'),
                           t('${r['party']}'),
                           t(money(r['total'])),
                           t(money(r['paid'])),
                           t(money(num_(r['total']) - num_(r['paid'])), color: num_(r['total']) - num_(r['paid']) > 0.5 ? Palette.brick : null, bold: true),
-                          Row(mainAxisSize: MainAxisSize.min, children: [
+                          r['type'] == 'DEBIT_NOTE'
+                              // a debit note is opened, edited and printed in Debit notes
+                              ? TextButton(onPressed: () => printDebitNote(context, r['id'] as int), child: const Text('Print'))
+                              : Row(mainAxisSize: MainAxisSize.min, children: [
                             TextButton(onPressed: () => _open(r), child: const Text('View')),
                             TextButton(onPressed: () => AppScope.read(context).requestEdit(r['type'] == 'SALE' ? 'INVOICE' : 'PURCHASE', r['id'] as int), child: const Text('Edit')),
                           ]),
                         ],
                     ], numeric: {5, 6, 7}, menu: (i) {
                       final r = rows[i], sale = r['type'] == 'SALE';
+                      if (r['type'] == 'DEBIT_NOTE') return [RowAction('Print debit note', () => printDebitNote(context, r['id'] as int), icon: Icons.print_outlined)];
                       return [
                         RowAction('View', () => _open(r), icon: Icons.visibility_outlined),
                         RowAction('Edit bill', () => AppScope.read(context).requestEdit(sale ? 'INVOICE' : 'PURCHASE', r['id'] as int), icon: Icons.edit_outlined),
