@@ -494,18 +494,32 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 t(kv.1, 7.5, bold: kv.2).lineLimit(1).minimumScaleFactor(0.6)
             }
         }
-        // three parts on one baseline: the outer two take equal widths, so the title stays in the centre of the row
-        return HStack(alignment: .firstTextBaseline, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                ForEach(Array(left.enumerated()), id: \.offset) { _, kv in item(kv) }
+        let leftPart = HStack(alignment: .firstTextBaseline, spacing: 10) {
+            ForEach(Array(left.enumerated()), id: \.offset) { _, kv in item(kv) }
+        }
+        let rightPart = HStack(alignment: .firstTextBaseline, spacing: 10) {
+            ForEach(Array(right.enumerated()), id: \.offset) { _, kv in item(kv) }
+            if !copy.isEmpty { t(copy, 6, bold: true).lineLimit(1).minimumScaleFactor(0.7).layoutPriority(1) }
+        }
+        let title = t(docTitle, 8.5, bold: true).lineLimit(1).fixedSize()
+        // three parts on one baseline: the outer two take equal widths, so the title stays in the centre of the row.
+        // When the right side (salesman, payment, a long copy label) would not fit half the row, the title moves left
+        // instead, so nothing is cut off with "…". Each half measures both sides, so it is as wide as the wider one.
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                ZStack(alignment: .leading) { leftPart.fixedSize(); rightPart.fixedSize().hidden() }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                title
+                ZStack(alignment: .trailing) { leftPart.fixedSize().hidden(); rightPart.fixedSize() }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            t(docTitle, 8.5, bold: true).lineLimit(1).fixedSize()
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                ForEach(Array(right.enumerated()), id: \.offset) { _, kv in item(kv) }
-                if !copy.isEmpty { t(copy, 6, bold: true).lineLimit(1).minimumScaleFactor(0.7) }
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                leftPart.fixedSize()
+                Spacer(minLength: 4)
+                title
+                Spacer(minLength: 4)
+                rightPart.layoutPriority(1)
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 5)
         .frame(height: g.strip)
