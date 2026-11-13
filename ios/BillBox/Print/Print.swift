@@ -525,6 +525,21 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                 Spacer(minLength: 4)
                 rightPacked.layoutPriority(1)
             }
+            // still too wide (long bill number on a full A4 page): the copy label goes on two lines
+            HStack(alignment: .center, spacing: 8) {
+                leftPart.fixedSize()
+                Spacer(minLength: 4)
+                title
+                Spacer(minLength: 4)
+                HStack(alignment: .center, spacing: 8) {
+                    ForEach(Array(right.enumerated()), id: \.offset) { _, kv in item(kv).fixedSize() }
+                    if !copy.isEmpty {
+                        t(copy, 5.5, bold: true).lineLimit(2).minimumScaleFactor(0.6).multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .layoutPriority(1)
+            }
         }
         .padding(.horizontal, 5)
         .frame(height: g.strip)
