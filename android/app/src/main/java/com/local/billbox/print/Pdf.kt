@@ -207,6 +207,7 @@ private val widths: List<Float?> = listOf(18f, null, 42f, 82f, 32f, 40f, 28f, 48
 private val headings = listOf("#", "Description of goods", "HSN", "Qty (box / pcs)", "MRP", "Rate", "Disc %", "Taxable", "GST %", "Amount")
 private const val FRAME = 1.1f
 private const val RULE = 0.6f
+private const val OUTER = 2.0f   // the outer border of the bill (thicker than the band dividers)
 private val SHADE = Color.argb(23, 0, 0, 0)
 private val MUTED = Color.argb(158, 0, 0, 0)
 
@@ -311,7 +312,7 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         table(pen, x, y, w, tableH)
         y += tableH
         if (last) { pen.hLine(x, x + w, y + FRAME / 2, FRAME); y += FRAME; totals(pen, x, y, w); y += g.totals }
-        pen.box(RectF(x, frameTop, x + w, y))
+        pen.box(RectF(x, frameTop, x + w, y), OUTER)
         footer(pen, x, y, w)
         pen.serif = false
     }
@@ -331,14 +332,15 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
         pen.vLine(x + half, y, y + g.sellerBand)
         val bx = x + half + 5; val bw = half - 10
         var by = y + 3
-        // Bill to as on a Marg bill: "M/s" and the party in bold, then address, state code and phone, GSTIN, PAN / FSSAI
+        // Bill to as on a Marg bill, against the right edge: "M/s" and the party in bold, then address, state code and phone,
+        // GSTIN, PAN / FSSAI
         val rowH = 13f * fs
-        pen.text(hc(partyTitle()), bx, by, bw, rowH, 10.5f * fs, 700, minScale = 0.6f)
+        pen.text(hc(partyTitle()), bx, by, bw, rowH, 10.5f * fs, 700, align = 2, minScale = 0.6f)
         by += rowH
         val lineH = 9.2f * fs
         for ((l, b) in buyerLines()) {
             if (by + lineH > y + g.sellerBand) break
-            pen.text(hc(l), bx, by, bw, lineH, 7.5f * fs, if (b) 700 else 400, minScale = 0.65f)
+            pen.text(hc(l), bx, by, bw, lineH, 7.5f * fs, if (b) 700 else 400, align = 2, minScale = 0.65f)
             by += lineH
         }
         pen.hLine(x, x + w, y + g.sellerBand + RULE / 2)
@@ -485,7 +487,8 @@ class InvoiceSheet(val inv: J, val co: J, val rows: IntRange, val page: Int, val
             val bs = bankSize(co); val sc = bs.first; val lh = 7.6f * fs * sc
             val bx = lx + leftW * (1f - bs.second); val cwid = leftW * bs.second / cols; val labW = 36f * g.cw * sc
             val top = maxOf(ly + 2, minOf(wy, y + g.totals - 4 - per * lh))
-            pen.vLine(bx - 6f, top, top + per * lh, 0.5f, MUTED)
+            // the divider between "Amount in words" and the bank details, down to the band's bottom line
+            pen.vLine(bx - 6f, top, y + g.totals, RULE)
             rows.forEachIndexed { i, (k, v) ->
                 val c = i / per; val cx = bx + c * cwid; val ry = top + (i % per) * lh
                 pen.text("$k:", cx, ry, labW, lh, 6.5f * fs * sc, 700, minScale = 0.8f)
@@ -555,7 +558,7 @@ fun invoicePdf(inv: J, co: J, layout: PrintLayout, into: PdfBuilder = PdfBuilder
     val n = inv.list("lines").size
     val base = (if (layout.isFullPage) Spec.full else Spec.half).scaled(printScale(co))
     val marg = printStyle(co) != "classic"   // Marg, Busy and Bizom are drawn by MargSheet
-    val g = if (marg) margSpec(base, inv, co) else base.copy(m = if (layout.isFullPage) 7f else 5f).withBank(co, inv)
+    val g = if (marg) margSpec(base, inv, co) else base.copy(m = if (layout.isFullPage) 3f else 2.5f).withBank(co, inv)
     // one copy of one page, in the company's bill design (Settings › Printing › Bill design)
     fun sheet(pen: Pen, r: IntRange, i: Int, n2: Int, label: String, oy: Float = 0f) {
         val c = if (co.str("print_copy_label") == "0") "" else label   // Settings › Printing › ORIGINAL / DUPLICATE on each copy

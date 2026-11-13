@@ -297,6 +297,7 @@ private let ink = Color.black
 private let muted = Color.black.opacity(0.62)
 private let frameLine: CGFloat = 1.1      // outer frame and band dividers
 private let ruleLine: CGFloat = 0.6       // inner dividers
+private let outerLine: CGFloat = 2.0      // the outer border of the bill (thicker than the band dividers)
 private let shade = Color.black.opacity(0.09)
 
 /// Column widths (points, before the page multiplier). The Item column takes whatever is left.
@@ -414,7 +415,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
         }
         .frame(width: W, height: g.inner + 3.6, alignment: .top)
         .clipped()
-        .overlay(Rectangle().stroke(ink, lineWidth: frameLine))
+        .overlay(Rectangle().stroke(ink, lineWidth: outerLine))
         .padding(g.m)
         .frame(width: g.w, height: g.h, alignment: .topLeading)
         .background(Color.white)
@@ -440,15 +441,16 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
             .padding(.horizontal, 5).padding(.vertical, 3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             vRule()
-            VStack(alignment: .leading, spacing: 0.5) {
-                // Bill to as on a Marg bill: "M/s" and the party in bold, then address, state code and phone, GSTIN, PAN / FSSAI
+            VStack(alignment: .trailing, spacing: 0.5) {
+                // Bill to as on a Marg bill, against the right edge: "M/s" and the party in bold, then address, state code and
+                // phone, GSTIN, PAN / FSSAI
                 t(hc(partyTitle), 10.5, bold: true).lineLimit(1).minimumScaleFactor(0.6)
                 ForEach(Array(buyerLines.enumerated()), id: \.offset) { _, l in
-                    t(hc(l.0), 7.5, weight: l.1 ? .bold : .regular).lineLimit(1).minimumScaleFactor(0.65)
+                    t(hc(l.0), 7.5, weight: l.1 ? .bold : .regular).lineLimit(1).minimumScaleFactor(0.65).multilineTextAlignment(.trailing)
                 }
             }
             .padding(.horizontal, 5).padding(.vertical, 3)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
         .frame(height: g.sellerBand)
         .clipped()
@@ -713,7 +715,8 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
         }
         .padding(.leading, 6)
         .frame(maxHeight: .infinity, alignment: .bottomLeading)
-        .overlay(alignment: .leading) { vRule(0.5, color: muted) }
+        // the divider between "Amount in words" and the bank details, down to the band's bottom line
+        .overlay(alignment: .leading) { vRule(ruleLine).padding(.bottom, -4) }
     }
 
     /// Bank details, one per line with the labels lined up (BANK NAME:, ACCOUNT NUMBER: …).
@@ -902,7 +905,7 @@ func renderPDF(pages: [AnyView], size: CGSize) -> PDFDocument? {
 /// The page measurements for the company's bill design (Settings › Printing › Bill design) and text size.
 func billSpec(_ inv: JSON, _ co: JSON, full: Bool) -> Spec {
     let base = (full ? Spec.full : Spec.half).scaled(printScale(co))
-    return printStyle(co) != "classic" ? margSpec(base, inv, co) : base.withMargin(full ? 7 : 5).withBank(co, inv)
+    return printStyle(co) != "classic" ? margSpec(base, inv, co) : base.withMargin(full ? 3 : 2.5).withBank(co, inv)
 }
 
 /// One copy of one page of a bill, in the company's bill design.
