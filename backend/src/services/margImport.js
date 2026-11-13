@@ -68,7 +68,9 @@ function readSource(p) {
   const take = (name, buf) => { const b = path.basename(name).toLowerCase(); if (b.endsWith('.csv') && buf && !(b in files)) files[b] = buf.toString('latin1'); };
   if (fs.statSync(p).isDirectory()) {
     const walk = (d, depth) => {
-      for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      let list;
+      try { list = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } // a folder that cannot be opened is skipped
+      for (const e of list.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
         const f = path.join(d, e.name);
         if (e.isDirectory()) { if (depth < 3 && e.name !== '__MACOSX') walk(f, depth + 1); continue; }
         // only regular .csv files are read: a folder such as Downloads may hold large files, sockets or devices

@@ -12503,7 +12503,13 @@ ${intra ? `<tr><td>CGST</td><td class="r">${money(inv.cgst)}</td></tr><tr><td>SG
         };
         if (fs.statSync(p).isDirectory()) {
           const walk = (d, depth) => {
-            for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
+            let list;
+            try {
+              list = fs.readdirSync(d, { withFileTypes: true });
+            } catch {
+              return;
+            }
+            for (const e of list.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
               const f = path.join(d, e.name);
               if (e.isDirectory()) {
                 if (depth < 3 && e.name !== "__MACOSX") walk(f, depth + 1);

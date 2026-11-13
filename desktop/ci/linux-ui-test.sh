@@ -28,7 +28,11 @@ pass() {   # $1 = light | dark
   [ -n "$win" ] || { echo "::error::no app window ($mode)"; cat "$log"; fail=1; kill $pid 2>/dev/null; return; }
   # once: every engine route the new desktop screens use answers with the fields they read (adds a debit note, a bill,
   # payments, so those screens have rows in the shots)
-  if [ "$mode" = light ]; then node "$HERE/desktop/ci/api-check.mjs" http://127.0.0.1:37420 | tee "$OUT/api-check.txt" || fail=1; fi
+  if [ "$mode" = light ]; then
+    node "$HERE/desktop/ci/api-check.mjs" http://127.0.0.1:37420 > "$OUT/api-check.txt" 2>&1; local rc=$?
+    cat "$OUT/api-check.txt"
+    [ $rc -eq 0 ] || { echo "::error title=Desktop API check::failed, see api-check.txt"; fail=1; }
+  fi
   xdotool windowsize "$win" 1440 900 windowmove "$win" 0 0 2>/dev/null || true
   sleep 4
   for n in $(seq 1 10); do
