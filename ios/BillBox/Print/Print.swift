@@ -308,7 +308,7 @@ private func cell(_ t: String, _ i: Int, _ g: Spec, bold: Bool = false, serif: B
     let center = i == 0
     let align: Alignment = center ? .center : (right ? .trailing : .leading)
     let w = widths[i].map { $0 * g.cw }
-    return Text(t).font(.system(size: 7 * g.fs, weight: bold ? .semibold : .regular, design: serif ? .serif : .default)).lineLimit(1).minimumScaleFactor(0.75)
+    return Text(t).font(.system(size: 7 * g.fs, weight: bold ? .semibold : .regular, design: serif ? .serif : .default)).lineLimit(1).minimumScaleFactor(bold ? 0.5 : 0.75)   // headings shrink rather than end in "…"
         .padding(.horizontal, 3)
         .frame(width: w, alignment: align)
         .frame(maxWidth: w == nil ? .infinity : nil, alignment: align)
