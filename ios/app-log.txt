@@ -1,14 +1,15 @@
 Timestamp               Ty Process[PID:TID]
-2026-11-13 03:57:55.317 E  BillBox[28141:13347] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
-2026-11-13 03:57:55.363 E  BillBox[28141:13347] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
-2026-11-13 03:57:56.429 E  BillBox[28141:13346] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
-2026-11-13 03:58:29.082 E  BillBox[29334:13f14] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
-2026-11-13 03:58:29.082 E  BillBox[29334:13f14] (libCoreFSCache.dylib) Errors found! Invalidating cache...
-2026-11-13 03:58:29.638 E  BillBox[29334:13f14] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
-2026-11-13 03:58:29.638 E  BillBox[29334:13f14] (libCoreFSCache.dylib) Errors found! Invalidating cache...
-2026-11-13 03:58:29.685 F  BillBox[29334:13f14] [com.apple.renderbox:error] building pipeline path_exterior-jba6la8feba4 took 0.602776 seconds
-2026-11-13 03:59:22.391 E  BillBox[30590:14cc4] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
-2026-11-13 04:00:04.449 E  BillBox[32343:15f63] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
-2026-11-13 04:00:04.503 E  BillBox[32343:15f6b] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
-2026-11-13 04:00:33.871 E  BillBox[33719:16e54] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
-2026-11-13 04:00:33.937 E  BillBox[33719:16e5b] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-13 04:09:02.607 E  BillBox[11713:9289] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-13 04:09:03.392 E  BillBox[11713:9289] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
+2026-11-13 04:09:03.440 E  BillBox[11713:928a] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-13 04:09:09.076 E  BillBox[12598:9ac4] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-13 04:09:09.548 E  BillBox[12598:9aca] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-13 04:09:10.025 E  BillBox[12598:9a9e] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-11-13 04:09:10.026 E  BillBox[12598:9a9e] (libCoreFSCache.dylib) Errors found! Invalidating cache...
+2026-11-13 04:09:10.481 E  BillBox[12598:9a9e] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-11-13 04:09:10.481 E  BillBox[12598:9a9e] (libCoreFSCache.dylib) Errors found! Invalidating cache...
+2026-11-13 04:09:18.332 E  BillBox[12992:9f80] [com.apple.coreaudio:AudioConverter]     AudioConverterOOP.cpp:1084  Failed to prepare AudioConverterService: -302
+2026-11-13 04:09:24.126 E  BillBox[13628:a4f9] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-13 04:09:24.836 E  BillBox[13628:a4fa] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-13 04:09:38.276 E  BillBox[14337:ac17] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-13 04:09:38.328 E  BillBox[14337:ac17] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
