@@ -15,8 +15,8 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 
 ## Log
 - 2026-11-13 (run 5, end): stage 9 done. Pull request #1 into `main` opened (not merged):
-  https://github.com/mohdshahbaz/BillBox/pull/1 . Every stage done; the scheduled task "BillBox UI overhaul – continue" is
-  deleted. Leftovers are listed in the pull request (Android engine bundle rebuild, Flutter sticky headings, more profiling).
+  https://github.com/mohdshahbaz/BillBox/pull/1 . Every stage done. The scheduled task "BillBox UI overhaul – continue" could not be deleted from the run
+  (permission denied): the owner deletes it in Scheduled tasks. Leftovers are listed in the pull request (Android engine bundle rebuild, Flutter sticky headings, more profiling).
 - 2026-11-13 (run 5): stage 8 done. The iPhone self-test now draws the first bill in every design × every paper layout
   (20 `layout_<design>_<layout>.pdf`, 39 PDFs in all). Found and fixed text cut off with "…": bank details in the totals
   band (values shrink to 60 %, else printed in full in the footer), GST % / Disc % headings on A4 (shrink instead), the
