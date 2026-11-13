@@ -7,7 +7,7 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 2. iPhone: shared components to the design system
 - [x] 3. iPhone: screen by screen, self-test screenshots reviewed
 - [x] 4. Android: theme and components (Material 3), then screens; Android self-test
-- [ ] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow (in progress)
+- [ ] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow (in progress 2026-11-13 00:15 UTC, part 2)
 - [ ] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
 - [ ] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
 - [ ] 8. Bills: every style and layout checked from self-test PDFs
