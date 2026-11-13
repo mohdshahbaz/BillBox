@@ -42,6 +42,27 @@ Future<void> printInvoice(BuildContext context, int invoiceId, {bool forcePrevie
   );
 }
 
+/// Print a debit note: the engine gives it in the sale bill's shape (doc_title, print_lines with per-piece rates), so the
+/// same layouts and printer settings as invoices apply (as on the Mac).
+Future<void> printDebitNote(BuildContext context, int noteId) async {
+  try {
+    final n = await Api.get('/debit-notes/$noteId') as Json;
+    final inv = {...n, 'lines': n['print_lines'] ?? n['lines'], 'paid': 0};
+    if (!context.mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PrintManager(
+        title: 'Debit note ${n['note_no']}',
+        heading: 'Print preview · debit note ${n['note_no']}',
+        build: (settings, layout) => buildInvoicePdf(inv, settings, layout),
+      ),
+    );
+  } on ApiException catch (e) {
+    if (context.mounted) toast(context, e.message, error: true);
+  }
+}
+
 /// Print a receipt / payment voucher (same print manager, same printer and layout settings as invoices).
 Future<void> printVoucher(BuildContext context, String voucherNo) async {
   final v = await Api.get('/vouchers/${Uri.encodeComponent(voucherNo)}') as Json;

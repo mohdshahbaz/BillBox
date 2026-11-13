@@ -151,7 +151,7 @@ pw.Widget _headFirst(Json inv, Json co, String copy) {
             pw.SizedBox(
               width: 190,
               child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                pw.Text('TAX INVOICE', style: _s(10, bold: true)),
+                pw.Text('${inv['doc_title'] ?? 'TAX INVOICE'}', style: _s(10, bold: true)),
                 pw.Text('No: ${inv['invoice_no']}    Date: ${dmy(inv['date'])}', style: _s(7.5), maxLines: 1),
                 pw.SizedBox(height: 2),
                 pw.Container(
@@ -195,6 +195,7 @@ pw.Widget _headFirst(Json inv, Json co, String copy) {
 
 String _partyTitle(Json inv, Json co) {
   final name = '${inv['party_name'] ?? ''}';
+  if (inv['doc_title'] == 'DEBIT NOTE') return 'Supplier: $name'; // a debit note goes to the supplier
   if (name.isEmpty) return 'Cash customer';
   return '${'${co['print_marg_ms'] ?? ''}' == '0' ? '' : 'M/s '}$name';
 }
@@ -212,6 +213,7 @@ List<(String, bool)> _partyLines(Json inv) {
   final sp = [if (v('party_state').isNotEmpty) 'State code : ${v('party_state')}', if (mob.isNotEmpty) 'Ph.No. : ${mob.join(', ')}'].join('   ');
   if (sp.isNotEmpty) out.add((sp, false));
   out.add(('GSTIN : ${v('party_gstin').isEmpty ? 'Unregistered' : v('party_gstin')}', true));
+  if (v('doc_line').isNotEmpty) out.add(('Ref : ${v('doc_line')}', false)); // debit note: against bill · reason
   return out;
 }
 
@@ -250,7 +252,7 @@ pw.Widget _headNext(Json inv, Json co, String copy) => pw.SizedBox(
           child: pw.Padding(
             padding: const pw.EdgeInsets.symmetric(horizontal: 5),
             child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-              pw.Text('${_cut('${co['company_name']}', 40)}  -  Tax Invoice ${inv['invoice_no']} (continued)', style: _s(8, bold: true), maxLines: 1),
+              pw.Text('${_cut('${co['company_name']}', 40)}  -  ${inv['doc_title'] == null ? 'Tax Invoice' : 'Debit Note'} ${inv['invoice_no']} (continued)', style: _s(8, bold: true), maxLines: 1),
               pw.Text('${_cut('${inv['party_name'] ?? 'Cash customer'}', 30)}   ${dmy(inv['date'])}', style: _s(7), maxLines: 1),
             ]),
           ),
@@ -378,8 +380,8 @@ pw.Widget _totals(Json inv, Json co) {
             if (co['print_gst_lines'] == 'rate')
               for (final r in _gstRateLines(inv)) kv(r.$1, _m(r.$2))
             else if (intra) ...[kv('CGST', _m(inv['cgst'])), kv('SGST', _m(inv['sgst']))] else kv('IGST', _m(inv['igst'])),
-            kv('Invoice total (Rs.)', _m(inv['total']), big: true),
-            kv('Paid ${_m(inv['paid'])}', 'Balance ${_m(due)}'),
+            kv(inv['doc_title'] == null ? 'Invoice total (Rs.)' : 'Note total (Rs.)', _m(inv['total']), big: true),
+            if (inv['doc_title'] == null) kv('Paid ${_m(inv['paid'])}', 'Balance ${_m(due)}'),
           ]),
         ),
       ]),

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'screens/billing_screen.dart';
 import 'screens/bills_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/debit_notes_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/parties_screen.dart';
 import 'screens/purchase_screen.dart';
@@ -140,7 +141,11 @@ class _ShellState extends State<Shell> {
     (Icons.route_outlined, 'Salesmen'),
     (Icons.menu_book_outlined, 'Books & GST'),
     (Icons.settings_outlined, 'Settings'),
+    (Icons.assignment_return_outlined, 'Debit notes'),
   ];
+  /// Order in the sidebar: Debit notes sits under Purchases (as on the Mac), while Ctrl+1…9 keep the screens they always
+  /// had and Debit notes is Ctrl+0.
+  static const _order = [0, 1, 2, 9, 3, 4, 5, 6, 7, 8];
 
   /// An Edit button elsewhere asked to open a saved bill: switch to its screen.
   void _routeEdit(AppState app) {
@@ -154,6 +159,8 @@ class _ShellState extends State<Shell> {
         if (id != null) _bk(app.companyId).currentState?.loadForEdit(id);
       } else if (e['type'] == 'PURCHASE') {
         setState(() => _i = 2); // the purchase screen picks the request up when it opens
+      } else if (e['type'] == 'RETURN_PURCHASE') {
+        setState(() => _i = 9); // Debit notes opens a new note filled from that purchase
       }
     });
   }
@@ -177,6 +184,7 @@ class _ShellState extends State<Shell> {
         6 => const SalesmenScreen(),
         7 => const ReportsScreen(),
         8 => const SettingsScreen(),
+        9 => const DebitNotesScreen(),
         _ => const SizedBox.shrink(),
       };
 
@@ -209,7 +217,7 @@ class _ShellState extends State<Shell> {
           const SizedBox(height: 14),
           Expanded(
             child: ListView(children: [
-              for (var n = 0; n < _nav.length; n++)
+              for (final n in _order)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
                   child: Tooltip(
@@ -226,7 +234,7 @@ class _ShellState extends State<Shell> {
                                 Icon(_nav[n].$1, size: 19, color: _i == n ? Palette.onAccent : Colors.white60),
                                 const SizedBox(width: 12),
                                 Expanded(child: Text(_nav[n].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _i == n ? Palette.onAccent : Colors.white70, fontWeight: _i == n ? FontWeight.w600 : FontWeight.w400))),
-                                if (n < 9) Text('${Platform.isMacOS ? '⌘' : 'Ctrl+'}${n + 1}', style: TextStyle(color: _i == n ? Palette.onAccent.withValues(alpha: .7) : Colors.white38, fontSize: 11)),
+                                if (n < 10) Text('${Platform.isMacOS ? '⌘' : 'Ctrl+'}${(n + 1) % 10}', style: TextStyle(color: _i == n ? Palette.onAccent.withValues(alpha: .7) : Colors.white38, fontSize: 11)),
                               ]),
                       ),
                     ),
@@ -243,7 +251,7 @@ class _ShellState extends State<Shell> {
     _routeEdit(app);
     final digits = [
       LogicalKeyboardKey.digit1, LogicalKeyboardKey.digit2, LogicalKeyboardKey.digit3, LogicalKeyboardKey.digit4, LogicalKeyboardKey.digit5,
-      LogicalKeyboardKey.digit6, LogicalKeyboardKey.digit7, LogicalKeyboardKey.digit8, LogicalKeyboardKey.digit9,
+      LogicalKeyboardKey.digit6, LogicalKeyboardKey.digit7, LogicalKeyboardKey.digit8, LogicalKeyboardKey.digit9, LogicalKeyboardKey.digit0,
     ];
     return Focus(
       autofocus: true,

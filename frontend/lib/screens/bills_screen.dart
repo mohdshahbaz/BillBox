@@ -4,6 +4,7 @@ import '../api.dart';
 import '../print/print_dialog.dart';
 import '../state/app_state.dart';
 import '../widgets.dart';
+import 'bill_tools.dart';
 
 /// All Bills: every sales invoice and purchase bill in one searchable, filterable list.
 class BillsScreen extends StatefulWidget {
@@ -183,6 +184,9 @@ class _BillsState extends State<BillsScreen> {
                         RowAction('View', () => _open(r), icon: Icons.visibility_outlined),
                         RowAction('Edit bill', () => AppScope.read(context).requestEdit(sale ? 'INVOICE' : 'PURCHASE', r['id'] as int), icon: Icons.edit_outlined),
                         if (sale) RowAction('Print', () => printInvoice(context, r['id'] as int, forcePreview: true), icon: Icons.print_outlined),
+                        if (sale) RowAction('Send on WhatsApp…', () => shareOnWhatsApp(context, r['id'] as int), icon: Icons.chat_outlined),
+                        if (sale) RowAction('E-way bill…', () => showEwayBill(context, r['id'] as int), icon: Icons.local_shipping_outlined),
+                        if (!sale) RowAction('Return goods (debit note)…', () => AppScope.read(context).requestEdit('RETURN_PURCHASE', r['id'] as int), icon: Icons.assignment_return_outlined),
                       ];
                     }),
       ),
