@@ -203,7 +203,29 @@ func bankTabPer(_ co: JSON, _ inv: JSON, _ g: Spec) -> Int {
     return n <= fit ? n : (n + 1) / 2
 }
 /// True when the bank block fits in the totals band of this page design (otherwise the bank lines stay in the footer).
-func bankTabFits(_ co: JSON, _ inv: JSON, _ g: Spec) -> Bool { bankTabHeight(co, g.fs) > 0 && leftOther(co, inv, g.fs) + 2 <= g.totals + 0.5 }
+func bankTabFits(_ co: JSON, _ inv: JSON, _ g: Spec) -> Bool {
+    bankTabHeight(co, g.fs) > 0 && leftOther(co, inv, g.fs) + 2 <= g.totals + 0.5 && bankTabWide(co, inv, g)
+}
+/// Smallest scale a bank value may shrink to in the totals band; below that the bank lines go to the footer instead.
+let bankValueMinScale: CGFloat = 0.6
+/// True when every bank value fits its column of the totals band at `bankValueMinScale` or more, so no account number or
+/// IFSC is ever cut off with "…". The widths are the ones `InvoicePage` uses (totals column, signature and receiver boxes,
+/// the bank block's share). Text width is estimated at 0.6 em per character (semibold, digits and capitals).
+func bankTabWide(_ co: JSON, _ inv: JSON, _ g: Spec) -> Bool {
+    let rows = bankTabRows(co)
+    guard !rows.isEmpty else { return false }
+    let sig = signatureInBand(co), recv = receiverInBand(co)
+    let sumW = (sig || recv ? 176 : 186) * g.cw
+    let leftW = g.contentW - sumW - 12 - (sig ? signatureBandWidth(g) : 0) - (recv ? receiverBandWidth(g) : 0)
+    let share: CGFloat = recv ? 0.66 : sig ? min(0.8, bankSize(co).width + 0.12) : bankSize(co).width
+    let sc = bankSize(co).scale
+    let per = max(1, bankTabPer(co, inv, g))
+    let cols = CGFloat((rows.count + per - 1) / per)
+    let colW = (leftW * share - 6 - 8 * (cols - 1)) / cols
+    let valueW = colW - 32 * g.cw * sc - 4
+    let longest = rows.map { CGFloat($0.1.count) }.max() ?? 0
+    return longest * 7 * sc * 0.6 * bankValueMinScale <= valueW
+}
 
 func bankRows(_ co: JSON) -> [(String, String)] {
     if co.str("print_bank_block") == "0" { return [] }
@@ -647,7 +669,7 @@ private func vRule(_ w: CGFloat = ruleLine, color: Color = ink) -> some View {
                     ForEach(Array(cols[c].enumerated()), id: \.offset) { _, r in
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             t(r.0 + ":", 6 * sc, bold: true).lineLimit(1).minimumScaleFactor(0.8).frame(width: 32 * g.cw * sc, alignment: .leading)
-                            t(r.1, 7 * sc, weight: .semibold).lineLimit(1).minimumScaleFactor(0.8)
+                            t(r.1, 7 * sc, weight: .semibold).lineLimit(1).minimumScaleFactor(bankValueMinScale)
                         }
                         .frame(height: bankRowH * g.fs * sc, alignment: .leading)
                     }
