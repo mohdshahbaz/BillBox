@@ -10,6 +10,7 @@ import AppKit
     @State private var catId = 0
     @State private var selection = Set<JSON.ID>()
     @State private var loading = true
+    @State private var loadError: String?
     @State private var busy = false
 
     @State private var editing: JSON?
@@ -41,8 +42,29 @@ import AppKit
         VStack(spacing: 0) {
             SelectionBar(ids: items.map(\.id), selection: $selection, busy: busy) { confirmBulkDelete = true }
             grid
+            if !items.isEmpty { summary.padding(.top, 8) }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
+    }
+
+    /// Out / Low against the low-stock level in Settings (the same rule as the stock figure's colour).
+    private func stockPill(_ it: JSON) -> StatusPill {
+        let s = it.num("stock")
+        if s <= 0 { return StatusPill(text: "Out", tint: Theme.negative) }
+        if s <= app.lowStockQty { return StatusPill(text: "Low", tint: Theme.warning) }
+        return StatusPill(text: "")
+    }
+
+    private var summary: some View {
+        let value = items.reduce(0.0) { $0 + max($1.num("stock"), 0) * $1.num("purchase_price") }
+        let out = items.filter { $0.num("stock") <= 0 }.count
+        let low = items.filter { $0.num("stock") > 0 && $0.num("stock") <= app.lowStockQty }.count
+        return SummaryCard(items: [
+            SummaryCard.Item(label: "Items", value: "\(items.count)"),
+            SummaryCard.Item(label: "Stock value (cost)", value: Fmt.money(value), strong: true),
+            SummaryCard.Item(label: "Low stock", value: "\(low)", tint: low > 0 ? Theme.warning : nil),
+            SummaryCard.Item(label: "Out of stock", value: "\(out)", tint: out > 0 ? Theme.negative : nil),
+        ])
     }
 
     private var grid: some View {
@@ -61,6 +83,8 @@ import AppKit
                 Text(stockText(it)).mono().fw(.semibold)
                     .foregroundStyle(it.num("stock") <= app.lowStockQty ? Theme.warning : Color.primary)
             }
+
+            GridColumn("Status", id: "status", min: 60, ideal: 70) { (it: JSON) in stockPill(it) }
 
             GridColumn("Pcs per box", id: "box", min: 70, ideal: 90) { (it: JSON) in Text(it.int("pcs_per_box") > 1 ? "\(it.int("pcs_per_box"))" : "–") }
             GridColumn("Total pcs", id: "pcs", min: 70, ideal: 90, align: .trailing, hidden: true) { (it: JSON) in Text(it.str("stock")).mono() }
@@ -87,7 +111,9 @@ import AppKit
             
         }
         .overlay {
-            if loading { ProgressView() }
+            if loading && items.isEmpty { SkeletonRows() }
+            else if loading { ProgressView() }
+            else if let e = loadError, items.isEmpty { ErrorState(message: e) { Task { await load() } } }
             else if items.isEmpty { EmptyState(title: "No items", symbol: "archivebox", message: "Add an item, or scan a supplier bill in Purchases and items are created for you.") }
         }
     }
@@ -201,11 +227,15 @@ import AppKit
     }
 
     private func load() async {
-        await app.guarded {
+        do {
             async let i = API.list("/items", query: ["q": query, "category_id": catId == 0 ? nil : catId])
             async let c = API.list("/categories")
             items = try await i
             cats = try await c
+            loadError = nil
+        } catch {
+            loadError = error.localizedDescription
+            if !items.isEmpty { app.notify(error.localizedDescription, error: true) }   // the list stays; say why it did not refresh
         }
         loading = false
     }

@@ -12,6 +12,7 @@ let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
     @State private var salesmen: [JSON] = []
     @State private var selection = Set<JSON.ID>()
     @State private var loading = true
+    @State private var loadError: String?
     @State private var editing: JSON?
     @State private var creating = false
     @State private var autoRoutes = false
@@ -35,14 +36,32 @@ let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
             if !supplier && showPhotoCard { PhotoPaymentsCard { photoPayments = true }.padding(.bottom, 8) }
             SelectionBar(ids: parties.map(\.id), selection: $selection, busy: busy) { confirmBulkDelete = true }
             grid
+            if !parties.isEmpty { summary.padding(.top, 8) }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
+    }
+
+    private func overLimit(_ p: JSON) -> Bool { p.num("credit_limit") > 0 && p.num("balance") > p.num("credit_limit") }
+
+    private var summary: some View {
+        let receive = parties.reduce(0.0) { $0 + max($1.num("balance"), 0) }
+        let pay = parties.reduce(0.0) { $0 + max(-$1.num("balance"), 0) }
+        let over = parties.filter(overLimit).count
+        var items = [
+            SummaryCard.Item(label: supplier ? "Suppliers" : "Customers", value: "\(parties.count)"),
+            SummaryCard.Item(label: "To receive", value: Fmt.money(receive), strong: !supplier, tint: receive > 0.5 ? Theme.warning : nil),
+            SummaryCard.Item(label: "To pay", value: Fmt.money(pay), strong: supplier, tint: pay > 0.5 ? Theme.negative : nil),
+        ]
+        if !supplier { items.append(SummaryCard.Item(label: "Over credit limit", value: "\(over)", tint: over > 0 ? Theme.negative : nil)) }
+        return SummaryCard(items: items)
     }
 
     private var grid: some View {
         DataGrid(parties, layoutKey: "parties", selection: $selection, onOpen: { openLedger($0) }, menu: { AnyView(partyMenu($0)) }) {
             GridColumn("Party", id: "name", min: 160, ideal: 260) { (p: JSON) in Text(p.str("name")).fw(.medium).lineLimit(1) }
-            GridColumn("Type", id: "type", min: 70, ideal: 90) { (p: JSON) in Text(p.str("type").capitalized) }
+            GridColumn("Type", id: "type", min: 70, ideal: 90) { (p: JSON) in
+                StatusPill(text: p.str("type").capitalized, tint: p.str("type") == "SUPPLIER" ? Theme.info : Theme.accent)
+            }
             GridColumn("GSTIN", id: "gstin", min: 110, ideal: 150) { (p: JSON) in Text(p.str("gstin")).mono() }
             GridColumn("Route", id: "route", min: 80, ideal: 140) { (p: JSON) in Text(p.str("route_name")) }
             GridColumn("Price tier", id: "tier", min: 70, ideal: 90) { (p: JSON) in Text(p.str("price_tier").capitalized) }
@@ -52,9 +71,15 @@ let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
                 Text(balanceText(p.num("balance"))).mono().fw(.semibold)
                     .foregroundStyle(p.num("balance") > 0.5 ? Theme.warning : (p.num("balance") < -0.5 ? Theme.negative : Color.secondary))
             }
+            GridColumn("Status", id: "status", min: 80, ideal: 100) { (p: JSON) in
+                overLimit(p) ? StatusPill(text: "Over limit", tint: Theme.negative)
+                    : abs(p.num("balance")) < 0.5 ? StatusPill(text: "Settled", tint: Theme.positive) : StatusPill(text: "")
+            }
         }
         .overlay {
-            if loading { ProgressView() }
+            if loading && parties.isEmpty { SkeletonRows() }
+            else if loading { ProgressView() }
+            else if let e = loadError, parties.isEmpty { ErrorState(message: e) { Task { await load() } } }
             else if parties.isEmpty { EmptyState(title: supplier ? "No suppliers" : "No customers", symbol: "person.2", message: supplier ? "Suppliers are added automatically when you scan their bill." : "Add your first customer.") }
         }
     }
@@ -147,13 +172,17 @@ let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
     }
 
     private func load() async {
-        await app.guarded {
+        do {
             async let p = API.list("/parties", query: ["q": query, "kind": kind])
             async let r = API.list("/routes")
             async let s = API.list("/salesmen")
             parties = try await p
             routes = try await r
             salesmen = try await s
+            loadError = nil
+        } catch {
+            loadError = error.localizedDescription
+            if !parties.isEmpty { app.notify(error.localizedDescription, error: true) }
         }
         loading = false
     }

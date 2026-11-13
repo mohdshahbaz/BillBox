@@ -20,6 +20,7 @@ struct DNLine: Identifiable, Equatable {
     @State private var rows: [JSON] = []
     @State private var totals = JSON()
     @State private var loading = true
+    @State private var loadError: String?
     @State private var viewing: JSON?
     @State private var editing: DNEdit?
     @State private var deleting: JSON?
@@ -72,29 +73,32 @@ struct DNLine: Identifiable, Equatable {
             GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).mono().fw(.semibold) }
         }
         .overlay {
-            if loading { ProgressView() }
+            if loading && rows.isEmpty { SkeletonRows() }
+            else if loading { ProgressView() }
+            else if let e = loadError, rows.isEmpty { ErrorState(message: e) { Task { await load() } } }
             else if rows.isEmpty { EmptyState(title: "No debit notes in \(app.fy)", symbol: "arrow.uturn.backward.square") }
         }
     }
 
     private var footer: some View {
-        HStack(spacing: 24) { footerItems; Spacer() }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            .background(Theme.card)
-    }
-
-    @ViewBuilder private var footerItems: some View {
-        Text("\(totals.int("count")) notes").foregroundStyle(.secondary)
-        Text("Taxable \(Fmt.money(totals, "taxable"))").mono()
-        Text("GST reversed \(Fmt.money(totals.num("cgst") + totals.num("sgst") + totals.num("igst")))").mono()
-        Text("Total \(Fmt.money(totals, "total"))").mono().fw(.bold)
+        SummaryCard(items: [
+            SummaryCard.Item(label: "Notes", value: "\(totals.int("count"))"),
+            SummaryCard.Item(label: "Taxable", value: Fmt.money(totals, "taxable")),
+            SummaryCard.Item(label: "GST reversed", value: Fmt.money(totals.num("cgst") + totals.num("sgst") + totals.num("igst"))),
+            SummaryCard.Item(label: "Total", value: Fmt.money(totals, "total"), strong: true),
+        ])
+        .padding(.horizontal, 16).padding(.vertical, 8)
     }
 
     private func load() async {
-        await app.guarded {
+        do {
             let r = try await API.obj("GET", "/debit-notes", query: ["q": query])
             rows = r.list("rows")
             totals = r.obj("totals")
+            loadError = nil
+        } catch {
+            loadError = error.localizedDescription
+            if !rows.isEmpty { app.notify(error.localizedDescription, error: true) }
         }
         loading = false
     }
