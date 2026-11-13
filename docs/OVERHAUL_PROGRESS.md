@@ -10,10 +10,17 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow
 - [x] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
 - [x] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
-- [ ] 8. Bills: every style and layout checked from self-test PDFs (in progress 2026-11-13 02:30 UTC)
-- [ ] 9. Docs updated, one pull request into `main` (not merged)
+- [x] 8. Bills: every style and layout checked from self-test PDFs
+- [ ] 9. Docs updated, one pull request into `main` (not merged) (in progress 2026-11-13 03:55 UTC)
 
 ## Log
+- 2026-11-13 (run 5): stage 8 done. The iPhone self-test now draws the first bill in every design × every paper layout
+  (20 `layout_<design>_<layout>.pdf`, 39 PDFs in all). Found and fixed text cut off with "…": bank details in the totals
+  band (values shrink to 60 %, else printed in full in the footer), GST % / Disc % headings on A4 (shrink instead), the
+  duplicate copy label (info row centres the title only when everything fits, else packs; long labels on two lines).
+  Self-test 99d284e: 543/543, no crash reports, no "…" in any of the 39 PDFs; unit tests (67f56de) 17 passed, 0 failures.
+  Self-test made faster: simulator boots first, no fixed 8 s wait, reused drawings, caches for npm / SwiftPM / Xcode build.
+  Docs updated (README, FEATURE_PARITY, CI_CD, desktop README).
 - 2026-11-13 (run 4, end): stage 7 done. `backend/test/bench.js` (20 000 bills, answers checksum) and
   `docs/BACKEND_PERF.md`: dashboard 204→156 ms, profit 72→42 ms, GST month 27→16 ms, GST workbook 51→29 ms; checksum
   6a04214f8649d201 before and after (no figure changed). Prepared statements cached in `src/sqlite.js`; covering index
