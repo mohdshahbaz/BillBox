@@ -528,7 +528,76 @@ class Stat extends StatelessWidget {
 }
 
 /// Data table in a bordered card. Scrolls sideways on small windows; long cell text is cut with an ellipsis.
-Widget table(List<String> cols, List<List<Widget>> rows, {Set<int> numeric = const {}, double maxCell = 280}) => Card(
+/// Click a heading to sort by that column (again to reverse); amounts and dd-mm-yyyy dates sort by value.
+Widget table(List<String> cols, List<List<Widget>> rows, {Set<int> numeric = const {}, double maxCell = 280}) =>
+    SortTable(cols: cols, rows: rows, numeric: numeric, maxCell: maxCell);
+
+class SortTable extends StatefulWidget {
+  final List<String> cols;
+  final List<List<Widget>> rows;
+  final Set<int> numeric;
+  final double maxCell;
+  const SortTable({super.key, required this.cols, required this.rows, this.numeric = const {}, this.maxCell = 280});
+  @override
+  State<SortTable> createState() => _SortTableState();
+}
+
+class _SortTableState extends State<SortTable> {
+  int? _col;
+  bool _asc = true;
+
+  @override
+  void didUpdateWidget(SortTable old) {
+    super.didUpdateWidget(old);
+    if (_col != null && _col! >= widget.cols.length) _col = null;
+  }
+
+  /// The text a cell shows (Text, a pill, or the first Text inside a small wrapper), for sorting.
+  static String _text(Widget w) {
+    if (w is Text) return w.data ?? w.textSpan?.toPlainText() ?? '';
+    if (w is StatusPill) return w.text;
+    if (w is Padding && w.child != null) return _text(w.child!);
+    if (w is Align && w.child != null) return _text(w.child!);
+    if (w is SizedBox && w.child != null) return _text(w.child!);
+    if (w is Tooltip && w.child != null) return _text(w.child!);
+    return '';
+  }
+
+  static final _date = RegExp(r'^(\d{2})-(\d{2})-(\d{4})');
+  static final _num = RegExp(r'^-?[₹\s]*-?[\d,]*\.?\d+');
+
+  static Comparable _key(Widget w) {
+    final s = _text(w).trim();
+    final d = _date.firstMatch(s);
+    if (d != null) return '${d[3]}${d[2]}${d[1]}${s.substring(d.end)}';
+    final m = _num.firstMatch(s);
+    if (m != null && m.end >= s.length - 4) {
+      final v = double.tryParse(m[0]!.replaceAll(RegExp(r'[₹,\s]'), ''));
+      if (v != null) return v;
+    }
+    return s.toLowerCase();
+  }
+
+  static int _cmp(Comparable a, Comparable b) {
+    if (a is num && b is num) return a.compareTo(b);
+    if (a is num) return -1; // numbers before text (e.g. "Never")
+    if (b is num) return 1;
+    return a.compareTo(b);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var rows = widget.rows;
+    final c = _col;
+    if (c != null) {
+      // a closing "Total" row stays at the bottom
+      final pinned = rows.isNotEmpty && rows.last.isNotEmpty && _text(rows.last.first).trim().toLowerCase().startsWith('total');
+      final body = pinned ? rows.sublist(0, rows.length - 1) : rows;
+      final keyed = [for (final r in body) (c < r.length ? _key(r[c]) : '', r)];
+      keyed.sort((x, y) => _asc ? _cmp(x.$1, y.$1) : _cmp(y.$1, x.$1));
+      rows = [for (final k in keyed) k.$2, if (pinned) rows.last];
+    }
+    return Card(
       clipBehavior: Clip.antiAlias,
       child: LayoutBuilder(
         builder: (context, box) => SingleChildScrollView(
@@ -540,16 +609,30 @@ Widget table(List<String> cols, List<List<Widget>> rows, {Set<int> numeric = con
               dataRowMinHeight: 40,
               dataRowMaxHeight: 48,
               columnSpacing: 22,
-              columns: [for (var i = 0; i < cols.length; i++) DataColumn(label: Text(cols[i].toUpperCase()), numeric: numeric.contains(i))],
+              sortColumnIndex: c,
+              sortAscending: _asc,
+              columns: [
+                for (var i = 0; i < widget.cols.length; i++)
+                  DataColumn(
+                    label: Text(widget.cols[i].toUpperCase()),
+                    numeric: widget.numeric.contains(i),
+                    onSort: widget.cols[i].trim().isEmpty ? null : (i, asc) => setState(() {
+                          _col = i;
+                          _asc = asc;
+                        }),
+                  )
+              ],
               rows: [
                 for (final r in rows)
-                  DataRow(cells: [for (final c in r) DataCell(ConstrainedBox(constraints: BoxConstraints(maxWidth: maxCell), child: c))])
+                  DataRow(cells: [for (final cell in r) DataCell(ConstrainedBox(constraints: BoxConstraints(maxWidth: widget.maxCell), child: cell))])
               ],
             ),
           ),
         ),
       ),
     );
+  }
+}
 
 Text t(String s, {Color? color, bool bold = false}) =>
     Text(s, maxLines: 1, overflow: TextOverflow.ellipsis, style: tabular.copyWith(color: color, fontWeight: bold ? FontWeight.w600 : null));

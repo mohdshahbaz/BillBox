@@ -109,6 +109,13 @@ class _BookState extends State<_Book> with AutomaticKeepAliveClientMixin {
                     ], numeric: sales ? {5, 6, 7, 8, 9, 10} : {6, 7, 8, 9, 10, 11}),
                   ),
       ),
+      if (data != null && rows.isNotEmpty)
+        SummaryCard([
+          SumItem('Entries', '${tot['count'] ?? rows.length}'),
+          SumItem('Taxable', money(tot['taxable'])),
+          SumItem('Tax', money(num_(tot['cgst']) + num_(tot['sgst']) + num_(tot['igst']))),
+          SumItem('Total', money(tot['total']), strong: true),
+        ]),
     ]);
   }
 }
