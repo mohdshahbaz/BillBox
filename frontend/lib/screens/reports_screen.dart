@@ -98,8 +98,7 @@ class _BookState extends State<_Book> with AutomaticKeepAliveClientMixin {
             ? const Center(child: CircularProgressIndicator())
             : rows.isEmpty
                 ? Center(child: Text('No entries in this period.', style: TextStyle(color: Palette.muted)))
-                : SingleChildScrollView(
-                    child: table(['Date', sales ? 'Invoice' : 'Our ref', if (!sales) 'Supplier bill', 'Party', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Round off', 'Total'], [
+                : table(['Date', sales ? 'Invoice' : 'Our ref', if (!sales) 'Supplier bill', 'Party', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Round off', 'Total'], [
                       for (final r in rows)
                         [t(dmy(r['date'])), t('${r['no']}'), if (!sales) t('${r['ref']}'), t('${r['party']}'), t('${r['gstin']}'), t(money(r['taxable'])), t(money(r['cgst'])), t(money(r['sgst'])), t(money(r['igst'])), t(money(r['round_off'])), t(money(r['total']), bold: true)],
                       [
@@ -107,7 +106,6 @@ class _BookState extends State<_Book> with AutomaticKeepAliveClientMixin {
                         t(money(tot['taxable']), bold: true), t(money(tot['cgst']), bold: true), t(money(tot['sgst']), bold: true), t(money(tot['igst']), bold: true), t(money(tot['round_off']), bold: true), t(money(tot['total']), bold: true),
                       ],
                     ], numeric: sales ? {5, 6, 7, 8, 9, 10} : {6, 7, 8, 9, 10, 11}),
-                  ),
       ),
       if (data != null && rows.isNotEmpty)
         SummaryCard([

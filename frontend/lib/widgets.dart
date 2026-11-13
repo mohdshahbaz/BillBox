@@ -57,7 +57,7 @@ class Palette {
   static Color get ink => dark ? const Color(0xFFF4F4F5) : const Color(0xFF18181B); // text
   static Color get teal => Color(dark ? theme.accentDark : theme.accent); // accent
   static Color get paper => Color(dark ? theme.pageDark : theme.page); // page
-  static Color get card => dark ? Color(theme.cardDark) : Palette.card; // panels, tables, fields
+  static Color get card => dark ? Color(theme.cardDark) : Colors.white; // panels, tables, fields
   static Color get turmeric => dark ? const Color(0xFFFB923C) : const Color(0xFFC2410C); // warning: not printed, expiring, low stock
   static Color get brick => dark ? const Color(0xFFF87171) : const Color(0xFFDC2626); // negative: due, loss, errors
   static Color get leaf => dark ? const Color(0xFF4ADE80) : const Color(0xFF15803D); // positive: profit, paid
@@ -527,24 +527,48 @@ class Stat extends StatelessWidget {
       );
 }
 
-/// Data table in a bordered card. Scrolls sideways on small windows; long cell text is cut with an ellipsis.
-/// Click a heading to sort by that column (again to reverse); amounts and dd-mm-yyyy dates sort by value.
-Widget table(List<String> cols, List<List<Widget>> rows, {Set<int> numeric = const {}, double maxCell = 280}) =>
-    SortTable(cols: cols, rows: rows, numeric: numeric, maxCell: maxCell);
+/// One entry of a table row's right-click (or long-press) menu.
+class RowAction {
+  final String label;
+  final IconData? icon;
+  final VoidCallback onTap;
+  final bool danger;
+  const RowAction(this.label, this.onTap, {this.icon, this.danger = false});
+}
+
+/// Data table in a bordered card. The heading stays in place while the rows scroll (when the table has a bounded height,
+/// e.g. inside Expanded); a closing "Total" row stays pinned under them. Scrolls sideways on small windows; long cell text
+/// is cut with an ellipsis. Click a heading to sort by that column (again to reverse); amounts and dd-mm-yyyy dates sort
+/// by value. Drag the edge of a heading to resize that column (double-click the edge to go back to automatic widths;
+/// chosen widths are kept for this table while the app is open). `menu` gives a row's right-click / long-press menu
+/// (its argument is the row's index in `rows`, whatever the sort order).
+Widget table(List<String> cols, List<List<Widget>> rows,
+        {Set<int> numeric = const {}, double maxCell = 280, List<RowAction> Function(int row)? menu}) =>
+    SortTable(cols: cols, rows: rows, numeric: numeric, maxCell: maxCell, menu: menu);
 
 class SortTable extends StatefulWidget {
   final List<String> cols;
   final List<List<Widget>> rows;
   final Set<int> numeric;
   final double maxCell;
-  const SortTable({super.key, required this.cols, required this.rows, this.numeric = const {}, this.maxCell = 280});
+  final List<RowAction> Function(int row)? menu;
+  const SortTable({super.key, required this.cols, required this.rows, this.numeric = const {}, this.maxCell = 280, this.menu});
   @override
   State<SortTable> createState() => _SortTableState();
 }
 
 class _SortTableState extends State<SortTable> {
+  static const double _rowH = 44, _headH = 40, _pad = 12, _minW = 48;
+  /// Column widths the user dragged, per table (its headings), for as long as the app runs.
+  static final Map<String, List<double>> _chosen = {};
   int? _col;
   bool _asc = true;
+  final _v = ScrollController(), _h = ScrollController();
+  List<double>? _auto;
+  List<List<Widget>>? _measured;
+  int? _hover;
+
+  String get _key => widget.cols.join('|');
 
   @override
   void didUpdateWidget(SortTable old) {
@@ -552,7 +576,14 @@ class _SortTableState extends State<SortTable> {
     if (_col != null && _col! >= widget.cols.length) _col = null;
   }
 
-  /// The text a cell shows (Text, a pill, or the first Text inside a small wrapper), for sorting.
+  @override
+  void dispose() {
+    _v.dispose();
+    _h.dispose();
+    super.dispose();
+  }
+
+  /// The text a cell shows (Text, a pill, or the first Text inside a small wrapper), for sorting and sizing.
   static String _text(Widget w) {
     if (w is Text) return w.data ?? w.textSpan?.toPlainText() ?? '';
     if (w is StatusPill) return w.text;
@@ -566,7 +597,7 @@ class _SortTableState extends State<SortTable> {
   static final _date = RegExp(r'^(\d{2})-(\d{2})-(\d{4})');
   static final _num = RegExp(r'^-?[₹\s]*-?[\d,]*\.?\d+');
 
-  static Comparable _key(Widget w) {
+  static Comparable _sortKey(Widget w) {
     final s = _text(w).trim();
     final d = _date.firstMatch(s);
     if (d != null) return '${d[3]}${d[2]}${d[1]}${s.substring(d.end)}';
@@ -585,52 +616,230 @@ class _SortTableState extends State<SortTable> {
     return a.compareTo(b);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    var rows = widget.rows;
-    final c = _col;
-    if (c != null) {
-      // a closing "Total" row stays at the bottom
-      final pinned = rows.isNotEmpty && rows.last.isNotEmpty && _text(rows.last.first).trim().toLowerCase().startsWith('total');
-      final body = pinned ? rows.sublist(0, rows.length - 1) : rows;
-      final keyed = [for (final r in body) (c < r.length ? _key(r[c]) : '', r)];
-      keyed.sort((x, y) => _asc ? _cmp(x.$1, y.$1) : _cmp(y.$1, x.$1));
-      rows = [for (final k in keyed) k.$2, if (pinned) rows.last];
+  static double _textW(String s, TextStyle st) {
+    final p = TextPainter(text: TextSpan(text: s, style: st), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+    return p.width;
+  }
+
+  /// Width a cell needs: measured text, a pill, or a row of small buttons.
+  static double _cellW(Widget w) {
+    if (w is StatusPill) return w.text.isEmpty ? 0 : _textW(w.text, const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)) + 2 * DS.s8 + 2;
+    final s = _text(w);
+    if (s.isNotEmpty) return _textW(s, tabular.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600)) + 2;
+    if (w is Row) return w.children.fold(0.0, (a, c) => a + _cellW(c));
+    if (w is TextButton) return (w.child is Text ? _cellW(w.child!) : 24) + 28;
+    if (w is IconButton) return 40;
+    if (w is Icon) return (w.size ?? 24) + 4;
+    return 120;
+  }
+
+  /// Automatic widths from the heading and up to 300 rows, each within [_minW, maxCell].
+  List<double> _autoWidths() {
+    if (_auto != null && identical(_measured, widget.rows) && _auto!.length == widget.cols.length) return _auto!;
+    final head = TextStyle(fontWeight: FontWeight.w600, fontSize: 12, letterSpacing: .4);
+    final w = [for (final c in widget.cols) _textW(c.toUpperCase(), head) + 18];
+    final sample = widget.rows.length > 300 ? widget.rows.sublist(0, 300) : widget.rows;
+    for (final r in sample) {
+      for (var i = 0; i < r.length && i < w.length; i++) {
+        w[i] = math.max(w[i], _cellW(r[i]));
+      }
     }
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: LayoutBuilder(
-        builder: (context, box) => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: box.maxWidth),
-            child: DataTable(
-              headingRowHeight: 40,
-              dataRowMinHeight: 40,
-              dataRowMaxHeight: 48,
-              columnSpacing: 22,
-              sortColumnIndex: c,
-              sortAscending: _asc,
-              columns: [
-                for (var i = 0; i < widget.cols.length; i++)
-                  DataColumn(
-                    label: Text(widget.cols[i].toUpperCase()),
-                    numeric: widget.numeric.contains(i),
-                    onSort: widget.cols[i].trim().isEmpty ? null : (i, asc) => setState(() {
-                          _col = i;
-                          _asc = asc;
-                        }),
-                  )
-              ],
-              rows: [
-                for (final r in rows)
-                  DataRow(cells: [for (final cell in r) DataCell(ConstrainedBox(constraints: BoxConstraints(maxWidth: widget.maxCell), child: cell))])
-              ],
+    _measured = widget.rows;
+    return _auto = [for (final x in w) (x + 2 * _pad).clamp(_minW, widget.maxCell + 2 * _pad).toDouble()];
+  }
+
+  void _resize(int i, double dx, List<double> current) {
+    setState(() {
+      final w = _chosen[_key] ??= List.of(current);
+      w[i] = math.max(_minW, w[i] + dx);
+    });
+  }
+
+  Future<void> _showMenu(Offset at, int row) async {
+    final acts = widget.menu?.call(row) ?? const <RowAction>[];
+    if (acts.isEmpty) return;
+    final f = await showMenu<VoidCallback>(
+      context: context,
+      position: RelativeRect.fromLTRB(at.dx, at.dy, at.dx, at.dy),
+      items: [
+        for (final a in acts)
+          PopupMenuItem(
+            value: a.onTap,
+            height: 40,
+            child: Row(children: [
+              if (a.icon != null) ...[Icon(a.icon, size: 18, color: a.danger ? Palette.brick : Palette.muted), const SizedBox(width: 10)],
+              Text(a.label, style: TextStyle(color: a.danger ? Palette.brick : Palette.ink)),
+            ]),
+          ),
+      ],
+    );
+    f?.call();
+  }
+
+  Widget _heading(List<double> w) {
+    final style = TextStyle(fontWeight: FontWeight.w600, color: Palette.muted, fontSize: 12, letterSpacing: .4);
+    return Container(
+      height: _headH,
+      decoration: BoxDecoration(color: Palette.headerBand, border: Border(bottom: BorderSide(color: Palette.line, width: .6))),
+      child: Row(children: [
+        for (var i = 0; i < widget.cols.length; i++)
+          SizedBox(
+            width: w[i],
+            child: Stack(children: [
+              Positioned.fill(
+                child: InkWell(
+                  onTap: widget.cols[i].trim().isEmpty
+                      ? null
+                      : () => setState(() {
+                            _asc = _col == i ? !_asc : true;
+                            _col = i;
+                          }),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: _pad),
+                    child: Row(mainAxisAlignment: widget.numeric.contains(i) ? MainAxisAlignment.end : MainAxisAlignment.start, children: [
+                      Flexible(child: Text(widget.cols[i].toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: style)),
+                      if (_col == i) Padding(padding: const EdgeInsets.only(left: 2), child: Icon(_asc ? Icons.arrow_upward : Icons.arrow_downward, size: 14, color: Palette.muted)),
+                    ]),
+                  ),
+                ),
+              ),
+              // drag to resize; double-click to go back to automatic widths
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: 9,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeColumn,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragUpdate: (d) => _resize(i, d.delta.dx, w),
+                    onDoubleTap: () => setState(() => _chosen.remove(_key)),
+                    child: Center(child: Container(width: 1, height: 18, color: Palette.line)),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  Widget _row(List<Widget> r, int index, List<double> w, {bool total = false}) {
+    final hover = _hover == index && !total;
+    Widget row = Container(
+      height: _rowH,
+      decoration: BoxDecoration(
+        color: hover ? Palette.teal.withValues(alpha: .05) : (total ? Palette.headerBand : null),
+        border: Border(bottom: BorderSide(color: Palette.line, width: .6)),
+      ),
+      child: Row(children: [
+        for (var i = 0; i < widget.cols.length; i++)
+          SizedBox(
+            width: w[i],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: _pad),
+              child: ClipRect(
+                child: Align(
+                  alignment: widget.numeric.contains(i) ? Alignment.centerRight : Alignment.centerLeft,
+                  child: i >= r.length
+                      ? const SizedBox.shrink()
+                      : r[i] is Text || r[i] is StatusPill || _text(r[i]).isNotEmpty
+                          ? r[i]
+                          // buttons and other widgets shrink to fit a narrowed column instead of overflowing
+                          : FittedBox(fit: BoxFit.scaleDown, alignment: widget.numeric.contains(i) ? Alignment.centerRight : Alignment.centerLeft, child: r[i]),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+      ]),
     );
+    row = DefaultTextStyle.merge(style: TextStyle(color: Palette.ink, fontSize: 13.5), child: row);
+    if (total) return row;
+    row = MouseRegion(
+      onEnter: (_) => setState(() => _hover = index),
+      onExit: (_) => setState(() => _hover = _hover == index ? null : _hover),
+      child: row,
+    );
+    if (widget.menu == null) return row;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onSecondaryTapDown: (d) => _showMenu(d.globalPosition, index),
+      onLongPressStart: (d) => _showMenu(d.globalPosition, index),
+      child: row,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // rows with their index in widget.rows, sorted when a heading was clicked; a closing "Total" row stays at the bottom
+    final all = widget.rows;
+    final pinned = all.isNotEmpty && all.last.isNotEmpty && _text(all.last.first).trim().toLowerCase().startsWith('total');
+    var body = [for (var k = 0; k < (pinned ? all.length - 1 : all.length); k++) k];
+    final c = _col;
+    if (c != null) {
+      final keys = {for (final k in body) k: c < all[k].length ? _sortKey(all[k][c]) : ''};
+      body.sort((x, y) => _asc ? _cmp(keys[x]!, keys[y]!) : _cmp(keys[y]!, keys[x]!));
+    }
+    final auto = _autoWidths();
+    final chosen = _chosen[_key];
+    return LayoutBuilder(builder: (context, box) {
+      var w = chosen != null && chosen.length == auto.length ? chosen : auto;
+      var total = w.fold(0.0, (a, x) => a + x);
+      final width = box.maxWidth.isFinite ? box.maxWidth : total;
+      // automatic widths fill the card: the spare room is shared out in proportion
+      if (chosen == null && total < width && total > 0) {
+        final f = width / total;
+        w = [for (final x in w) x * f];
+        total = width;
+      }
+      Widget sideways(Widget child) => Scrollbar(
+            controller: _h,
+            child: SingleChildScrollView(
+              controller: _h,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(width: math.max(total, width), child: child),
+            ),
+          );
+      if (!box.maxHeight.isFinite) {
+        // inside a page that scrolls: every row, the page does the scrolling
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: sideways(Column(mainAxisSize: MainAxisSize.min, children: [
+            _heading(w),
+            for (final k in body) _row(all[k], k, w),
+            if (pinned) _row(all.last, all.length - 1, w, total: true),
+          ])),
+        );
+      }
+      // the heading stays and only the rows scroll; the card is no taller than its rows
+      final need = _headH + body.length * _rowH + (pinned ? _rowH : 0) + 2;
+      return Align(
+        alignment: Alignment.topLeft,
+        child: SizedBox(
+          width: width,
+          height: math.min(box.maxHeight, need),
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            child: sideways(Column(children: [
+              _heading(w),
+              Expanded(
+                child: Scrollbar(
+                  controller: _v,
+                  child: ListView.builder(
+                    controller: _v,
+                    itemExtent: _rowH,
+                    itemCount: body.length,
+                    itemBuilder: (_, n) => _row(all[body[n]], body[n], w),
+                  ),
+                ),
+              ),
+              if (pinned) _row(all.last, all.length - 1, w, total: true),
+            ])),
+          ),
+        ),
+      );
+    });
   }
 }
 

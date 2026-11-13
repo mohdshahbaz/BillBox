@@ -287,8 +287,7 @@ class _InventoryState extends State<InventoryScreen> {
       Expanded(
         child: loading
             ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                child: table(
+            : table(
                   ['Item', 'Category', 'HSN', 'Unit', 'Stock (pcs)', 'Box', 'MRP', 'Retail', 'Wholesale', 'Cost', 'GST', 'Your margin', 'Retailer margin', ''],
                   [
                     for (final it in items)
@@ -315,8 +314,16 @@ class _InventoryState extends State<InventoryScreen> {
                       ],
                   ],
                   numeric: {4, 6, 7, 8, 9, 10, 11, 12},
+                  menu: (i) {
+                    final it = items[i];
+                    return [
+                      RowAction('Edit item', () => _edit(it), icon: Icons.edit_outlined),
+                      RowAction('Add opening stock', () => _addStock(it), icon: Icons.add_box_outlined),
+                      RowAction('Add scheme', () => _addScheme(it), icon: Icons.local_offer_outlined),
+                      RowAction('Delete', () => _delete(it), icon: Icons.delete_outline, danger: true),
+                    ];
+                  },
                 ),
-              ),
       ),
     ]);
   }

@@ -205,8 +205,7 @@ class _PartiesState extends State<PartiesScreen> {
                 Text(_balText(l['balance']), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: num_(l['balance']) > 0 ? Palette.turmeric : (num_(l['balance']) < 0 ? Palette.brick : Palette.leaf))),
                 const SizedBox(height: 8),
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: table(['Date', 'Type', 'Reference', 'Narration', 'Debit', 'Credit', 'Balance', ''], [
+                  child: table(['Date', 'Type', 'Reference', 'Narration', 'Debit', 'Credit', 'Balance', ''], [
                       for (final r in rows)
                         [
                           t(dmy(r['date'])),
@@ -221,7 +220,6 @@ class _PartiesState extends State<PartiesScreen> {
                               : const SizedBox.shrink(),
                         ],
                     ], numeric: {4, 5, 6}),
-                  ),
                 ),
                 Text('Dr = they owe you. Cr = you owe them. Use the bin to delete a receipt, payment or opening line.', style: TextStyle(color: Palette.muted, fontSize: 12)),
               ]),
@@ -274,8 +272,7 @@ class _PartiesState extends State<PartiesScreen> {
       ]),
       const SizedBox(height: 12),
       Expanded(
-        child: SingleChildScrollView(
-          child: table([
+        child: table([
             'Party', kind == 'SUPPLIER' ? 'GSTIN' : 'Route', if (kind != 'SUPPLIER') 'Tier', if (kind == 'SUPPLIER') 'Contact', 'Phone', if (kind != 'SUPPLIER') 'Credit limit', 'Balance', ''
           ], [
             for (final p in parties)
@@ -300,8 +297,15 @@ class _PartiesState extends State<PartiesScreen> {
                   IconButton(tooltip: 'Delete', icon: Icon(Icons.delete_outline, color: Palette.brick), onPressed: () => _delete(p)),
                 ]),
               ],
-          ], numeric: {if (kind != 'SUPPLIER') ...{4, 5} else 4}),
-        ),
+          ], numeric: {if (kind != 'SUPPLIER') ...{4, 5} else 4}, menu: (i) {
+            final p = parties[i];
+            return [
+              RowAction('Ledger', () => _ledger(p), icon: Icons.menu_book_outlined),
+              RowAction('Payment', () => _voucher(p), icon: Icons.payments_outlined),
+              RowAction('Edit party', () => _form(p), icon: Icons.edit_outlined),
+              RowAction('Delete', () => _delete(p), icon: Icons.delete_outline, danger: true),
+            ];
+          }),
       ),
     ]);
   }

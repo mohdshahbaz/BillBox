@@ -60,8 +60,7 @@ class _BillsState extends State<BillsScreen> {
               Text('${dmy(b['date'])}${sale ? '' : '   ·   Supplier bill ${b['supplier_invoice_no'] ?? '-'}'}   ·   Total ${money(b['total'])}   ·   Paid ${money(b['paid'])}   ·   Due ${money(num_(b['total']) - num_(b['paid']))}'),
               const SizedBox(height: 8),
               Expanded(
-                child: SingleChildScrollView(
-                  child: sale
+                child: sale
                       ? table(['Item', 'Qty', 'Free', 'Rate', 'Taxable', 'GST', 'Amount'], [
                           for (final l in ls)
                             [t('${l['item_name']}'), t('${l['qty']}'), t('${l['free_qty']}'), t(money(l['rate'])), t(money(l['taxable'])), t('${l['gst_rate']}%'), t(money(l['amount']), bold: true)],
@@ -69,7 +68,6 @@ class _BillsState extends State<BillsScreen> {
                       : table(['S.No', 'Item name', 'HSN code', 'Qty', 'Unit', 'Price', 'Amount'], [
                           for (final l in ls) [t('${l['sno']}'), t('${l['item_name']}'), t('${l['hsn'] ?? ''}'), t('${l['qty']}'), t('${l['unit'] ?? 'PCS'}'), t(money(l['rate'])), t(money(l['amount']), bold: true)],
                         ], numeric: {3, 5, 6}),
-                ),
               ),
             ]),
           ),
@@ -163,8 +161,7 @@ class _BillsState extends State<BillsScreen> {
             ? const Center(child: CircularProgressIndicator())
             : rows.isEmpty
                 ? Center(child: Text('No bills match these filters.', style: TextStyle(color: Palette.muted)))
-                : SingleChildScrollView(
-                    child: table(['Date', 'Type', 'Bill no', 'Supplier bill', 'Party', 'Total', 'Paid', 'Due', ''], [
+                : table(['Date', 'Type', 'Bill no', 'Supplier bill', 'Party', 'Total', 'Paid', 'Due', ''], [
                       for (final r in rows)
                         [
                           t(dmy(r['date'])),
@@ -180,8 +177,14 @@ class _BillsState extends State<BillsScreen> {
                             TextButton(onPressed: () => AppScope.read(context).requestEdit(r['type'] == 'SALE' ? 'INVOICE' : 'PURCHASE', r['id'] as int), child: const Text('Edit')),
                           ]),
                         ],
-                    ], numeric: {5, 6, 7}),
-                  ),
+                    ], numeric: {5, 6, 7}, menu: (i) {
+                      final r = rows[i], sale = r['type'] == 'SALE';
+                      return [
+                        RowAction('View', () => _open(r), icon: Icons.visibility_outlined),
+                        RowAction('Edit bill', () => AppScope.read(context).requestEdit(sale ? 'INVOICE' : 'PURCHASE', r['id'] as int), icon: Icons.edit_outlined),
+                        if (sale) RowAction('Print', () => printInvoice(context, r['id'] as int, forcePreview: true), icon: Icons.print_outlined),
+                      ];
+                    }),
       ),
       SummaryCard([
         SumItem('Bills', '${rows.length}'),

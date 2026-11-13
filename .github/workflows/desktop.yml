@@ -20,6 +20,8 @@ concurrency:
 
 jobs:
   linux:
+    permissions:
+      contents: write             # screenshots go to the selftest-results branch (not on release builds)
     runs-on: ubuntu-22.04          # older glibc: the app runs on Ubuntu 22.04+, Debian 12+, Mint 21+ …
     steps:
       - uses: actions/checkout@v5
@@ -28,7 +30,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
       - name: Build tools
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev xvfb >/dev/null
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev xvfb xdotool imagemagick >/dev/null
       - name: Build
         env: { EDITION: "${{ inputs.edition || 'public' }}" }
         run: |
@@ -48,6 +50,29 @@ jobs:
           test -f "$HOME/.local/share/BillBox/data/registry.db" && echo "books in ~/.local/share/BillBox"
           pkill -f /tmp/run/BillBox/billbox || true; sleep 4
           if pgrep -f "BillBox/engine/node" >/dev/null; then echo "::error::engine still running after the app closed"; exit 1; fi
+      - name: UI test (every screen opens, light and dark; screenshots)
+        run: |
+          export HOME=/tmp/home-ui && mkdir -p $HOME
+          xvfb-run -a -s "-screen 0 1440x900x24" bash desktop/ci/linux-ui-test.sh
+      - name: Publish screenshots to the selftest-results branch
+        if: always() && !inputs.version
+        env:
+          URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: |
+          [ -d /tmp/ui ] || exit 0
+          R=$PWD/results; rm -rf $R
+          git clone -q --depth 1 -b selftest-results "$URL" $R 2>/dev/null || { mkdir -p $R; git -C $R init -q -b selftest-results; git -C $R remote add origin "$URL"; }
+          rm -rf $R/desktop-linux; mkdir -p $R/desktop-linux
+          cp /tmp/ui/* $R/desktop-linux/
+          echo "${{ github.sha }}" > $R/desktop-linux/commit.txt
+          cd $R
+          git config user.name "BillBox self-test"; git config user.email "actions@github.com"
+          git add -A
+          git commit -q -m "Linux desktop screenshots for ${{ github.sha }}" || true
+          for i in 1 2 3 4; do
+            git push -q origin HEAD:selftest-results && break
+            sleep $((i * 5)); git pull -q --rebase -X theirs origin selftest-results || true
+          done
       - uses: actions/upload-artifact@v6
         with:
           name: linux-${{ inputs.version || 'ci' }}
