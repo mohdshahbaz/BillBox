@@ -5,7 +5,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'api.dart';
 
 /// One colour theme from Settings › Appearance: the same list and values as the iPhone's `AppTheme.all`
@@ -636,7 +636,7 @@ class _SortTableState extends State<SortTable> {
   /// Automatic widths from the heading and up to 300 rows, each within [_minW, maxCell].
   List<double> _autoWidths() {
     if (_auto != null && identical(_measured, widget.rows) && _auto!.length == widget.cols.length) return _auto!;
-    final head = TextStyle(fontWeight: FontWeight.w600, fontSize: 12, letterSpacing: .4);
+    const head = TextStyle(fontWeight: FontWeight.w600, fontSize: 12, letterSpacing: .4);
     final w = [for (final c in widget.cols) _textW(c.toUpperCase(), head) + 18];
     final sample = widget.rows.length > 300 ? widget.rows.sublist(0, 300) : widget.rows;
     for (final r in sample) {
