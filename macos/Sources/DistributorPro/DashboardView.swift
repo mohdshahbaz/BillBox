@@ -111,9 +111,9 @@ import SwiftUI
     private func alerts(_ x: JSON) -> some View {
         let chips: [(String, String, Color, () -> Void)] = [
             x.int("unprinted_bills") > 0 ? ("\(x.int("unprinted_bills")) bills to print", "printer", Color.blue, { app.openUnprinted = true; go(.bills) }) : nil,
-            x.int("low_stock_count") > 0 ? ("\(x.int("low_stock_count")) items low on stock", "exclamationmark.triangle", Color.red, { go(.stock) }) : nil,
-            x.int("expiring_30d") > 0 ? ("\(x.int("expiring_30d")) batches expire within \(x.has("expiry_days") ? x.int("expiry_days") : 30) days", "clock.badge.exclamationmark", Color.orange, { go(.reports) }) : nil,
-            x.int("expired_stock") > 0 ? ("\(x.int("expired_stock")) expired batches in stock", "xmark.octagon", Color.red, { go(.reports) }) : nil,
+            x.int("low_stock_count") > 0 ? ("\(x.int("low_stock_count")) items low on stock", "exclamationmark.triangle", Theme.negative, { go(.stock) }) : nil,
+            x.int("expiring_30d") > 0 ? ("\(x.int("expiring_30d")) batches expire within \(x.has("expiry_days") ? x.int("expiry_days") : 30) days", "clock.badge.exclamationmark", Theme.warning, { go(.reports) }) : nil,
+            x.int("expired_stock") > 0 ? ("\(x.int("expired_stock")) expired batches in stock", "xmark.octagon", Theme.negative, { go(.reports) }) : nil,
         ].compactMap { $0 }
         return Group {
             if !chips.isEmpty {
@@ -149,13 +149,13 @@ import SwiftUI
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], spacing: 12) {
             Kpi(title: "Sales", symbol: "indianrupeesign.circle", value: Fmt.money(sales), note: "\(Int(bills)) bills \(periodWord)", tint: .teal) { go(.bills) }
             Kpi(title: "Profit", symbol: "chart.line.uptrend.xyaxis", value: Fmt.money(profit),
-                note: period == "year" ? "Margin \(Fmt.qty(x.num("fy_margin_pct")))%" : "Before expenses, \(periodWord)", tint: profit >= 0 ? .green : .red) { go(.reports) }
-            Kpi(title: "Collections", symbol: "banknote", value: Fmt.money(collected), note: "Payments received \(periodWord)", tint: .green) { go(.parties) }
-            Kpi(title: "Purchases", symbol: "shippingbox", value: Fmt.money(purchases), note: "Supplier bills \(periodWord)", tint: .orange) { go(.purchases) }
+                note: period == "year" ? "Margin \(Fmt.qty(x.num("fy_margin_pct")))%" : "Before expenses, \(periodWord)", tint: profit >= 0 ? Theme.positive : Theme.negative) { go(.reports) }
+            Kpi(title: "Collections", symbol: "banknote", value: Fmt.money(collected), note: "Payments received \(periodWord)", tint: Theme.positive) { go(.parties) }
+            Kpi(title: "Purchases", symbol: "shippingbox", value: Fmt.money(purchases), note: "Supplier bills \(periodWord)", tint: Theme.warning) { go(.purchases) }
             Kpi(title: "To receive", symbol: "person.crop.circle.badge.exclamationmark", value: Fmt.money(x.num("receivable")),
-                note: "You owe suppliers \(Fmt.money(x.num("payable")))", tint: .orange) { go(.parties) }
+                note: "You owe suppliers \(Fmt.money(x.num("payable")))", tint: Theme.warning) { go(.parties) }
             Kpi(title: period == "year" ? "GST for the year" : "GST this month", symbol: "building.columns", value: Fmt.money(abs(gst)),
-                note: gst >= 0 ? "To pay (output less input)" : "Credit carried forward", tint: gst >= 0 ? .red : .green) { go(.reports) }
+                note: gst >= 0 ? "To pay (output less input)" : "Credit carried forward", tint: gst >= 0 ? Theme.negative : Theme.positive) { go(.reports) }
         }
     }
 
@@ -164,7 +164,7 @@ import SwiftUI
     private func monthChart(_ x: JSON) -> some View {
         let rows = x.list("monthly")
         let key = metric == "sales" ? "sales" : (metric == "purchases" ? "purchases" : "profit")
-        let color: Color = metric == "sales" ? .teal : (metric == "purchases" ? .orange : .green)
+        let color: Color = metric == "sales" ? .teal : (metric == "purchases" ? Theme.warning : Theme.positive)
         let sel = pickedMonth ?? x.str("month")
         let chosen = rows.first { $0.str("month") == sel }
         return VStack(alignment: .leading, spacing: 10) {
@@ -181,8 +181,8 @@ import SwiftUI
                 HStack(spacing: 14) {
                     Text(Self.monthName(c.str("month")) + " " + String(c.str("month").prefix(4))).fw(.semibold)
                     Text("Sales \(Fmt.money(c.num("sales")))").foregroundStyle(.teal)
-                    Text("Purchases \(Fmt.money(c.num("purchases")))").foregroundStyle(.orange)
-                    Text("Profit \(Fmt.money(c.num("profit")))").foregroundStyle(c.num("profit") >= 0 ? .green : .red)
+                    Text("Purchases \(Fmt.money(c.num("purchases")))").foregroundStyle(Theme.warning)
+                    Text("Profit \(Fmt.money(c.num("profit")))").foregroundStyle(c.num("profit") >= 0 ? Theme.positive : Theme.negative)
                 }
                 .font(.caption).mono().lineLimit(1).minimumScaleFactor(0.6)
             }
@@ -198,7 +198,7 @@ import SwiftUI
                 Text("Last 14 days").font(.headline)
                 Spacer()
                 HStack(spacing: 4) { Circle().fill(Color.teal).frame(width: 8, height: 8); Text("Sales").font(.caption).foregroundStyle(.secondary) }
-                HStack(spacing: 4) { Circle().fill(Color.orange).frame(width: 8, height: 8); Text("Purchases").font(.caption).foregroundStyle(.secondary) }
+                HStack(spacing: 4) { Circle().fill(Theme.warning).frame(width: 8, height: 8); Text("Purchases").font(.caption).foregroundStyle(.secondary) }
             }
             BarChartView(data: data).frame(height: 160)
         }
@@ -311,7 +311,7 @@ import SwiftUI
                         if on { Text(Fmt.money(v.value)).font(.system(size: 9).weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5).fixedSize() }
                         GeometryReader { g in
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(v.value < 0 ? Color.red : color)
+                                .fill(v.value < 0 ? Theme.negative : color)
                                 .opacity(on ? 1 : 0.45)
                                 .frame(height: max(v.value != 0 ? 3 : 0, g.size.height * CGFloat(abs(v.value) / top)))
                                 .frame(maxHeight: .infinity, alignment: .bottom)

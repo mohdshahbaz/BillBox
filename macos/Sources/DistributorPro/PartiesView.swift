@@ -50,7 +50,7 @@ let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
             GridColumn("Credit limit", id: "limit", min: 90, ideal: 110, align: .trailing) { (p: JSON) in Text(p.num("credit_limit") > 0 ? Fmt.money(p, "credit_limit") : "–").mono() }
             GridColumn("Balance", id: "balance", min: 110, ideal: 130, align: .trailing) { (p: JSON) in
                 Text(balanceText(p.num("balance"))).mono().fw(.semibold)
-                    .foregroundStyle(p.num("balance") > 0.5 ? Color.orange : (p.num("balance") < -0.5 ? Color.red : Color.secondary))
+                    .foregroundStyle(p.num("balance") > 0.5 ? Theme.warning : (p.num("balance") < -0.5 ? Theme.negative : Color.secondary))
             }
         }
         .overlay {
@@ -341,7 +341,7 @@ extension PartiesView {
             VStack(alignment: .leading, spacing: 8) {
                 Text(balanceText(bal) + (bal > 0.005 ? "  (they owe you)" : (bal < -0.005 ? "  (you owe them)" : "")))
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(bal > 0.5 ? Color.orange : (bal < -0.5 ? Color.red : Color.green))
+                    .foregroundStyle(bal > 0.5 ? Theme.warning : (bal < -0.5 ? Theme.negative : Theme.positive))
                 if let d = data, abs(d.num("opening_balance")) > 0.005 {
                     Text("Opening balance for FY \(shownYear), brought forward from earlier years: \(balanceText(d.num("opening_balance")))")
                         .font(.callout).foregroundStyle(.secondary)

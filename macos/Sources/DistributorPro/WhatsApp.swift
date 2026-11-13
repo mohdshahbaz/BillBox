@@ -96,7 +96,7 @@ enum WhatsApp {
     var body: some View {
         SettingsForm {
             HStack(spacing: 8) {
-                Image(systemName: web.connected ? "checkmark.seal.fill" : "link.circle").foregroundColor(web.connected ? .green : .orange)
+                Image(systemName: web.connected ? "checkmark.seal.fill" : "link.circle").foregroundColor(web.connected ? Theme.positive : Theme.warning)
                 Text(web.status).font(.callout)
                 Spacer()
                 Button(web.connected ? "Reconnect" : "Connect WhatsApp") { web.connect() }

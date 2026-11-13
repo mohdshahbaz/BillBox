@@ -144,10 +144,10 @@ import SwiftUI
                     let x = d!
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 12)], spacing: 12) {
                         StatCard(title: "Invoices in \(x.str("month"))", value: "\(x.int("invoices"))")
-                        StatCard(title: "B2B (party has GSTIN)", value: Fmt.money(x.obj("b2b").num("taxable")), tint: .green)
-                        StatCard(title: "B2C (no GSTIN)", value: Fmt.money(x.obj("b2c").num("taxable")), tint: .orange)
-                        StatCard(title: x.obj("input_credit").num("debit_notes") > 0 ? "Input tax credit (purchases less \(Fmt.money(x.obj("input_credit").num("debit_notes"))) on debit notes)" : "Input tax credit (purchases)", value: Fmt.money(x.obj("input_credit").num("total")), tint: .green)
-                        StatCard(title: x.num("net_payable") >= 0 ? "Net GST payable (estimate)" : "Credit carried forward", value: Fmt.money(abs(x.num("net_payable"))), tint: x.num("net_payable") >= 0 ? .red : .green)
+                        StatCard(title: "B2B (party has GSTIN)", value: Fmt.money(x.obj("b2b").num("taxable")), tint: Theme.positive)
+                        StatCard(title: "B2C (no GSTIN)", value: Fmt.money(x.obj("b2c").num("taxable")), tint: Theme.warning)
+                        StatCard(title: x.obj("input_credit").num("debit_notes") > 0 ? "Input tax credit (purchases less \(Fmt.money(x.obj("input_credit").num("debit_notes"))) on debit notes)" : "Input tax credit (purchases)", value: Fmt.money(x.obj("input_credit").num("total")), tint: Theme.positive)
+                        StatCard(title: x.num("net_payable") >= 0 ? "Net GST payable (estimate)" : "Credit carried forward", value: Fmt.money(abs(x.num("net_payable"))), tint: x.num("net_payable") >= 0 ? Theme.negative : Theme.positive)
                     }
                     Text("The Excel file has four sheets: Summary, B2B Bills, B2C Bills and Rate-wise Summary. Rates are taken from each invoice line. Round-off is excluded from taxable value. The net figure is an estimate; check it with your accountant.")
                         .font(.caption).foregroundStyle(.secondary)

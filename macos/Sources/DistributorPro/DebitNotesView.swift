@@ -215,7 +215,7 @@ struct DNEdit: Identifiable {
             }
             .groupedForm()
             if let errorText {
-                Text(errorText).font(.callout).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 20)
+                Text(errorText).font(.callout).foregroundStyle(Theme.negative).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 20)
             }
             HStack {
                 Button { Task { await save(print: true) } } label: { Label("Save and print", systemImage: "printer") }.disabled(busy || preview == nil)
@@ -263,7 +263,7 @@ struct DNEdit: Identifiable {
                     Task { await loadBatches(picked) }
                 }
                 Button(role: .destructive) { if lines.count > 1 { lines.removeAll { $0.id == l.wrappedValue.id } } } label: { Image(systemName: "minus.circle.fill") }
-                    .buttonStyle(.plain).foregroundStyle(.red).disabled(lines.count < 2).help("Remove row")
+                    .buttonStyle(.plain).foregroundStyle(Theme.negative).disabled(lines.count < 2).help("Remove row")
             }
             HStack(spacing: 8) {
                 TextField("Qty", text: l.qty).frame(maxWidth: 90)
@@ -281,7 +281,7 @@ struct DNEdit: Identifiable {
                     }
                 }
                 Text("\(Fmt.boxPcs(pcs, ppb)) out of stock  ·  in stock \(Fmt.boxPcs(it.int("stock"), ppb))  ·  GST \(Fmt.qty(it.num("gst_rate")))%")
-                    .font(.caption).foregroundStyle(pcs > it.int("stock") ? Color.red : Color.secondary)
+                    .font(.caption).foregroundStyle(pcs > it.int("stock") ? Theme.negative : Color.secondary)
             }
         }
         .padding(.vertical, 2)

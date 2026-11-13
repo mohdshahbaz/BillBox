@@ -129,7 +129,7 @@ struct BillLine: Identifiable {
                     linesTable
                     if !suggestions.isEmpty { suggestionList.zIndex(2) }
                 }
-                if let errorText { Banner(text: errorText, symbol: "exclamationmark.triangle.fill", tint: .red) }
+                if let errorText { Banner(text: errorText, symbol: "exclamationmark.triangle.fill", tint: Theme.negative) }
             }
             .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -268,7 +268,7 @@ struct BillLine: Identifiable {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        if it.num("stock") <= 0 { Text("Out of stock").font(.caption).foregroundStyle(.red) }
+                        if it.num("stock") <= 0 { Text("Out of stock").font(.caption).foregroundStyle(Theme.negative) }
                     }
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -380,7 +380,7 @@ struct BillLine: Identifiable {
                     set: { v in if let i = lines.firstIndex(where: { $0.id == l.id }) { lines[i].boxRate = nil; lines[i].rate = v } }),
                     prompt: Text(pc(l).map { Fmt.rate($0.rate) } ?? "rate"))
                     .multilineTextAlignment(.trailing)
-                    .foregroundStyle(l.rate.isEmpty ? Color.primary : Color.orange)
+                    .foregroundStyle(l.rate.isEmpty ? Color.primary : Theme.warning)
                     .help("Type a different rate to override the price list for this line. Clear it to go back to the price list.")
             }
 
@@ -404,7 +404,7 @@ struct BillLine: Identifiable {
                             if let d = Double(t), d >= 0 { lines[i].rate = String(format: "%.8f", d / Double(lines[i].ppb)) } else if t.isEmpty { lines[i].rate = ""; lines[i].boxRate = nil }
                         }), prompt: Text(Fmt.amount(shown * Double(l.ppb))))
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(l.rate.isEmpty ? Color.primary : Color.orange)
+                        .foregroundStyle(l.rate.isEmpty ? Color.primary : Theme.warning)
                 } else {
                     Text("–").foregroundStyle(.secondary)
                 }
@@ -412,7 +412,7 @@ struct BillLine: Identifiable {
 
             GridColumn("Free", id: "free", min: 50, ideal: 76) { (l: BillLine) in
                 let f = pc(l)?.free ?? 0
-                Text(f > 0 ? "+\(Fmt.qty(f)) pcs free" : "").foregroundStyle(.green).fw(.semibold)
+                Text(f > 0 ? "+\(Fmt.qty(f)) pcs free" : "").foregroundStyle(Theme.positive).fw(.semibold)
             }
 
             GridColumn("Amount", id: "amount", min: 90, ideal: 110, align: .trailing) { (l: BillLine) in
@@ -495,10 +495,10 @@ struct BillLine: Identifiable {
                     TextField("Paid now", text: $paid, prompt: Text(partyId == 0 && payMode == "CREDIT" ? "Walk-in: paid in full" : (payMode == "CREDIT" ? "Paid now (blank = on credit)" : "Paid now (blank = full)")))
                         .multilineTextAlignment(.trailing)
                 }
-                if let n = tierNote { Text(n).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true) }
+                if let n = tierNote { Text(n).font(.caption).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true) }
                 Text(duesLine)
                     .font(.caption)
-                    .foregroundStyle(duesOver ? Color.red : Color.secondary)
+                    .foregroundStyle(duesOver ? Theme.negative : Color.secondary)
                     .lineLimit(1)
                     .frame(height: 16, alignment: .leading)
             }

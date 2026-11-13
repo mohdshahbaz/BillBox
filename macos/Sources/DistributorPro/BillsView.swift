@@ -69,7 +69,7 @@ import AppKit
     }) }) {
         GridColumn("Date", id: "date", min: 80, ideal: 95) { (r: JSON) in Text(Fmt.dmy(r.str("date"))).mono() }
         GridColumn("Type", id: "type", min: 60, ideal: 75) { (r: JSON) in
-            Text(billTypeName(r)).fw(.semibold).foregroundStyle(billTypeColor(r))
+            StatusPill(text: billTypeName(r), tint: billTypeColor(r))
         }
         GridColumn("Bill no", id: "no", min: 90, ideal: 120) { (r: JSON) in Text(r.str("no")).mono() }
         GridColumn("Supplier bill", id: "ref", min: 80, ideal: 110) { (r: JSON) in Text(r.str("ref")) }
@@ -77,15 +77,16 @@ import AppKit
         GridColumn("Total", id: "total", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "total")).mono() }
         GridColumn("Paid", id: "paid", min: 90, ideal: 110, align: .trailing) { (r: JSON) in Text(Fmt.money(r, "paid")).mono() }
         GridColumn("Printed", id: "printed", min: 54, ideal: 64) { (r: JSON) in
-            Text(r.str("type") != "SALE" ? "" : r.int("printed") == 1 ? "Yes" : "Not yet").foregroundStyle(r.int("printed") == 1 ? Color.secondary : Color.orange)
+            if r.str("type") == "SALE" && r.int("printed") != 1 { StatusPill(text: "Not yet", tint: Theme.warning) } else { Text(r.str("type") != "SALE" ? "" : "Yes").foregroundStyle(.secondary) }
         }
         GridColumn("Due", id: "due", min: 90, ideal: 110, align: .trailing) { (r: JSON) in
             let due = r.num("total") - r.num("paid")
-            Text(Fmt.money(due)).mono().fw(.semibold).foregroundStyle(due > 0.5 ? Color.red : Color.primary)
+            Text(Fmt.money(due)).mono().fw(.semibold).foregroundStyle(due > 0.5 ? Theme.negative : Color.primary)
         }
     }
     .overlay {
-        if loading { ProgressView() }
+        if loading && rows.isEmpty { SkeletonRows() }
+        else if loading { ProgressView() }
         else if rows.isEmpty { EmptyState(title: "No bills match these filters", symbol: "doc.text.magnifyingglass") }
     }
         .padding(.horizontal, 16).padding(.vertical, 10)
@@ -109,16 +110,15 @@ import AppKit
     }
 
     private var footer: some View {
-        HStack(spacing: 24) {
-            Text("\(rows.count) bills").foregroundStyle(.secondary)
-            Spacer()
-            Text("Sales \(Fmt.money(totals, "sales"))").mono()
-            Text("Purchases \(Fmt.money(totals, "purchases"))").mono()
-            if totals.num("debit_notes") > 0 { Text("Debit notes \(Fmt.money(totals, "debit_notes"))").mono() }
-            Text("Due \(Fmt.money(totals, "due"))").mono().fw(.bold)
-        }
-        .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Theme.card)
+        var items: [SummaryCard.Item] = [
+            SummaryCard.Item(label: "Bills", value: "\(rows.count)"),
+            SummaryCard.Item(label: "Sales", value: Fmt.money(totals, "sales")),
+            SummaryCard.Item(label: "Purchases", value: Fmt.money(totals, "purchases")),
+        ]
+        if totals.num("debit_notes") > 0 { items.append(SummaryCard.Item(label: "Debit notes", value: Fmt.money(totals, "debit_notes"))) }
+        items.append(SummaryCard.Item(label: "Due", value: Fmt.money(totals, "due"), strong: true, tint: totals.num("due") > 0.5 ? Theme.negative : nil))
+        return SummaryCard(items: items)
+            .padding(.horizontal, DS.Pad.tableSide).padding(.bottom, DS.Space.xs)
     }
 
     /// Asks first; Cancel is the default button, so pressing Return or Escape keeps the bill.
@@ -268,5 +268,5 @@ import AppKit
 
 /// All Bills: what a row is, its colour, and where it lives in the engine.
 func billTypeName(_ r: JSON) -> String { r.str("type") == "SALE" ? "Sale" : r.str("type") == "DEBIT_NOTE" ? "Debit note" : "Purchase" }
-func billTypeColor(_ r: JSON) -> Color { r.str("type") == "SALE" ? Color.teal : r.str("type") == "DEBIT_NOTE" ? Color.purple : Color.orange }
+func billTypeColor(_ r: JSON) -> Color { r.str("type") == "SALE" ? Color.teal : r.str("type") == "DEBIT_NOTE" ? Color.purple : Theme.warning }
 func billPath(_ r: JSON) -> String { r.str("type") == "SALE" ? "/invoices" : r.str("type") == "DEBIT_NOTE" ? "/debit-notes" : "/purchases" }
