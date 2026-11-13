@@ -9,11 +9,16 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 4. Android: theme and components (Material 3), then screens; Android self-test
 - [x] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow
 - [x] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
-- [ ] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green (in progress 2026-11-13 00:40 UTC)
+- [x] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
 - [ ] 8. Bills: every style and layout checked from self-test PDFs
 - [ ] 9. Docs updated, one pull request into `main` (not merged)
 
 ## Log
+- 2026-11-13 (run 4, end): stage 7 done. `backend/test/bench.js` (20 000 bills, answers checksum) and
+  `docs/BACKEND_PERF.md`: dashboard 204→156 ms, profit 72→42 ms, GST month 27→16 ms, GST workbook 51→29 ms; checksum
+  6a04214f8649d201 before and after (no figure changed). Prepared statements cached in `src/sqlite.js`; covering index
+  `idx_invl_cover`; GST month as a date range (rates column kept in line order with INDEXED BY); grouped dashboard series.
+  smoke 89/89. CI 43340550740 green (engines agree, Android builds); Desktop 43340550826 green.
 - 2026-11-13 (run 4, later): stage 6 done. Mac: `DesignSystem.swift` (DS tokens, type tokens, semantic colours
   `Theme.positive/negative/warning/info` as light/dark pairs), `StatusPill`, `SummaryCard`, `SkeletonRows`, `ErrorState`
   (all Monterey-safe); red/green/orange literals → semantic roles on every screen (73 lines; Print*.swift untouched);
@@ -70,9 +75,12 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - iPhone/Android tables still run past the screen edge (sideways scroll by design).
 
 ## Next
-Stage 7 (backend): profile dashboard, All Bills with filters, stock list, GST reports + Excel export, backup/restore,
-PDF supplier-bill import; add indexes / cached prepared statements / transactions; record before/after in
-`docs/BACKEND_PERF.md`; `node backend/test/smoke.js` + CI parity must stay green. Then 8 (bills), 9 (docs + PR).
+Stage 8 (bills): run the iPhone self-test (unit tests off is fine; engine Swift unchanged), render `bill_*.pdf` from the
+`selftest-results` branch with `pdftoppm -r 200`, check every style/layout prints every field. Then stage 9: update
+`ios/FEATURE_PARITY.md` (Flutter Appearance tab, sortable tables), READMEs, `docs/CI_CD.md` (bench.js), open ONE PR into
+`main` (not merged) with before/after screenshots per platform, then delete the scheduled task.
+Backend leftovers: rebuild the Android engine bundle (`cd android && ./build.sh engine`, commit engine.js) — npm was
+unreachable from the sandbox; profile Excel export, backup/restore, PDF import; `{ code, message }` errors + route validation.
 Mac leftovers (nice to have): pills/summary cards on Stock, Parties, Debit Notes; skeletons on the other lists.
 Flutter leftovers (nice to have, not in the checklist): sticky table headings (header outside the vertical scroll),
 resizable columns, right-click menus on table rows, no desktop screenshots in CI yet.
