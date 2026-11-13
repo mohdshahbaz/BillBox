@@ -156,6 +156,8 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 CREATE INDEX IF NOT EXISTS idx_inv_party ON invoices(party_id);
 CREATE INDEX IF NOT EXISTS idx_invl_inv ON invoice_lines(invoice_id);
+-- profit, GST and top-items reads find every figure of a bill's lines in this index, without visiting the table
+CREATE INDEX IF NOT EXISTS idx_invl_cover ON invoice_lines(invoice_id, item_id, batch_id, qty, free_qty, taxable, gst_rate);
 CREATE INDEX IF NOT EXISTS idx_invl_item ON invoice_lines(item_id);
 CREATE INDEX IF NOT EXISTS idx_purl_pur ON purchase_lines(purchase_id);
 CREATE INDEX IF NOT EXISTS idx_purl_item ON purchase_lines(item_id);

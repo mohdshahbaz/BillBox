@@ -17,6 +17,8 @@ class Database {
     this.idBase = 0;
     this.idTables = new Set();
     this.idNext = {};
+    // prepared statements, compiled once per SQL text (and per id range, which changes the INSERT rewrite)
+    this.cache = new Map();
   }
   /** Next free id of this device's range in table t. */
   nextId(t) {
@@ -31,9 +33,19 @@ class Database {
     return n;
   }
   pragma(s) { this.d.exec('PRAGMA ' + s); }
-  exec(s) { this.d.exec(s); }
-  close() { this.d.close(); }
-  prepare(s) {
+  exec(s) { this.cache.clear(); this.d.exec(s); } // DDL may change what a cached statement means
+  close() { this.cache.clear(); this.d.close(); }
+  prepare(sql) {
+    const key = this.idBase + '|' + sql;
+    let p = this.cache.get(key);
+    if (!p) {
+      p = this._prepare(sql);
+      if (this.cache.size >= 500) this.cache.delete(this.cache.keys().next().value); // oldest first
+      this.cache.set(key, p);
+    }
+    return p;
+  }
+  _prepare(s) {
     // sync on: "INSERT INTO t(a,b) VALUES(…)" without an id gets this device's next id as its first value
     let idTable = null, named = false;
     if (this.idBase) {
