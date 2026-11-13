@@ -10,7 +10,7 @@ Branch: `ui-overhaul` (from `ios-design-refresh`). Prompt: `docs/UI_OVERHAUL_PRO
 - [x] 5. Windows/Linux (Flutter): Material 3 theme, navigation rail, tables; Desktop workflow
 - [x] 6. Mac (Monterey-safe): sidebar, toolbar, tables; Mac build in CI
 - [x] 7. Backend: profile, indexes, prepared statements, `docs/BACKEND_PERF.md`; parity checks green
-- [ ] 8. Bills: every style and layout checked from self-test PDFs
+- [ ] 8. Bills: every style and layout checked from self-test PDFs (in progress 2026-11-13 02:30 UTC)
 - [ ] 9. Docs updated, one pull request into `main` (not merged)
 
 ## Log
