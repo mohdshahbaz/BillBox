@@ -1,0 +1,29 @@
+Debit notes
+  ok   preview has the totals the editor shows
+  ok   save, list, open, print fields
+  ok   items/:id/batches is a list of batches
+E-way bill and WhatsApp
+  ok   a sale bill can be made
+  ok   e-way bill details for a sale
+  ok   a bill has the party phone fields WhatsApp reads
+Salesmen
+  ok   edit keeps the salesman, merge and delete answer
+Reports
+  ok   profit
+  ok   outstanding
+  ok   expiry
+Payments from a list
+  ok   parse a list and save it
+Stock tools
+  ok   set stock, mrp table, set-prices preview, clean preview, auto-pack
+  ok   merge two items
+  ok   items from a pasted list, then bulk add
+Marg import
+  FAIL a folder that is not a Marg backup gets a readable answer: HTTP 500
+::error title=Desktop API check::a folder that is not a Marg backup gets a readable answer: HTTP 500
+A new year's books
+  ok   carried-forward year file, then back to the main books
+Error replies
+  ok   errors carry message and code
+
+16 passed, 1 failed
