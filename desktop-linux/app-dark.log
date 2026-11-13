@@ -1,5 +1,5 @@
 
-(com.akenterprises.billbox:4110): dbind-WARNING **: 05:37:26.293: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+(com.akenterprises.billbox:4249): dbind-WARNING **: 05:45:07.216: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
 
-(com.akenterprises.billbox:4110): Atk-CRITICAL **: 05:37:26.319: atk_socket_embed: assertion 'plug_id != NULL' failed
+(com.akenterprises.billbox:4249): Atk-CRITICAL **: 05:45:07.248: atk_socket_embed: assertion 'plug_id != NULL' failed
 [IMPORTANT:flutter/shell/platform/embedder/embedder_surface_gl_impeller.cc(127)] Using the Impeller rendering backend (OpenGLESSDF).
