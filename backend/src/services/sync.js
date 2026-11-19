@@ -514,6 +514,7 @@ async function turnOn(cid) {
   }
   const key = randomKey();
   await rtdb('PUT', `books/${key}/info`, { name: row.name, fy: row.fy || null, at: { '.sv': 'timestamp' }, by: getApp('sync_slot') });
+  await rtdb('PUT', `books/${key}/links/${Number(getApp('sync_slot'))}`, true);
   m[cid] = key; setMap(m);
   const d = db.openCompany(cid);
   try {
@@ -532,12 +533,42 @@ async function turnOn(cid) {
   return status(cid);
 }
 
-function turnOff(cid) {
+async function turnOff(cid) {
   const m = map();
   if (!m[cid]) return status(cid);
+  const key = m[cid];
   delete m[cid]; setMap(m);
   detach(cid);
+  try { await rtdb('DELETE', `books/${key}/links/${Number(getApp('sync_slot'))}`); } catch { /* the link is left; the copy shows it as in use */ }
   return status(cid);
+}
+
+/**
+ * Deletes a synced company's book from the account. This device's own link is stopped first; the book is refused while
+ * any other device still writes to it (the same "Used by" devices the list shows).
+ */
+async function removeBook(key) {
+  if (!key) throw new HttpError(400, 'Choose the copy to delete.');
+  const m = map();
+  const info = await rtdb('GET', `books/${key}/info`);
+  if (!info) throw new HttpError(404, 'That company is no longer in the sync account.');
+  const dev = (await rtdb('GET', 'devices')) || {};
+  const slots = Object.keys(dev).sort();
+  const mine = await mySlots();
+  const log = (await rtdb('GET', `books/${key}/log`, undefined, `&orderBy=${encodeURIComponent('"$key"')}&limitToLast=300`)) || {};
+  const others = new Set();
+  const links = (await rtdb('GET', `books/${key}/links`)) || {};
+  for (const sl of Object.keys(links)) {
+    if (!mine.has(Number(sl))) others.add(((dev[slots[Number(sl) - 1]] || {}).name) || 'another device');
+  }
+  for (const e of Object.values(log)) {
+    if (e && e.s && !mine.has(Number(e.s))) others.add(((dev[slots[Number(e.s) - 1]] || {}).name) || 'another device');
+  }
+  if (others.size) throw new HttpError(409, `${info.name || 'This copy'} is still in use by ${[...others].join(', ')}. Stop syncing it on those devices first.`);
+  for (const [cid, k] of Object.entries(m)) if (k === key) await turnOff(Number(cid));
+  await rtdb('DELETE', `books/${key}`);
+  state.version++;
+  return status();
 }
 
 /** Books of this account that are not on this device yet. */
@@ -785,6 +816,7 @@ async function join(key) {
   await slot();
   const info = await rtdb('GET', `books/${key}/info`);
   if (!info) throw new HttpError(404, 'That company is no longer in the sync account.');
+  await rtdb('PUT', `books/${key}/links/${Number(getApp('sync_slot'))}`, true);
   const cid = db.createCompany({ name: info.name || 'Company', fy: info.fy || null });
   const d = db.openCompany(cid);
   // start empty: every row (settings too) comes from the other devices
@@ -816,4 +848,4 @@ function status(cid) {
 
 for (const [id, d] of db.openHandles()) attach(id, d);
 
-module.exports = { signIn, signOut, status, tick, turnOn, turnOff, remote, join, merge, attach, afterReplace, CONFIG, _state: state, pushTime, pushPrefix };
+module.exports = { signIn, signOut, status, tick, turnOn, turnOff, remote, join, merge, removeBook, attach, afterReplace, CONFIG, _state: state, pushTime, pushPrefix };

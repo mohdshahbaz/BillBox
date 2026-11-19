@@ -579,6 +579,7 @@ public final class Sync {
         }
         let key = Sync.randomKey()
         _ = try await rtdb("PUT", "books/\(key)/info", ["name": row.str("name"), "fy": row.v("fy") ?? NSNull(), "at": [".sv": "timestamp"], "by": sl] as [String: Any])
+        _ = try await rtdb("PUT", "books/\(key)/links/\(sl)", true)
         try await inDB {
             var m = try self.map(); m[String(cid)] = key; try self.setMap(m)
             guard let d = try self.engine.openCompany(cid) else { return }
@@ -594,11 +595,14 @@ public final class Sync {
         return try await status(cid)
     }
 
-    func turnOff(_ cid: Int) throws {
-        var m = try map()
-        guard m[String(cid)] != nil else { return }
-        m[String(cid)] = nil; try setMap(m)
-        if let d = try engine.openCompany(cid) { try detach(d) }
+    func turnOff(_ cid: Int) async throws {
+        let (key, sl): (String?, Int) = try await inDB { (try self.map()[String(cid)], try self.slotNow()) }
+        guard let key = key else { return }
+        try await inDB {
+            var m = try self.map(); m[String(cid)] = nil; try self.setMap(m)
+            if let d = try self.engine.openCompany(cid) { try self.detach(d) }
+        }
+        _ = try? await rtdb("DELETE", "books/\(key)/links/\(sl)")   // the link is left if this fails; the copy shows it as in use
     }
 
     static func randomKey() -> String {
@@ -665,6 +669,40 @@ public final class Sync {
         var out: Set<Int> = [sl]
         for (i, k) in dev.keys.sorted().enumerated() where name != nil && (dev[k] as? [String: Any])?["name"] as? String == name { out.insert(i + 1) }
         return out
+    }
+
+    /// Deletes a synced company's book from the account. This device's own link is stopped first; the book is refused
+    /// while any other device still writes to it (the same "Used by" devices the list shows). backend/src/services/sync.js removeBook.
+    func removeBook(_ key: String) async throws -> Row {
+        if key.isEmpty { throw HttpError(400, "Choose the copy to delete.") }
+        let m = try await inDB { try self.map() }
+        guard let info = (try await rtdb("GET", "books/\(key)/info")) as? [String: Any] else { throw HttpError(404, "That company is no longer in the sync account.") }
+        let dev = (try await rtdb("GET", "devices")) as? [String: Any] ?? [:]
+        let slots = dev.keys.sorted()
+        let mine = try await mySlots()
+        var allowed = CharacterSet.alphanumerics; allowed.insert(charactersIn: "-._~")
+        let order = "\"$key\"".addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+        let log = (try await rtdb("GET", "books/\(key)/log", query: "&orderBy=\(order)&limitToLast=300")) as? [String: Any] ?? [:]
+        var others = Set<String>()
+        let links = (try await rtdb("GET", "books/\(key)/links")) as? [String: Any] ?? [:]
+        for lk in links.keys {
+            guard let sl = Int(lk), !mine.contains(sl) else { continue }
+            let n = sl <= slots.count ? ((dev[slots[sl - 1]] as? [String: Any])?["name"] as? String ?? "") : ""
+            others.insert(n.isEmpty ? "another device" : n)
+        }
+        for case let e as [String: Any] in log.values {
+            let sl = Int(JS.number(e["s"]))
+            guard sl > 0, !mine.contains(sl) else { continue }
+            let n = sl <= slots.count ? ((dev[slots[sl - 1]] as? [String: Any])?["name"] as? String ?? "") : ""
+            others.insert(n.isEmpty ? "another device" : n)
+        }
+        if !others.isEmpty {
+            let name = info["name"] as? String ?? "This copy"
+            throw HttpError(409, "\(name) is still in use by \(others.sorted().joined(separator: ", ")). Stop syncing it on those devices first.")
+        }
+        for (c, k) in m where k == key { if let id = Int(c) { try await turnOff(id) } }
+        _ = try await rtdb("DELETE", "books/\(key)")
+        return try await status(nil)
     }
 
     /// Two copies of one company (each device turned sync on for its own): the open company stays, and the other copy's
@@ -856,8 +894,9 @@ public final class Sync {
     func join(_ key: String) async throws -> Row {
         if key.isEmpty { throw HttpError(400, "Choose the company to bring here.") }
         if try await inDB({ try self.map().values.contains(key) }) { throw HttpError(400, "That company is already synced on this device.") }
-        _ = try await slot()
+        let linkSlot = try await slot()
         guard let info = (try await rtdb("GET", "books/\(key)/info")) as? [String: Any] else { throw HttpError(404, "That company is no longer in the sync account.") }
+        _ = try await rtdb("PUT", "books/\(key)/links/\(linkSlot)", true)
         let cid: Int = try await inDB {
             let cid = try self.engine.createCompany(name: (info["name"] as? String) ?? "Company", fy: info["fy"] as? String)
             guard let d = try self.engine.openCompany(cid) else { throw HttpError(404, "Company not found") }
@@ -910,10 +949,11 @@ public final class Sync {
         case ("GET", "tick"): return ok(await tick())
         case ("GET", "remote"): return ok(try await remote(cid))
         case ("POST", "merge"): return ok(try await merge(cid ?? 0, b.str("key")))
+        case ("POST", "delete"): return ok(try await removeBook(b.str("key")))
         case ("POST", "signin"): try await signIn(b); return ok(try await status(cid))
         case ("POST", "signout"): try await inDB { try self.signOut() }; return ok(try await status(cid))
         case ("POST", "on"): return ok(try await turnOn(cid ?? 0))
-        case ("POST", "off"): try await inDB { try self.turnOff(cid ?? 0) }; return ok(try await status(cid))
+        case ("POST", "off"): try await turnOff(cid ?? 0); return ok(try await status(cid))
         case ("POST", "now"): _ = await tick(); return ok(try await status(cid))
         case ("POST", "join"): return ok(try await join(b.str("key")))
         default: return nil

@@ -13,6 +13,7 @@ import SwiftUI
     @State private var loadedRemote = false
     @State private var canMerge = false
     @State private var mergeKey: String?
+    @State private var deleteKey: String?
 
     #if os(macOS)
     private let device = "Mac"
@@ -74,6 +75,7 @@ import SwiftUI
                             if b.bool("same_name") && canMerge { Button("Merge") { mergeKey = b.str("key") }.buttonStyle(.borderedProminent).disabled(busy) }
                             if b.bool("on_this_device") { Text("On this \(device)").font(.caption).foregroundStyle(.secondary) }
                             else { Button("Bring here") { Task { await join(b.str("key")) } }.disabled(busy) }
+                            if !b.bool("open") { Button("Delete", role: .destructive) { deleteKey = b.str("key") }.disabled(busy) }
                         }
                     }
                     if loadedRemote && remote.isEmpty { Text("No company is synced in this account yet.").foregroundStyle(.secondary) }
@@ -96,6 +98,12 @@ import SwiftUI
             Button("Cancel", role: .cancel) { mergeKey = nil }
         } message: {
             Text("Its bills, parties and stock changes go into the open copy, which every device then shares; the devices on that copy move over by themselves. A backup is made first.")
+        }
+        .confirmationDialog("Delete \(companyName)'s copy from the sync account?", isPresented: Binding(get: { deleteKey != nil }, set: { if !$0 { deleteKey = nil } }), titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { if let k = deleteKey { Task { await deleteCopy(k) } } }
+            Button("Cancel", role: .cancel) { deleteKey = nil }
+        } message: {
+            Text("The copy is removed from the sync account. It is refused while another device still uses it; this device stops syncing it. Local bills stay on this device.")
         }
         .task(id: app.companyId) { await load() }
     }
@@ -139,6 +147,16 @@ import SwiftUI
             await app.switchCompany(r.int("company_id"))
             app.notify("Merged: \(r.int("merged")) changes came into the open copy.")
             s = r
+            await loadRemote()
+        }
+    }
+
+    private func deleteCopy(_ key: String) async {
+        busy = true; defer { busy = false }
+        deleteKey = nil
+        await app.guarded {
+            s = try await API.obj("POST", "/sync/delete", body: ["key": key])
+            app.notify("Deleted from the sync account.")
             await loadRemote()
         }
     }

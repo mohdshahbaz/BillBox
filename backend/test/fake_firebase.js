@@ -35,6 +35,7 @@ const server = http.createServer((req, res) => {
     if (u.searchParams.get('auth') !== 'T:' + m[1]) return send(401, { error: 'Permission denied' });
     const parts = ['users', m[1], ...m[2].split('/')];
     if (req.method === 'PUT') { const parent = at(parts.slice(0, -1), true); parent[parts[parts.length - 1]] = strip(JSON.parse(body)); return send(200, JSON.parse(body)); }
+    if (req.method === 'DELETE') { const parent = at(parts.slice(0, -1), false); if (parent) delete parent[parts[parts.length - 1]]; return send(200, null); }
     if (req.method === 'POST') { const o = at(parts, true); const k = pushId(); o[k] = strip(JSON.parse(body)); return send(200, { name: k }); }
     let v = parts.reduce((o, p) => (o && typeof o === 'object' ? o[p] : undefined), tree);
     if (v === undefined) return send(200, null);
